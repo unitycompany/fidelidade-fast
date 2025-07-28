@@ -1,0 +1,725 @@
+import React, { useState, useEffect } from 'react';
+import styled, { keyframes, css } from 'styled-components';
+import { FiPackage, FiPlus, FiEdit3, FiTrash2, FiSave, FiX, FiStar, FiCalendar, FiDollarSign } from 'react-icons/fi';
+import { supabase } from '../services/supabase';
+import toast from 'react-hot-toast';
+
+// Animações
+const fadeInUp = keyframes`
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
+const pulse = keyframes`
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+`;
+
+// Styled Components
+const Container = styled.div`
+  animation: ${fadeInUp} 0.6s ease-out;
+`;
+
+const Header = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  
+  h2 {
+    color: ${props => props.theme.colors.text};
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+  }
+`;
+
+const AddButton = styled.button`
+  background: ${props => props.theme.colors.gradientPrimary};
+  color: white;
+  border: none;
+  border-radius: ${props => props.theme.radii.md};
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${props => props.theme.shadows.lg};
+  }
+`;
+
+const PremiosGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+`;
+
+const PremioCard = styled.div`
+  background: white;
+  border-radius: ${props => props.theme.radii.lg};
+  padding: 1.5rem;
+  box-shadow: ${props => props.theme.shadows.md};
+  transition: all 0.3s ease;
+  position: relative;
+  
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: ${props => props.theme.shadows.xl};
+  }
+  
+  ${props => props.$destaque && css`
+    border: 2px solid #ffc107;
+    background: linear-gradient(135deg, #fff, #fffbf0);
+    animation: ${pulse} 2s infinite;
+    
+    &::before {
+      content: '⭐ DESTAQUE';
+      position: absolute;
+      top: -1px;
+      right: -1px;
+      background: #ffc107;
+      color: #856404;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: bold;
+      border-top-right-radius: ${props => props.theme.radii.lg};
+      border-bottom-left-radius: ${props => props.theme.radii.md};
+    }
+  `}
+`;
+
+const PremioHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  
+  h3 {
+    color: ${props => props.theme.colors.text};
+    margin: 0;
+    flex: 1;
+  }
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const ActionButton = styled.button`
+  width: 35px;
+  height: 35px;
+  border: none;
+  border-radius: ${props => props.theme.radii.md};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  
+  ${props => props.variant === 'edit' && css`
+    background: #17a2b8;
+    color: white;
+    &:hover { background: #138496; }
+  `}
+  
+  ${props => props.variant === 'delete' && css`
+    background: #dc3545;
+    color: white;
+    &:hover { background: #c82333; }
+  `}
+  
+  &:hover {
+    transform: translateY(-1px);
+  }
+`;
+
+const PremioInfo = styled.div`
+  .categoria {
+    background: ${props => props.theme.colors.gray100};
+    color: ${props => props.theme.colors.text};
+    padding: 0.25rem 0.75rem;
+    border-radius: ${props => props.theme.radii.full};
+    font-size: 0.8rem;
+    display: inline-block;
+    margin-bottom: 0.5rem;
+  }
+  
+  .descricao {
+    color: ${props => props.theme.colors.textSecondary};
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    line-height: 1.4;
+  }
+  
+  .pontos {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: ${props => props.theme.colors.primary};
+    margin-bottom: 0.5rem;
+  }
+  
+  .valor {
+    color: ${props => props.theme.colors.success};
+    font-weight: 600;
+  }
+  
+  .validade {
+    color: ${props => props.theme.colors.warning};
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+  }
+`;
+
+const StatusBadge = styled.span`
+  padding: 0.25rem 0.75rem;
+  border-radius: ${props => props.theme.radii.full};
+  font-size: 0.8rem;
+  font-weight: 600;
+  
+  ${props => props.$ativo && css`
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+  `}
+  
+  ${props => !props.$ativo && css`
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+  `}
+`;
+
+// Modal Components
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+`;
+
+const ModalContent = styled.div`
+  background: white;
+  border-radius: ${props => props.theme.radii.lg};
+  padding: 2rem;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: ${fadeInUp} 0.3s ease-out;
+`;
+
+const FormGroup = styled.div`
+  margin-bottom: 1.5rem;
+  
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: ${props => props.theme.colors.text};
+  }
+  
+  input, textarea, select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid ${props => props.theme.colors.gray200};
+    border-radius: ${props => props.theme.radii.md};
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+    
+    &:focus {
+      outline: none;
+      border-color: ${props => props.theme.colors.primary};
+    }
+  }
+  
+  textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+`;
+
+const FormRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  
+  @media (max-width: ${props => props.theme.breakpoints.sm}) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const CheckboxGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+  }
+`;
+
+const ModalButtons = styled.div`
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+`;
+
+const ModalButton = styled.button`
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: ${props => props.theme.radii.md};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  ${props => props.variant === 'primary' && css`
+    background: ${props.theme.colors.gradientPrimary};
+    color: white;
+    &:hover { transform: translateY(-2px); }
+  `}
+  
+  ${props => props.variant === 'secondary' && css`
+    background: ${props.theme.colors.gray200};
+    color: ${props.theme.colors.text};
+    &:hover { background: ${props.theme.colors.gray300}; }
+  `}
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 3rem;
+  color: ${props => props.theme.colors.textSecondary};
+  
+  svg {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+  
+  h3 {
+    margin-bottom: 0.5rem;
+  }
+`;
+
+function AdminPremios() {
+    const [premios, setPremios] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [editingPremio, setEditingPremio] = useState(null);
+    const [formData, setFormData] = useState({
+        nome: '',
+        descricao: '',
+        categoria: '',
+        pontos_necessarios: '',
+        valor_estimado: '',
+        estoque_atual: '',
+        estoque_ilimitado: false,
+        ativo: true,
+        destaque: false,
+        ordem_exibicao: '',
+        data_validade: ''
+    });
+
+    const categorias = [
+        'Ferramentas',
+        'Vale',
+        'Brinde',
+        'Eletrônicos',
+        'Casa e Jardim',
+        'Esporte',
+        'Outros'
+    ];
+
+    useEffect(() => {
+        carregarPremios();
+    }, []);
+
+    const carregarPremios = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('premios_catalogo')
+                .select('*')
+                .order('ordem_exibicao', { ascending: true });
+
+            if (error) throw error;
+            setPremios(data || []);
+        } catch (error) {
+            console.error('Erro ao carregar prêmios:', error);
+            toast.error('Erro ao carregar prêmios');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const abrirModal = (premio = null) => {
+        if (premio) {
+            setEditingPremio(premio);
+            setFormData({
+                nome: premio.nome || '',
+                descricao: premio.descricao || '',
+                categoria: premio.categoria || '',
+                pontos_necessarios: premio.pontos_necessarios || '',
+                valor_estimado: premio.valor_estimado || '',
+                estoque_atual: premio.estoque_atual || '',
+                estoque_ilimitado: premio.estoque_ilimitado || false,
+                ativo: premio.ativo !== false,
+                destaque: premio.destaque || false,
+                ordem_exibicao: premio.ordem_exibicao || '',
+                data_validade: premio.data_validade ? premio.data_validade.split('T')[0] : ''
+            });
+        } else {
+            setEditingPremio(null);
+            setFormData({
+                nome: '',
+                descricao: '',
+                categoria: '',
+                pontos_necessarios: '',
+                valor_estimado: '',
+                estoque_atual: '',
+                estoque_ilimitado: false,
+                ativo: true,
+                destaque: false,
+                ordem_exibicao: '',
+                data_validade: ''
+            });
+        }
+        setModalOpen(true);
+    };
+
+    const fecharModal = () => {
+        setModalOpen(false);
+        setEditingPremio(null);
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    const salvarPremio = async () => {
+        try {
+            if (!formData.nome || !formData.categoria || !formData.pontos_necessarios) {
+                toast.error('Preencha os campos obrigatórios');
+                return;
+            }
+
+            const dados = {
+                ...formData,
+                pontos_necessarios: parseInt(formData.pontos_necessarios),
+                valor_estimado: parseFloat(formData.valor_estimado) || null,
+                estoque_atual: formData.estoque_ilimitado ? null : parseInt(formData.estoque_atual) || 0,
+                ordem_exibicao: parseInt(formData.ordem_exibicao) || 0,
+                data_validade: formData.data_validade || null
+            };
+
+            let error;
+            if (editingPremio) {
+                const { error: updateError } = await supabase
+                    .from('premios_catalogo')
+                    .update(dados)
+                    .eq('id', editingPremio.id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('premios_catalogo')
+                    .insert(dados);
+                error = insertError;
+            }
+
+            if (error) throw error;
+
+            toast.success(editingPremio ? 'Prêmio atualizado!' : 'Prêmio adicionado!');
+            fecharModal();
+            carregarPremios();
+        } catch (error) {
+            console.error('Erro ao salvar prêmio:', error);
+            toast.error('Erro ao salvar prêmio');
+        }
+    };
+
+    const excluirPremio = async (id) => {
+        if (!confirm('Tem certeza que deseja excluir este prêmio?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('premios_catalogo')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+
+            toast.success('Prêmio excluído!');
+            carregarPremios();
+        } catch (error) {
+            console.error('Erro ao excluir prêmio:', error);
+            toast.error('Erro ao excluir prêmio');
+        }
+    };
+
+    const formatarData = (data) => {
+        if (!data) return '';
+        return new Date(data).toLocaleDateString('pt-BR');
+    };
+
+    if (loading) {
+        return (
+            <Container>
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                    Carregando prêmios...
+                </div>
+            </Container>
+        );
+    }
+
+    return (
+        <Container>
+            <Header>
+                <h2>
+                    <FiPackage />
+                    Gerenciar Prêmios
+                </h2>
+                <AddButton onClick={() => abrirModal()}>
+                    <FiPlus />
+                    Adicionar Prêmio
+                </AddButton>
+            </Header>
+
+            {premios.length === 0 ? (
+                <EmptyState>
+                    <FiPackage />
+                    <h3>Nenhum prêmio cadastrado</h3>
+                    <p>Adicione o primeiro prêmio para começar</p>
+                </EmptyState>
+            ) : (
+                <PremiosGrid>
+                    {premios.map(premio => (
+                        <PremioCard key={premio.id} $destaque={premio.destaque}>
+                            <PremioHeader>
+                                <h3>{premio.nome}</h3>
+                                <ActionButtons>
+                                    <ActionButton
+                                        variant="edit"
+                                        onClick={() => abrirModal(premio)}
+                                        title="Editar"
+                                    >
+                                        <FiEdit3 />
+                                    </ActionButton>
+                                    <ActionButton
+                                        variant="delete"
+                                        onClick={() => excluirPremio(premio.id)}
+                                        title="Excluir"
+                                    >
+                                        <FiTrash2 />
+                                    </ActionButton>
+                                </ActionButtons>
+                            </PremioHeader>
+
+                            <PremioInfo>
+                                <div className="categoria">{premio.categoria}</div>
+                                <div className="descricao">{premio.descricao}</div>
+                                <div className="pontos">
+                                    <FiStar style={{ marginRight: '0.5rem' }} />
+                                    {premio.pontos_necessarios} pontos
+                                </div>
+                                {premio.valor_estimado && (
+                                    <div className="valor">
+                                        <FiDollarSign style={{ marginRight: '0.25rem' }} />
+                                        R$ {premio.valor_estimado.toFixed(2)}
+                                    </div>
+                                )}
+                                {premio.data_validade && (
+                                    <div className="validade">
+                                        <FiCalendar style={{ marginRight: '0.25rem' }} />
+                                        Válido até: {formatarData(premio.data_validade)}
+                                    </div>
+                                )}
+                                <div style={{ marginTop: '1rem' }}>
+                                    <StatusBadge $ativo={premio.ativo}>
+                                        {premio.ativo ? 'Ativo' : 'Inativo'}
+                                    </StatusBadge>
+                                    {premio.destaque && (
+                                        <StatusBadge style={{ marginLeft: '0.5rem', background: 'rgba(255, 193, 7, 0.1)', color: '#856404' }}>
+                                            Destaque
+                                        </StatusBadge>
+                                    )}
+                                </div>
+                            </PremioInfo>
+                        </PremioCard>
+                    ))}
+                </PremiosGrid>
+            )}
+
+            {/* Modal de Adicionar/Editar */}
+            {modalOpen && (
+                <ModalOverlay onClick={fecharModal}>
+                    <ModalContent onClick={e => e.stopPropagation()}>
+                        <h3>{editingPremio ? 'Editar Prêmio' : 'Adicionar Novo Prêmio'}</h3>
+
+                        <FormGroup>
+                            <label>Nome do Prêmio *</label>
+                            <input
+                                type="text"
+                                name="nome"
+                                value={formData.nome}
+                                onChange={handleInputChange}
+                                placeholder="Ex: Kit de Ferramentas"
+                            />
+                        </FormGroup>
+
+                        <FormGroup>
+                            <label>Descrição</label>
+                            <textarea
+                                name="descricao"
+                                value={formData.descricao}
+                                onChange={handleInputChange}
+                                placeholder="Descrição detalhada do prêmio..."
+                            />
+                        </FormGroup>
+
+                        <FormRow>
+                            <FormGroup>
+                                <label>Categoria *</label>
+                                <select
+                                    name="categoria"
+                                    value={formData.categoria}
+                                    onChange={handleInputChange}
+                                >
+                                    <option value="">Selecione uma categoria</option>
+                                    {categorias.map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                            </FormGroup>
+
+                            <FormGroup>
+                                <label>Pontos Necessários *</label>
+                                <input
+                                    type="number"
+                                    name="pontos_necessarios"
+                                    value={formData.pontos_necessarios}
+                                    onChange={handleInputChange}
+                                    min="1"
+                                />
+                            </FormGroup>
+                        </FormRow>
+
+                        <FormRow>
+                            <FormGroup>
+                                <label>Valor Estimado (R$)</label>
+                                <input
+                                    type="number"
+                                    name="valor_estimado"
+                                    value={formData.valor_estimado}
+                                    onChange={handleInputChange}
+                                    step="0.01"
+                                    min="0"
+                                />
+                            </FormGroup>
+
+                            <FormGroup>
+                                <label>Ordem de Exibição</label>
+                                <input
+                                    type="number"
+                                    name="ordem_exibicao"
+                                    value={formData.ordem_exibicao}
+                                    onChange={handleInputChange}
+                                    min="0"
+                                />
+                            </FormGroup>
+                        </FormRow>
+
+                        <FormRow>
+                            <FormGroup>
+                                <label>Data de Validade</label>
+                                <input
+                                    type="date"
+                                    name="data_validade"
+                                    value={formData.data_validade}
+                                    onChange={handleInputChange}
+                                />
+                            </FormGroup>
+
+                            {!formData.estoque_ilimitado && (
+                                <FormGroup>
+                                    <label>Estoque Atual</label>
+                                    <input
+                                        type="number"
+                                        name="estoque_atual"
+                                        value={formData.estoque_atual}
+                                        onChange={handleInputChange}
+                                        min="0"
+                                    />
+                                </FormGroup>
+                            )}
+                        </FormRow>
+
+                        <FormRow>
+                            <CheckboxGroup>
+                                <input
+                                    type="checkbox"
+                                    name="estoque_ilimitado"
+                                    checked={formData.estoque_ilimitado}
+                                    onChange={handleInputChange}
+                                />
+                                <label>Estoque Ilimitado</label>
+                            </CheckboxGroup>
+
+                            <CheckboxGroup>
+                                <input
+                                    type="checkbox"
+                                    name="destaque"
+                                    checked={formData.destaque}
+                                    onChange={handleInputChange}
+                                />
+                                <label>Prêmio em Destaque</label>
+                            </CheckboxGroup>
+                        </FormRow>
+
+                        <CheckboxGroup>
+                            <input
+                                type="checkbox"
+                                name="ativo"
+                                checked={formData.ativo}
+                                onChange={handleInputChange}
+                            />
+                            <label>Ativo (disponível para resgate)</label>
+                        </CheckboxGroup>
+
+                        <ModalButtons>
+                            <ModalButton variant="secondary" onClick={fecharModal}>
+                                <FiX />
+                                Cancelar
+                            </ModalButton>
+                            <ModalButton variant="primary" onClick={salvarPremio}>
+                                <FiSave />
+                                {editingPremio ? 'Atualizar' : 'Adicionar'}
+                            </ModalButton>
+                        </ModalButtons>
+                    </ModalContent>
+                </ModalOverlay>
+            )}
+        </Container>
+    );
+}
+
+export default AdminPremios;

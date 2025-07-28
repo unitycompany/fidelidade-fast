@@ -1,0 +1,1670 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import styled, { keyframes, css } from 'styled-components';
+import { FiUpload, FiFile, FiCheck, FiX, FiStar, FiShoppingBag, FiInfo, FiAward, FiZap, FiEye } from 'react-icons/fi';
+import { analyzeOrderWithGemini } from '../services/geminiService';
+import { processOrderResult, validateOrder, getProdutosElegiveis, validarPontosCalculados } from '../utils/pedidosFast';
+import { saveOrder, saveOrderItems, addPointsToCustomer, checkOrderExists } from '../services/supabase';
+import { useAuth } from '../App';
+
+// Animações
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+`;
+
+// Layout principal
+const Container = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  min-height: 100vh;
+  font-family: 'Montserrat', sans-serif;
+`;
+
+const Header = styled.div`
+  background: linear-gradient(135deg, #A91918 0%, #8B1510 100%);
+  color: white;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  text-align: center;
+  animation: ${fadeIn} 0.6s ease-out;
+  
+  h1 {
+    font-family: 'Urbanist', sans-serif;
+    font-size: 2.2rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    font-weight: 700;
+  }
+  
+  p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0;
+  }
+`;
+
+const MainContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const UploadSection = styled.div`
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  animation: ${fadeIn} 0.6s ease-out 0.1s both;
+`;
+
+const ProdutosSection = styled.div`
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  animation: ${fadeIn} 0.6s ease-out 0.2s both;
+  
+  h3 {
+    font-family: 'Urbanist', sans-serif;
+    color: #353535;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.3rem;
+  }
+`;
+
+const UploadArea = styled.div.withConfig({
+    shouldForwardProp: (prop) => !['$isDragOver', '$hasFile'].includes(prop),
+})`
+  border: 3px dashed ${props => props.$isDragOver ? '#A91918' : props.$hasFile ? '#28a745' : '#CBD5E0'};
+  border-radius: 16px;
+  padding: 3rem;
+  text-align: center;
+  background: ${props => props.$isDragOver ? 'rgba(169, 25, 24, 0.05)' : props.$hasFile ? 'rgba(40, 167, 69, 0.05)' : '#fafafa'};
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 2rem;
+  
+  &:hover {
+    border-color: ${props => props.$hasFile ? '#28a745' : '#A91918'};
+    background: ${props => props.$hasFile ? 'rgba(40, 167, 69, 0.05)' : 'rgba(169, 25, 24, 0.05)'};
+  }
+`;
+
+const UploadIcon = styled.div.withConfig({
+    shouldForwardProp: (prop) => !['$hasFile'].includes(prop),
+})`
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: ${props => props.$hasFile ? '#28a745' : '#A91918'};
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin: 0 auto 1.5rem;
+  transition: all 0.3s ease;
+`;
+
+const UploadText = styled.div`
+  h3 {
+    font-family: 'Urbanist', sans-serif;
+    color: #353535;
+    margin-bottom: 0.5rem;
+    font-size: 1.4rem;
+  }
+  
+  p {
+    color: #666;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+  }
+  
+  small {
+    color: #999;
+    font-size: 0.85rem;
+  }
+`;
+
+const FileInput = styled.input`
+  display: none;
+`;
+
+const ProcessButton = styled.button`
+  background: linear-gradient(135deg, #A91918, #8B1510);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  box-shadow: 0 4px 15px rgba(169, 25, 24, 0.3);
+  font-family: 'Montserrat', sans-serif;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(169, 25, 24, 0.4);
+  }
+
+  &:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+`;
+
+// Tabela de produtos elegíveis
+const ProdutosTable = styled.div`
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+`;
+
+const TableHeader = styled.div`
+  background: #f8f9fa;
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 1rem;
+  font-weight: 600;
+  color: #353535;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e9ecef;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 2fr 1fr 1fr;
+    
+    .hide-mobile {
+      display: none;
+    }
+  }
+`;
+
+const TableRow = styled.div`
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 1rem;
+  align-items: center;
+  border-bottom: 1px solid #f1f3f4;
+  transition: background 0.2s ease;
+  
+  &:hover {
+    background: #f8f9fa;
+  }
+  
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 2fr 1fr 1fr;
+    
+    .hide-mobile {
+      display: none;
+    }
+  }
+`;
+
+const ProductName = styled.div`
+  font-weight: 600;
+  color: #353535;
+  font-size: 0.9rem;
+`;
+
+const ProductCode = styled.div`
+  font-size: 0.8rem;
+  color: #666;
+  font-family: 'Courier New', monospace;
+`;
+
+const CategoryBadge = styled.span.withConfig({
+    shouldForwardProp: (prop) => !['$categoria'].includes(prop),
+})`
+  background: ${props => {
+        switch (props.$categoria) {
+            case 'drywall': return '#e3f2fd';
+            case 'glasroc': return '#f3e5f5';
+            case 'acabamento': return '#e8f5e8';
+            default: return '#f5f5f5';
+        }
+    }};
+  color: ${props => {
+        switch (props.$categoria) {
+            case 'drywall': return '#1976d2';
+            case 'glasroc': return '#7b1fa2';
+            case 'acabamento': return '#388e3c';
+            default: return '#616161';
+        }
+    }};
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const PointsBadge = styled.span`
+  background: linear-gradient(135deg, #A91918, #8B1510);
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  justify-content: center;
+`;
+
+// Loading e resultado
+const LoadingContainer = styled.div`
+  background: white;
+  border-radius: 16px;
+  padding: 3rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin-bottom: 2rem;
+`;
+
+const LoadingSpinner = styled.div`
+  width: 60px;
+  height: 60px;
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #A91918;
+  border-radius: 50%;
+  animation: ${spin} 1s linear infinite;
+  margin: 0 auto 2rem;
+`;
+
+const LoadingText = styled.div`
+  h3 {
+    font-family: 'Urbanist', sans-serif;
+    color: #353535;
+    margin-bottom: 0.5rem;
+    font-size: 1.4rem;
+  }
+  
+  p {
+    color: #666;
+    margin: 0;
+    animation: ${pulse} 2s ease-in-out infinite;
+  }
+`;
+
+// Resultado
+const ResultContainer = styled.div`
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin-bottom: 2rem;
+  overflow: hidden;
+  animation: ${fadeIn} 0.6s ease-out;
+`;
+
+const ResultHeader = styled.div`
+  background: ${props => props.$success ? 'linear-gradient(135deg, #28a745, #20c997)' : props.$warning ? 'linear-gradient(135deg, #ffc107, #ff8f00)' : 'linear-gradient(135deg, #dc3545, #c82333)'};
+  color: white;
+  padding: 2rem;
+  text-align: center;
+  
+  h3 {
+    font-family: 'Urbanist', sans-serif;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+  
+  p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1rem;
+  }
+`;
+
+const ResultContent = styled.div`
+  padding: 2rem;
+`;
+
+const SummaryGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+`;
+
+const SummaryCard = styled.div`
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid #e9ecef;
+  
+  .icon {
+    font-size: 2rem;
+    color: #A91918;
+    margin-bottom: 0.5rem;
+  }
+  
+  .value {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #353535;
+    margin-bottom: 0.25rem;
+  }
+  
+  .label {
+    color: #666;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+`;
+
+const ProductsResultTable = styled.div`
+  margin-top: 2rem;
+  
+  h4 {
+    font-family: 'Urbanist', sans-serif;
+    color: #353535;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.2rem;
+  }
+`;
+
+const ResultTableHeader = styled.div`
+  background: #f8f9fa;
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  gap: 1rem;
+  font-weight: 600;
+  color: #353535;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px 8px 0 0;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 2fr 1fr 1fr;
+    
+    .hide-mobile {
+      display: none;
+    }
+  }
+`;
+
+const ResultTableRow = styled.div`
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid #e9ecef;
+  border-top: none;
+  background: ${props => props.$eligible ? '#f0f9ff' : '#f9f9f9'};
+  
+  &:last-child {
+    border-radius: 0 0 8px 8px;
+  }
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 2fr 1fr 1fr;
+    
+    .hide-mobile {
+      display: none;
+    }
+  }
+`;
+
+const StatusBadge = styled.span`
+  background: ${props => props.$eligible ? '#dcf3e3' : '#f8d7da'};
+  color: ${props => props.$eligible ? '#155724' : '#721c24'};
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  justify-content: center;
+`;
+
+const TotalPointsCard = styled.div`
+  background: linear-gradient(135deg, #A91918, #8B1510);
+  color: white;
+  padding: 2rem;
+  border-radius: 16px;
+  text-align: center;
+  margin-top: 2rem;
+  box-shadow: 0 8px 30px rgba(169, 25, 24, 0.3);
+  
+  .icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    animation: ${pulse} 2s ease-in-out infinite;
+  }
+  
+  .value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+  
+  .label {
+    font-size: 1.1rem;
+    opacity: 0.9;
+  }
+`;
+
+const UploadPedidoNovo = () => {
+    const { user } = useAuth();
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [isDragOver, setIsDragOver] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [result, setResult] = useState(null);
+    const [resultBackup, setResultBackup] = useState(null); // Backup do resultado
+    const [error, setError] = useState('');
+    const [produtosElegiveis, setProdutosElegiveis] = useState([]);
+    const [loadingProdutos, setLoadingProdutos] = useState(true);
+
+    // Carregar produtos elegíveis ao montar o componente
+    useEffect(() => {
+        const loadProdutos = async () => {
+            try {
+                setLoadingProdutos(true);
+                const produtos = await getProdutosElegiveis();
+                setProdutosElegiveis(produtos || []);
+            } catch (error) {
+                console.error('Erro ao carregar produtos elegíveis:', error);
+                setProdutosElegiveis([]);
+            } finally {
+                setLoadingProdutos(false);
+            }
+        };
+
+        loadProdutos();
+    }, []);
+
+    const handleFileSelect = (file) => {
+        if (!file) return;
+
+        // Validar tipo de arquivo
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+        if (!allowedTypes.includes(file.type)) {
+            setError('Tipo de arquivo não suportado. Use apenas JPG, PNG ou PDF.');
+            return;
+        }
+
+        // Validar tamanho (máximo 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+            setError('Arquivo muito grande. Tamanho máximo: 10MB.');
+            return;
+        }
+
+        setSelectedFile(file);
+        setError('');
+        // ⚠️ NÃO resetar result automaticamente - deixar o usuário decidir
+        // setResult(null);
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        setIsDragOver(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        const file = e.dataTransfer.files[0];
+        handleFileSelect(file);
+    };
+
+    const handleFileInputChange = (e) => {
+        const file = e.target.files[0];
+        handleFileSelect(file);
+    };
+
+    const removeFile = () => {
+        setSelectedFile(null);
+        setError('');
+        // ⚠️ NÃO resetar result se já há resultado processado
+        if (!result || !result.orderNumber) {
+            setResult(null);
+            setResultBackup(null);
+        } else {
+            console.log('📋 Mantendo resultado existente ao remover arquivo');
+        }
+    };
+
+    const formatFileSize = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    const processOrder = async () => {
+        if (!selectedFile) return;
+
+        // Confirmação adicional antes do processamento
+        const confirmacao = window.confirm(
+            '⚠️ ATENÇÃO: Esta nota será processada apenas uma vez!\n\n' +
+            '• Certifique-se que a imagem está nítida e legível\n' +
+            '• Todos os produtos e valores devem estar visíveis\n' +
+            '• Após o processamento, não será possível enviar novamente\n\n' +
+            'Deseja continuar com o processamento?'
+        );
+
+        if (!confirmacao) {
+            return; // Usuário cancelou
+        }
+
+        setIsProcessing(true);
+        setError('');
+        setResult(null);
+
+        try {
+            // Converter arquivo para base64
+            const base64 = await fileToBase64(selectedFile);
+
+            let aiResult;
+            let dailyLimitExceeded = false;
+
+            // 🔄 PRIORIDADE 1: Google Gemini (IA PRINCIPAL)
+            try {
+                console.log('🤖 Tentando análise com Google Gemini (Principal)...');
+                aiResult = await analyzeOrderWithGemini(base64, selectedFile.type);
+
+                if (aiResult.success) {
+                    console.log('✅ Gemini respondeu com sucesso');
+                } else {
+                    throw new Error(aiResult.error || 'Erro na análise do documento');
+                }
+
+            } catch (geminiError) {
+                console.warn('⚠️ Erro na API Gemini:', geminiError.message);
+                allApisFailedCount++;
+                
+                // Verificar se é erro de quota/limite diário
+                if (openaiError.message.includes('429') || 
+                    openaiError.message.includes('quota') || 
+                    openaiError.message.includes('rate_limit') ||
+                    openaiError.message.includes('usage_limit')) {
+                    console.log('� OpenAI: Limite diário detectado');
+                }
+            }
+
+            // �🔄 PRIORIDADE 2: Anthropic Claude (excelente alternativa)
+            if (!aiResult || !aiResult.success) {
+                try {
+                    console.log('🎭 Tentando análise com Anthropic Claude...');
+                    aiResult = await analyzeOrderWithClaude(base64, selectedFile.type);
+
+                    if (aiResult.success) {
+                        console.log('✅ Claude respondeu com sucesso');
+                        processingMethod = 'claude';
+                    } else {
+                        throw new Error(aiResult.error || 'Erro no Claude');
+                    }
+
+                } catch (claudeError) {
+                    console.warn('⚠️ Erro no Claude:', claudeError.message);
+                    allApisFailedCount++;
+                    
+                    // Verificar se é erro de quota/limite diário
+                    if (claudeError.message.includes('429') || 
+                        claudeError.message.includes('quota') || 
+                        claudeError.message.includes('rate_limit') ||
+                        claudeError.message.includes('usage_limit')) {
+                        console.log('📊 Claude: Limite diário detectado');
+                    }
+                }
+            }
+
+            // 🔄 PRIORIDADE 3: OCR Real (processamento local)
+            if (!aiResult || !aiResult.success) {
+                const ocrRealAvailable = await checkOcrRealServiceHealth();
+
+                if (ocrRealAvailable.success && ocrRealAvailable.easyocrAvailable) {
+                    try {
+                        console.log('🔍 Tentando análise com OCR REAL...');
+                        aiResult = await analyzeOrderWithOcrReal(base64, user.id);
+
+                        if (aiResult.success) {
+                            console.log('✅ OCR REAL respondeu com sucesso');
+                            processingMethod = 'ocr-real';
+                        } else {
+                            throw new Error(aiResult.error || 'Erro no OCR Real');
+                        }
+
+                    } catch (ocrError) {
+                        console.warn('⚠️ Erro no OCR Real:', ocrError.message);
+                        allApisFailedCount++;
+                    }
+                } else {
+                    console.log('⚠️ OCR Real não disponível');
+                    allApisFailedCount++;
+                }
+            }
+
+            // 🔄 PRIORIDADE 4: Gemini AI (backup)
+            if (!aiResult || !aiResult.success) {
+                try {
+                    console.log('🤖 Tentando análise com Gemini AI (backup)...');
+                    aiResult = await analyzeOrderWithGemini(base64, selectedFile.type);
+
+                    if (aiResult.success) {
+                        console.log('✅ Gemini AI respondeu com sucesso');
+                        processingMethod = 'gemini';
+                    } else {
+                        throw new Error(aiResult.error || 'Erro na análise do documento');
+                    }
+
+                } catch (geminiError) {
+                    console.warn('⚠️ Erro na API Gemini:', geminiError.message);
+                    allApisFailedCount++;
+
+                    // Verificar se é erro de quota
+                    if (geminiError.message.includes('429') ||
+                        geminiError.message.includes('quota') ||
+                        geminiError.message.includes('limit') ||
+                        geminiError.message.includes('resource_exhausted')) {
+
+                        console.log('🔄 API Gemini com cota excedida');
+                    }
+                }
+            }
+
+            // 🚨 VERIFICAR SE TODAS AS IAs FALHARAM (LIMITE DIÁRIO EXCEDIDO)
+            if ((!aiResult || !aiResult.success) && allApisFailedCount >= 3) {
+                console.log('🚨 LIMITE DIÁRIO EXCEDIDO - Todas as IAs falharam');
+                dailyLimitExceeded = true;
+                
+                // Mostrar mensagem específica para limite diário
+                setResult({
+                    orderNumber: `LIMIT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+                    customer: 'Sistema Fast',
+                    totalValue: 0,
+                    totalPoints: 0,
+                    items: [],
+                    allProducts: [],
+                    error: true,
+                    dailyLimitExceeded: true,
+                    errorMessage: 'Limite diário de análise de notas fiscais excedido. Tente novamente amanhã após 00:00h.',
+                    quotaExceeded: true
+                });
+                return; // Parar processamento aqui
+            }
+
+            // 🔄 PRIORIDADE 5: IA Simulada (último recurso)
+            if (!aiResult || !aiResult.success) {
+                console.log('🔄 Usando IA simulada como último recurso...');
+                usingFallback = true;
+                processingMethod = 'simulation';
+
+                const simulationResult = await analyzeOrderWithSimulation(base64);
+
+                aiResult = {
+                    success: true,
+                    data: {
+                        products: simulationResult.products,
+                        totalPoints: simulationResult.totalPoints,
+                        orderNumber: simulationResult.orderNumber,
+                        orderDate: simulationResult.orderDate,
+                        totalValue: simulationResult.totalValue
+                    }
+                };
+
+                console.log('✅ IA simulada funcionando como fallback');
+            }
+
+            // Aguardando o processamento de dados pela IA
+            const processedOrder = await processOrderResult(aiResult.data); // Garantir que a promise seja resolvida
+
+            // 🔍 LOG DETALHADO: Verificar dados processados
+            console.log('📊 DADOS PROCESSADOS COMPLETOS:', {
+                orderNumber: processedOrder.orderNumber,
+                orderDate: processedOrder.orderDate,
+                totalValue: processedOrder.totalValue,
+                totalPoints: processedOrder.totalPoints,
+                items: processedOrder.items,
+                allProducts: processedOrder.allProducts,
+                quantidadeItensElegiveis: processedOrder.items?.length || 0,
+                quantidadeTodosProdutos: processedOrder.allProducts?.length || 0,
+                usingFallback: usingFallback // Indicar se usou fallback
+            });
+
+            // Validar pedido
+            const validation = await validateOrder(processedOrder);
+
+            // ✅ APENAS LOG DE WARNINGS - NÃO BLOQUEAR PROCESSAMENTO
+            if (validation.warnings && validation.warnings.length > 0) {
+                console.log('Avisos de validação:', validation.warnings);
+            }
+
+            if (validation.errors && validation.errors.length > 0) {
+                console.log('Erros de validação (não bloqueando):', validation.errors);
+            }
+
+            // VALIDAÇÃO DE PONTOS: Verificar se os cálculos estão corretos
+            if (processedOrder.items && processedOrder.items.length > 0) {
+                const validacaoPontos = validarPontosCalculados(processedOrder.items);
+
+                if (!validacaoPontos.todosCorretos) {
+                    console.warn('⚠️ Alguns pontos podem estar incorretos, mas prosseguindo...');
+                    // Recalcular pontos para garantir precisão
+                    processedOrder.totalPoints = validacaoPontos.totalPontosValidados;
+                } else {
+                    console.log('✅ Todos os pontos foram validados e estão corretos!');
+                }
+            }
+
+            // Salvar no banco
+            const customerId = user.id;
+
+            // Log de verificação antes de salvar
+            console.log('🔍 Dados que serão salvos no banco:', {
+                cliente_id: customerId,
+                numero_pedido: processedOrder.orderNumber,
+                data_emissao: processedOrder.orderDate,
+                valor_total: processedOrder.totalValue,
+                hash_documento: processedOrder.documentHash,
+                pontos_gerados: processedOrder.totalPoints,
+                status: 'processado'
+            })
+
+            // Salvar pedido principal
+            const savedOrder = await saveOrder({
+                cliente_id: customerId,
+                numero_pedido: processedOrder.orderNumber,
+                data_emissao: processedOrder.orderDate,
+                valor_total: processedOrder.totalValue,
+                hash_documento: processedOrder.documentHash,
+                pontos_gerados: processedOrder.totalPoints,
+                status: 'processado' // Sempre usar 'processado' - o que importa são os pontos
+            });
+
+            // Salvar itens do pedido (apenas se houver itens)
+            if (processedOrder.items && processedOrder.items.length > 0) {
+                for (const item of processedOrder.items) {
+                    await saveOrderItems({
+                        pedido_id: savedOrder.id,
+                        produto_catalogo_id: item.product_id,
+                        nome_produto: item.product_name,
+                        codigo_produto: item.product_code,
+                        quantidade: item.quantity,
+                        valor_unitario: item.unit_price,
+                        valor_total: item.total_value,
+                        pontos_calculados: item.points,
+                        categoria: item.category,
+                        produto_fast: true
+                    });
+                }
+            }
+
+            // Adicionar pontos ao cliente (apenas se houver pontos)
+            if (processedOrder.totalPoints > 0) {
+                try {
+                    const updatedCustomer = await addPointsToCustomer(customerId, processedOrder.totalPoints, `Pedido ${processedOrder.orderNumber}`);
+                    // Atualizar contexto global do usuário para refletir novos pontos
+                    if (window.updateUserContext) {
+                        await window.updateUserContext({
+                            saldo_pontos: updatedCustomer.saldo_pontos,
+                            total_pontos_ganhos: updatedCustomer.total_pontos_ganhos
+                        });
+                    }
+                    // Forçar refresh global (dashboard)
+                    if (window.triggerGlobalRefresh) {
+                        window.triggerGlobalRefresh();
+                    }
+                    // Incluir saldo atualizado no resultado para interface
+                    resultadoFinal.saldoAtualizado = updatedCustomer.saldo_pontos;
+                } catch (error) {
+                    setError('Erro ao creditar pontos no banco de dados. Tente novamente.');
+                    setResult({
+                        ...resultadoFinal,
+                        error: true,
+                        errorMessage: 'Erro ao creditar pontos no banco de dados. Tente novamente.'
+                    });
+                    return;
+                }
+            }
+
+            // 🔍 LOG FINAL: Dados que serão exibidos na interface
+            console.log('🎯 DADOS PARA A INTERFACE:', {
+                orderNumber: processedOrder.orderNumber,
+                totalValue: processedOrder.totalValue,
+                totalPoints: processedOrder.totalPoints,
+                items: processedOrder.items,
+                allProducts: processedOrder.allProducts,
+                orderId: savedOrder.id
+            });
+
+            // ✅ RESULTADO FINAL PARA A INTERFACE
+            const resultadoFinal = {
+                orderNumber: processedOrder.orderNumber,
+                orderDate: processedOrder.orderDate,
+                customer: processedOrder.customer,
+                totalValue: processedOrder.totalValue,
+                items: processedOrder.items,
+                totalPoints: processedOrder.totalPoints,
+                documentHash: processedOrder.documentHash,
+                allProducts: processedOrder.allProducts,
+                orderId: savedOrder.id,
+                usingFallback: usingFallback, // Informar se usou IA simulada
+                processingMethod: processingMethod // Informar qual método foi usado
+            };
+
+            console.log('🎯 RESULTADO FINAL DEFINIDO NO setResult:', resultadoFinal);
+            console.log('🔍 VERIFICAÇÃO SPREAD OPERATOR:', {
+                'processedOrder.orderNumber': processedOrder.orderNumber,
+                'processedOrder.totalValue': processedOrder.totalValue,
+                'processedOrder.totalPoints': processedOrder.totalPoints,
+                'processedOrder.items': processedOrder.items,
+                'processedOrder.allProducts': processedOrder.allProducts,
+                'savedOrder.id': savedOrder.id
+            });
+
+            // 🚨 LOG CRÍTICO ANTES DO setResult
+            console.log('🚨 ANTES DO setResult - DADOS QUE SERÃO PASSADOS:', {
+                'typeof resultadoFinal': typeof resultadoFinal,
+                'resultadoFinal keys': Object.keys(resultadoFinal),
+                'resultadoFinal.items': resultadoFinal.items,
+                'resultadoFinal.allProducts': resultadoFinal.allProducts,
+                'resultadoFinal.totalPoints': resultadoFinal.totalPoints,
+                'resultadoFinal.orderNumber': resultadoFinal.orderNumber,
+                'Array.isArray(resultadoFinal.items)': Array.isArray(resultadoFinal.items),
+                'Array.isArray(resultadoFinal.allProducts)': Array.isArray(resultadoFinal.allProducts),
+                'JSON completo': JSON.stringify(resultadoFinal, null, 2)
+            });
+
+            // 🎯 APLICAR O RESULTADO FINAL DIRETAMENTE
+            const resultadoSeguro = {
+                ...resultadoFinal,
+                // Garantir que campos essenciais existam
+                allProducts: resultadoFinal.allProducts || [],
+                items: resultadoFinal.items || [],
+                totalPoints: resultadoFinal.totalPoints ?? 0, // Usar nullish coalescing para preservar 0 como valor válido
+                totalValue: resultadoFinal.totalValue ?? 0    // Usar nullish coalescing para preservar 0 como valor válido
+            };
+
+            console.log('🔒 APLICANDO RESULTADO SEGURO:', {
+                'resultadoSeguro.totalPoints': resultadoSeguro.totalPoints,
+                'typeof resultadoSeguro.totalPoints': typeof resultadoSeguro.totalPoints,
+                'resultadoSeguro.totalPoints === 0': resultadoSeguro.totalPoints === 0,
+                'resultadoSeguro completo': resultadoSeguro
+            });
+            setResult(resultadoSeguro);
+            setResultBackup(resultadoSeguro);
+            console.log('✅ RESULTADO APLICADO COM SUCESSO');
+
+        } catch (err) {
+            console.error('Erro ao processar pedido:', err);
+
+            // 🚨 TRATAMENTO ESPECÍFICO PARA ERRO DE QUOTA DA API
+            if (err.message && (err.message.includes('429') || err.message.includes('quota'))) {
+                setResult({
+                    orderNumber: `QUOTA-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+                    customer: 'Cliente',
+                    totalValue: 0,
+                    totalPoints: 0,
+                    items: [],
+                    allProducts: [],
+                    error: true,
+                    errorMessage: 'Cota da API excedida. Tente novamente mais tarde ou entre em contato com o suporte.',
+                    quotaExceeded: true
+                });
+            } else {
+                setResult({
+                    orderNumber: `ERRO-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+                    customer: 'Cliente',
+                    totalValue: 0,
+                    totalPoints: 0,
+                    items: [],
+                    allProducts: [],
+                    error: true,
+                    errorMessage: err.message || 'Erro interno ao processar pedido'
+                });
+            }
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const fileToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    };
+
+    // Função para remover duplicatas na interface
+    const removeDuplicates = (products) => {
+        const seen = new Set();
+        return products.filter(product => {
+            const key = `${product.product_name?.toLowerCase()}-${product.product_code?.toLowerCase()}`;
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+    };
+
+    return (
+        <Container>
+            <Header>
+                <h1>
+                    <FiUpload />
+                    Enviar Nota Fiscal
+                </h1>
+                <p>Envie sua nota fiscal Fast Sistemas e ganhe pontos automaticamente</p>
+            </Header>
+
+            {isProcessing && (
+                <LoadingContainer>
+                    <LoadingSpinner />
+                    <LoadingText>
+                        <h3>Extraindo texto da nota fiscal...</h3>
+                        <p>Usando OCR real para identificar produtos e valores</p>
+                    </LoadingText>
+                </LoadingContainer>
+            )}
+
+            {result && (
+                <ResultContainer>
+                    {/* 🚨 LOG CRÍTICO: Verificar dados na interface */}
+                    {console.log('🎯 DADOS NA INTERFACE RESULTADO:', {
+                        'result existe?': !!result,
+                        'result.orderNumber': result.orderNumber,
+                        'result.totalValue': result.totalValue,
+                        'result.totalPoints': result.totalPoints,
+                        'result.items': result.items,
+                        'result.allProducts': result.allProducts,
+                        'result.items?.length': result.items?.length,
+                        'result.allProducts?.length': result.allProducts?.length,
+                        'typeof result.items': typeof result.items,
+                        'typeof result.allProducts': typeof result.allProducts,
+                        'Array.isArray(result.items)': Array.isArray(result.items),
+                        'Array.isArray(result.allProducts)': Array.isArray(result.allProducts),
+                        'JSON.stringify result': JSON.stringify(result)
+                    })}
+
+                    <ResultHeader
+                        $success={!result.error && !result.noEligibleProducts}
+                        $warning={result.noEligibleProducts || result.dailyLimitExceeded}
+                    >
+                        <h3>
+                            {result.error && !result.dailyLimitExceeded ? <FiX /> : 
+                             result.dailyLimitExceeded ? <FiInfo /> :
+                             result.noEligibleProducts ? <FiInfo /> : <FiCheck />}
+                            {result.dailyLimitExceeded ? 'Limite Diário Excedido' :
+                             result.error ? 'Erro no Processamento' : 
+                             result.noEligibleProducts ? 'Nota Analisada - Sem Pontos' : 
+                             'Sucesso! Pontos Creditados'}
+                        </h3>
+                        <p>
+                            {result.dailyLimitExceeded ? 'Limite de análises diário foi atingido. Tente novamente amanhã após 00:00h.' :
+                             result.error ? result.errorMessage : 
+                             result.noEligibleProducts ? 'Produtos não elegíveis encontrados' : 
+                             'Seus pontos foram adicionados à sua conta'}
+                        </p>
+                    </ResultHeader>
+
+                    {/* ⚠️ AVISO ESPECIAL PARA LIMITE DIÁRIO */}
+                    {result.dailyLimitExceeded && (
+                        <div style={{
+                            background: 'linear-gradient(135deg, #fff3cd, #ffeaa7)',
+                            border: '2px solid #ffc107',
+                            borderRadius: '12px',
+                            padding: '1.5rem',
+                            margin: '1rem 2rem',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '1rem',
+                            fontSize: '0.9rem',
+                            color: '#856404'
+                        }}>
+                            <div style={{ fontSize: '2rem', marginTop: '0.25rem' }}>
+                                ⏰
+                            </div>
+                            <div>
+                                <h4 style={{ 
+                                    margin: '0 0 0.75rem 0', 
+                                    color: '#856404', 
+                                    fontFamily: 'Urbanist',
+                                    fontSize: '1.1rem',
+                                    fontWeight: '600' 
+                                }}>
+                                    Limite Diário de Análises Atingido
+                                </h4>
+                                <ul style={{ 
+                                    margin: '0', 
+                                    paddingLeft: '1.2rem', 
+                                    lineHeight: '1.6' 
+                                }}>
+                                    <li><strong>Por que isso acontece?</strong> Para garantir qualidade e controlar custos, limitamos o número de análises por dia.</li>
+                                    <li><strong>Quando posso tentar novamente?</strong> Após 00:00h (meia-noite) de hoje o limite será renovado.</li>
+                                    <li><strong>Urgent?</strong> Entre em contato com nosso suporte para casos urgentes.</li>
+                                    <li><strong>Dica:</strong> Prepare suas notas durante o dia e envie logo após a meia-noite!</li>
+                                </ul>
+                                <div style={{
+                                    background: 'rgba(133, 100, 4, 0.1)',
+                                    padding: '0.75rem',
+                                    borderRadius: '8px',
+                                    marginTop: '1rem',
+                                    fontSize: '0.85rem',
+                                    fontWeight: '600'
+                                }}>
+                                    📱 Suporte: (11) 9999-9999 | 📧 suporte@fastsistemas.com.br
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Notificação sobre método de processamento */}
+                    {result.processingMethod === 'openai' && !result.dailyLimitExceeded && (
+                        <div style={{
+                            background: 'linear-gradient(135deg, #e8f5f8, #d1ecf8)',
+                            border: '1px solid #3b82f6',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            margin: '1rem 2rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: '0.9rem',
+                            color: '#1e40af'
+                        }}>
+                            <FiInfo />
+                            <span>
+                                <strong>🤖 OpenAI GPT-4:</strong> Análise realizada com inteligência artificial avançada.
+                                Alta precisão na identificação de produtos e valores.
+                            </span>
+                        </div>
+                    )}
+
+                    {result.processingMethod === 'claude' && !result.dailyLimitExceeded && (
+                        <div style={{
+                            background: 'linear-gradient(135deg, #f3e8ff, #e9d5ff)',
+                            border: '1px solid #8b5cf6',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            margin: '1rem 2rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: '0.9rem',
+                            color: '#7c3aed'
+                        }}>
+                            <FiInfo />
+                            <span>
+                                <strong>🎭 Anthropic Claude:</strong> Análise realizada com IA de última geração.
+                                Excelente precisão na extração de dados estruturados.
+                            </span>
+                        </div>
+                    )}
+
+                    {result.processingMethod === 'ocr-real' && (
+                        <div style={{
+                            background: 'linear-gradient(135deg, #e8f5e8, #d4edda)',
+                            border: '1px solid #28a745',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            margin: '1rem 2rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: '0.9rem',
+                            color: '#155724'
+                        }}>
+                            <FiInfo />
+                            <span>
+                                <strong>🔍 OCR Real:</strong> Análise realizada com extração completa de texto e busca de valores reais.
+                                Apenas produtos com valores identificados foram contabilizados.
+                            </span>
+                        </div>
+                    )}
+
+                    {result.processingMethod === 'gemini' && !result.dailyLimitExceeded && (
+                        <div style={{
+                            background: 'linear-gradient(135deg, #fef3e2, #fed7aa)',
+                            border: '1px solid #f59e0b',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            margin: '1rem 2rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: '0.9rem',
+                            color: '#d97706'
+                        }}>
+                            <FiInfo />
+                            <span>
+                                <strong>✨ Google Gemini:</strong> Análise realizada com IA do Google.
+                                Backup confiável para processamento de documentos.
+                            </span>
+                        </div>
+                    )}
+
+                    {result.usingFallback && (
+                        <div style={{
+                            background: 'linear-gradient(135deg, #e7f3ff, #cce7ff)',
+                            border: '1px solid #007bff',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            margin: '1rem 2rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: '0.9rem',
+                            color: '#0056b3'
+                        }}>
+                            <FiInfo />
+                            <span>
+                                <strong>Modo Demonstração:</strong> A análise foi processada com dados simulados devido à indisponibilidade temporária da API.
+                                Os pontos foram calculados corretamente e adicionados à sua conta.
+                            </span>
+                        </div>
+                    )}
+
+                    <ResultContent>
+                        {/* 🚨 CASO ESPECIAL: LIMITE DIÁRIO - MOSTRAR APENAS COMUNICADO */}
+                        {result.dailyLimitExceeded ? (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '3rem 2rem',
+                                background: 'linear-gradient(135deg, #fff9e6, #fff3cd)',
+                                borderRadius: '16px',
+                                margin: '2rem 0'
+                            }}>
+                                <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>
+                                    ⏰
+                                </div>
+                                <h2 style={{
+                                    color: '#856404',
+                                    fontFamily: 'Urbanist',
+                                    fontSize: '1.8rem',
+                                    marginBottom: '1rem',
+                                    fontWeight: '700'
+                                }}>
+                                    Sistema Temporariamente Indisponível
+                                </h2>
+                                <p style={{
+                                    color: '#856404',
+                                    fontSize: '1.1rem',
+                                    lineHeight: '1.6',
+                                    marginBottom: '2rem',
+                                    maxWidth: '600px',
+                                    margin: '0 auto 2rem auto'
+                                }}>
+                                    Devido ao <strong>alto número de envios hoje</strong>, atingimos o limite diário de processamento de notas fiscais.
+                                </p>
+                                
+                                <div style={{
+                                    background: 'rgba(133, 100, 4, 0.15)',
+                                    borderRadius: '12px',
+                                    padding: '2rem',
+                                    marginBottom: '2rem',
+                                    border: '2px solid rgba(133, 100, 4, 0.3)'
+                                }}>
+                                    <h3 style={{
+                                        color: '#856404',
+                                        fontSize: '1.2rem',
+                                        marginBottom: '1rem',
+                                        fontWeight: '600'
+                                    }}>
+                                        🔄 Quando Tentar Novamente?
+                                    </h3>
+                                    <div style={{
+                                        background: '#fff',
+                                        padding: '1.5rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(133, 100, 4, 0.2)',
+                                        marginBottom: '1rem'
+                                    }}>
+                                        <div style={{
+                                            fontSize: '2rem',
+                                            fontWeight: 'bold',
+                                            color: '#856404',
+                                            marginBottom: '0.5rem'
+                                        }}>
+                                            Amanhã após 00:00h
+                                        </div>
+                                        <div style={{
+                                            color: '#856404',
+                                            fontSize: '0.9rem'
+                                        }}>
+                                            O limite é renovado automaticamente todos os dias
+                                        </div>
+                                    </div>
+                                    
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                                        gap: '1rem',
+                                        marginTop: '1.5rem'
+                                    }}>
+                                        <div style={{
+                                            background: '#fff',
+                                            padding: '1rem',
+                                            borderRadius: '8px',
+                                            textAlign: 'center',
+                                            border: '1px solid rgba(133, 100, 4, 0.2)'
+                                        }}>
+                                            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>💡</div>
+                                            <strong style={{ color: '#856404' }}>Dica</strong>
+                                            <div style={{ fontSize: '0.85rem', color: '#856404', marginTop: '0.25rem' }}>
+                                                Prepare suas notas hoje e envie logo após a meia-noite
+                                            </div>
+                                        </div>
+                                        
+                                        <div style={{
+                                            background: '#fff',
+                                            padding: '1rem',
+                                            borderRadius: '8px',
+                                            textAlign: 'center',
+                                            border: '1px solid rgba(133, 100, 4, 0.2)'
+                                        }}>
+                                            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🚨</div>
+                                            <strong style={{ color: '#856404' }}>Urgente?</strong>
+                                            <div style={{ fontSize: '0.85rem', color: '#856404', marginTop: '0.25rem' }}>
+                                                Entre em contato conosco para casos especiais
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #856404, #a67c00)',
+                                    color: 'white',
+                                    padding: '1.5rem',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 4px 15px rgba(133, 100, 4, 0.3)'
+                                }}>
+                                    <h4 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>
+                                        📞 Suporte Fast Sistemas
+                                    </h4>
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                                        gap: '1rem',
+                                        fontSize: '0.9rem'
+                                    }}>
+                                        <div>
+                                            <strong>📱 WhatsApp:</strong><br />
+                                            (11) 9999-9999
+                                        </div>
+                                        <div>
+                                            <strong>📧 E-mail:</strong><br />
+                                            suporte@fastsistemas.com.br
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* CONTEÚDO NORMAL - QUANDO NÃO É LIMITE DIÁRIO */
+                            <>
+                                {/* 🚨 LOG DE DEBUG NA RENDERIZAÇÃO */}
+                                {console.log('🎯 RENDERIZANDO - DADOS RESULT ATUAIS:', {
+                                    'result existe': !!result,
+                                    'result.orderNumber': result?.orderNumber,
+                                    'result.totalValue': result?.totalValue,
+                                    'result.totalPoints': result?.totalPoints,
+                                    'result.items length': result?.items?.length,
+                                    'result.allProducts length': result?.allProducts?.length,
+                                    'typeof result.allProducts': typeof result?.allProducts,
+                                    'typeof result.items': typeof result?.items,
+                                    'Array.isArray(result.allProducts)': Array.isArray(result?.allProducts),
+                                    'Array.isArray(result.items)': Array.isArray(result?.items),
+                                    'JSON.stringify result': JSON.stringify(result)
+                                })}
+
+                                {/* 🔍 VERIFICAÇÃO DE SEGURANÇA ANTES DA RENDERIZAÇÃO */}
+                                {result ? (
+                                    <>
+                                        <SummaryGrid>
+                                            <SummaryCard>
+                                                <div className="icon"><FiFile /></div>
+                                                <div className="value">#{result.orderNumber || 'N/A'}</div>
+                                                <div className="label">Número do Pedido</div>
+                                            </SummaryCard>
+
+                                            <SummaryCard>
+                                                <div className="icon"><FiShoppingBag /></div>
+                                                <div className="value">R$ {result.totalValue?.toFixed(2) || '0.00'}</div>
+                                                <div className="label">Valor Total</div>
+                                            </SummaryCard>
+
+                                            <SummaryCard>
+                                                <div className="icon"><FiEye /></div>
+                                                <div className="value">{Array.isArray(result.allProducts) ? result.allProducts.length : 0}</div>
+                                                <div className="label">Produtos Identificados</div>
+                                            </SummaryCard>
+
+                                            <SummaryCard>
+                                                <div className="icon"><FiStar /></div>
+                                                <div className="value">{Array.isArray(result.items) ? result.items.length : 0}</div>
+                                                <div className="label">Produtos Elegíveis</div>
+                                            </SummaryCard>
+                                        </SummaryGrid>
+
+                                {(result.allProducts?.length > 0 || result.items?.length > 0) ? (
+                                    <ProductsResultTable>
+                                        <h4>
+                                            <FiShoppingBag />
+                                            Produtos na Nota Fiscal
+                                        </h4>
+
+                                        <div style={{ border: '1px solid #e9ecef', borderRadius: '8px', overflow: 'hidden' }}>
+                                            <ResultTableHeader>
+                                                <div>Produto</div>
+                                                <div>Quantidade</div>
+                                                <div>Valor</div>
+                                                <div className="hide-mobile">Status</div>
+                                                <div>Pontos</div>
+                                            </ResultTableHeader>
+
+                                            {/* Produtos elegíveis primeiro */}
+                                            {result.items?.map((item, index) => (
+                                                <ResultTableRow key={`eligible-${item.product_code}-${index}`} $eligible={true}>
+                                                    <div>
+                                                        <ProductName>{item.product_name}</ProductName>
+                                                        <ProductCode>{item.product_code}</ProductCode>
+                                                    </div>
+                                                    <div>{item.quantity}</div>
+                                                    <div>R$ {item.total_value.toFixed(2)}</div>
+                                                    <StatusBadge className="hide-mobile" $eligible={true}>
+                                                        <FiCheck /> Elegível
+                                                    </StatusBadge>
+                                                    <PointsBadge>
+                                                        <FiStar /> {item.points} pts
+                                                    </PointsBadge>
+                                                </ResultTableRow>
+                                            ))}
+
+                                            {/* Produtos não elegíveis */}
+                                            {result.allProducts?.filter(p => !p.isEligible)?.map((produto, index) => (
+                                                <ResultTableRow key={`non-eligible-${produto.product_code}-${index}`} $eligible={false}>
+                                                    <div>
+                                                        <ProductName>{produto.product_name}</ProductName>
+                                                        <ProductCode>{produto.product_code}</ProductCode>
+                                                    </div>
+                                                    <div>{produto.quantity > 0 ? produto.quantity : '-'}</div>
+                                                    <div>{produto.total_value > 0 ? `R$ ${produto.total_value.toFixed(2)}` : '-'}</div>
+                                                    <StatusBadge className="hide-mobile" $eligible={false}>
+                                                        <FiX /> Não Elegível
+                                                    </StatusBadge>
+                                                    <div style={{ textAlign: 'center', color: '#666' }}>0 pts</div>
+                                                </ResultTableRow>
+                                            ))}
+                                        </div>
+                                    </ProductsResultTable>
+                                ) : (
+                                    <div style={{
+                                        textAlign: 'center',
+                                        padding: '2rem',
+                                        background: '#f8f9fa',
+                                        borderRadius: '12px',
+                                        border: '1px dashed #dee2e6'
+                                    }}>
+                                        <FiInfo size={48} color="#666" style={{ marginBottom: '1rem' }} />
+                                        <h4 style={{ color: '#666', margin: '0 0 0.5rem 0' }}>Nenhum produto identificado</h4>
+                                        <p style={{ color: '#999', margin: 0 }}>Não foi possível identificar produtos na nota fiscal enviada.</p>
+                                    </div>
+                                )}
+
+                                <TotalPointsCard>
+                                    <div className="icon">
+                                        {result.error ? <FiX /> : <FiAward />}
+                                    </div>
+                                    <div className="value">{result.totalPoints ?? 0}</div>
+                                    <div className="label">Pontos Creditados</div>
+                                </TotalPointsCard>
+                            </>
+                        ) : (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '2rem',
+                                background: '#f8f9fa',
+                                borderRadius: '12px',
+                                border: '1px dashed #dee2e6'
+                            }}>
+                                <FiInfo size={48} color="#666" style={{ marginBottom: '1rem' }} />
+                                <h4 style={{ color: '#666', margin: '0 0 0.5rem 0' }}>Aguardando processamento</h4>
+                                <p style={{ color: '#999', margin: 0 }}>Os dados ainda estão sendo processados.</p>
+                            </div>
+                        )}
+                            </>
+                        )}
+                    </ResultContent>
+                </ResultContainer>
+            )}
+
+            <MainContent>
+                <UploadSection>
+                    <h3 style={{ fontFamily: 'Urbanist', color: '#353535', marginBottom: '1rem', fontSize: '1.3rem' }}>
+                        📄 Upload da Nota
+                    </h3>
+
+                    {/* Aviso importante sobre qualidade da imagem */}
+                    <div style={{
+                        background: 'linear-gradient(135deg, #fff3cd, #ffeaa7)',
+                        border: '1px solid #ffc107',
+                        borderRadius: '12px',
+                        padding: '1.5rem',
+                        marginBottom: '1.5rem',
+                        display: 'flex',
+                        gap: '1rem',
+                        alignItems: 'flex-start'
+                    }}>
+                        <div style={{ color: '#856404', fontSize: '1.5rem', marginTop: '0.25rem' }}>
+                            ⚠️
+                        </div>
+                        <div>
+                            <h4 style={{
+                                color: '#856404',
+                                margin: '0 0 0.5rem 0',
+                                fontFamily: 'Urbanist',
+                                fontSize: '1.1rem',
+                                fontWeight: '600'
+                            }}>
+                                Importante - Leia antes de enviar
+                            </h4>
+                            <ul style={{
+                                color: '#856404',
+                                margin: 0,
+                                paddingLeft: '1.2rem',
+                                lineHeight: '1.5',
+                                fontSize: '0.9rem'
+                            }}>
+                                <li><strong>Uma única chance:</strong> Cada nota pode ser enviada apenas uma vez no sistema</li>
+                                <li><strong>Qualidade da imagem:</strong> Certifique-se que a foto/PDF está nítida e legível</li>
+                                <li><strong>Campos visíveis:</strong> Todos os produtos, valores e dados devem estar claramente visíveis</li>
+                                <li><strong>Boa iluminação:</strong> Evite sombras, reflexos ou borrões que dificultem a leitura</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <UploadArea
+                        $isDragOver={isDragOver}
+                        $hasFile={!!selectedFile}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={() => document.getElementById('fileInput').click()}
+                    >
+                        <UploadIcon $hasFile={!!selectedFile}>
+                            {selectedFile ? <FiCheck /> : <FiUpload />}
+                        </UploadIcon>
+                        <UploadText>
+                            {selectedFile ? (
+                                <>
+                                    <h3>✅ {selectedFile.name}</h3>
+                                    <p>{formatFileSize(selectedFile.size)}</p>
+                                    <small>Arquivo carregado com sucesso</small>
+                                </>
+                            ) : (
+                                <>
+                                    <h3>Selecione sua nota fiscal</h3>
+                                    <p>Clique aqui ou arraste um arquivo</p>
+                                    <small>JPG, PNG ou PDF • Máx. 10MB</small>
+                                    <div style={{
+                                        marginTop: '1rem',
+                                        padding: '0.75rem',
+                                        background: 'rgba(169, 25, 24, 0.1)',
+                                        borderRadius: '8px',
+                                        fontSize: '0.8rem',
+                                        color: '#A91918'
+                                    }}>
+                                        💡 <strong>Dica:</strong> Foto nítida = mais produtos identificados = mais pontos!
+                                    </div>
+                                </>
+                            )}
+                        </UploadText>
+                    </UploadArea>
+
+                    <FileInput
+                        id="fileInput"
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={handleFileInputChange}
+                    />
+
+                    {selectedFile && (
+                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                            <ProcessButton onClick={processOrder} disabled={isProcessing}>
+                                <FiZap />
+                                {isProcessing ? 'Processando...' : 'Processar Nota (Única Vez)'}
+                            </ProcessButton>
+                            <button
+                                onClick={removeFile}
+                                style={{
+                                    background: '#6c757d',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '1rem',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s ease'
+                                }}
+                            >
+                                <FiX />
+                            </button>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div style={{
+                            background: '#f8d7da',
+                            color: '#721c24',
+                            padding: '1rem',
+                            borderRadius: '8px',
+                            border: '1px solid #f5c6cb',
+                            marginTop: '1rem'
+                        }}>
+                            <strong>Erro:</strong> {error}
+                        </div>
+                    )}
+                </UploadSection>
+
+                <ProdutosSection>
+                    <h3>
+                        <FiStar />
+                        Produtos Elegíveis para Pontos
+                    </h3>
+                    <p style={{ color: '#666', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                        Veja quais produtos Fast Sistemas geram pontos no programa de fidelidade:
+                    </p>
+
+                    <ProdutosTable>
+                        <TableHeader>
+                            <div>Produto</div>
+                            <div>Categoria</div>
+                            <div className="hide-mobile">Código</div>
+                            <div>Pontos</div>
+                        </TableHeader>
+                        {loadingProdutos ? (
+                            <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                                Carregando produtos...
+                            </div>
+                        ) : produtosElegiveis.length > 0 ? (
+                            produtosElegiveis.map((produto, index) => (
+                                <TableRow key={index}>
+                                    <ProductName>{produto.nome}</ProductName>
+                                    <CategoryBadge $categoria={produto.categoria}>
+                                        {produto.categoria}
+                                    </CategoryBadge>
+                                    <ProductCode className="hide-mobile">{produto.codigo}</ProductCode>
+                                    <PointsBadge>
+                                        <FiStar />
+                                        {produto.descricaoPontos}
+                                    </PointsBadge>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                                Nenhum produto elegível encontrado
+                            </div>
+                        )}
+                    </ProdutosTable>
+                </ProdutosSection>
+            </MainContent>
+
+
+        </Container>
+    );
+};
+
+export default UploadPedidoNovo;

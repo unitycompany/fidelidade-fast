@@ -1,0 +1,23 @@
+# Dependências para processamento completo de notas fiscais Fast Sistemas
+Flask==2.3.3
+Flask-CORS==4.0.0
+opencv-python==4.8.1.78
+pytesseract==0.3.10
+Pillow>=10.2.0
+numpy>=1.24.0,<2.0.0
+requests==2.31.0
+
+# Para melhor processamento de texto (opcional)
+# regex==2023.10.3
+
+# Opcional: para PDFs
+PyPDF2==3.0.1
+pdfplumber==0.9.0
+
+# Para logging avançado
+colorama==0.4.6
+# pdf2image>=1.16.0
+
+# Opcional: para processamento avançado de texto
+spacy
+nltk
