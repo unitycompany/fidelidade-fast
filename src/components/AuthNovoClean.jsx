@@ -34,7 +34,6 @@ const AuthCard = styled.div`
   width: 100%;
   max-width: 420px;
   background: white;
-  border-radius: 16px;
   box-shadow: 0 20px 40px rgba(53, 53, 53, 0.1);
   overflow: hidden;
   animation: ${fadeIn} 0.6s ease-out;
@@ -42,7 +41,6 @@ const AuthCard = styled.div`
   
   @media (max-width: 768px) {
     max-width: 100%;
-    border-radius: 12px;
   }
 `;
 
@@ -58,10 +56,12 @@ const Header = styled.div`
 `;
 
 const Logo = styled.h1`
-  font-size: 1.8rem;
-  font-weight: bold;
-  margin-bottom: 0.5rem;
-  font-family: 'Urbanist', sans-serif;
+  font-size: 1.2rem;
+
+  & > img {
+    width: 200px;
+    filter: invert(50%) contrast(200%) brightness(5);
+  }
   
   @media (max-width: 768px) {
     font-size: 1.5rem;
@@ -97,7 +97,7 @@ const Tab = styled.button`
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-bottom: 2px solid ${props => props.$active ? '#A91918' : 'transparent'};
+  border-bottom: 1px solid ${props => props.$active ? '#A91918' : 'transparent'};
   font-family: 'Montserrat', sans-serif;
   
   &:hover {
@@ -143,10 +143,9 @@ const InputIcon = styled.div`
 const Input = styled.input`
   width: 100%;
   padding: 0.875rem 1rem 0.875rem 2.5rem;
-  border: 2px solid #e9ecef;
+  border: 1px solid #e9ecef;
   background: white;
   color: #353535;
-  border-radius: 8px;
   font-size: 0.95rem;
   font-family: 'Montserrat', sans-serif;
   transition: all 0.3s ease;
@@ -175,7 +174,6 @@ const Button = styled.button`
   background: linear-gradient(135deg, #A91918 0%, #8B1514 100%);
   color: white;
   border: none;
-  border-radius: 8px;
   font-size: 0.95rem;
   font-weight: 600;
   font-family: 'Montserrat', sans-serif;
@@ -426,7 +424,7 @@ const AuthNovoClean = ({ onLogin }) => {
         <Container>
             <AuthCard>
                 <Header>
-                    <Logo>Fast Fidelidade</Logo>
+                    <Logo><img src="https://imagedelivery.net/1n9Gwvykoj9c9m8C_4GsGA/336e2c64-e66b-487b-d0e5-40df2b33d100/public" alt="" /></Logo>
                     <Subtitle>Clube Fast de Recompensas</Subtitle>
                 </Header>
 
