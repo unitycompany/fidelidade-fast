@@ -168,12 +168,13 @@ const PremiosContainer = styled.div`
 `;
 
 const PremioCard = styled.div`
-  background: #fff;
+  background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.05);
   overflow: hidden;
   transition: all 0.3s ease;
   animation: ${fadeInUp} 0.6s ease-out;
+  position: relative;
   
   &:hover {
     transform: translateY(-4px);
@@ -181,10 +182,18 @@ const PremioCard = styled.div`
   }
 `;
 
-const PremioImage = styled.img`
+const PremioImageContainer = styled.div`
+  position: relative;
   width: 100%;
   height: 200px;
-  object-fit: cover;
+  background: #ffffff;
+  overflow: hidden;
+`;
+
+const PremioImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   border-bottom: 1px solid #eee;
 `;
 
@@ -193,9 +202,6 @@ const PremioContent = styled.div`
 `;
 
 const PremioHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   margin-bottom: 1rem;
 `;
 
@@ -208,14 +214,20 @@ const PremioTitulo = styled.h3`
 `;
 
 const PremioCategoria = styled.span`
-  background: #EDF2F7;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.95);
   color: #4A5568;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  backdrop-filter: blur(4px);
+  z-index: 2;
 `;
 
 const PremioDescricao = styled.p`
@@ -238,21 +250,24 @@ const PremioPontos = styled.div`
   gap: 0.3rem;
   color: #cc1515;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
+  flex-shrink: 0;
 `;
 
 const BotaoResgatar = styled.button`
   background: ${props => props.disabled ? '#CBD5E0' : 'linear-gradient(135deg, #cc1515 0%, #9b0c0c 100%)'};
   color: ${props => props.disabled ? '#718096' : 'white'};
   border: none;
-  padding: 0.6rem 1.2rem;
+  padding: 0.6rem 1rem;
   border-radius: 4px;
   font-weight: 600;
+  font-size: 0.85rem;
   cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
+  flex-shrink: 0;
   
   &:hover:not(:disabled) {
     transform: translateY(-1px);
@@ -573,21 +588,24 @@ function PremiosNovo({ user, onUserUpdate }) {
           <PremiosContainer>
             {premiosFiltrados.map((premio) => (
               <PremioCard key={premio.id}>
-                {premio.imagem_url && (
-                  <PremioImage
-                    src={premio.imagem_url}
-                    alt={premio.nome}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
-                )}
+                <PremioImageContainer>
+                  {premio.imagem_url && (
+                    <PremioImage
+                      src={premio.imagem_url}
+                      alt={premio.nome}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <PremioCategoria>
+                    {CATEGORIAS_PREMIOS[premio.categoria]?.nome || premio.categoria}
+                  </PremioCategoria>
+                </PremioImageContainer>
+                
                 <PremioContent>
                   <PremioHeader>
                     <PremioTitulo>{premio.nome}</PremioTitulo>
-                    <PremioCategoria>
-                      {CATEGORIAS_PREMIOS[premio.categoria]?.nome || premio.categoria}
-                    </PremioCategoria>
                   </PremioHeader>
 
                   {premio.descricao && (
@@ -617,7 +635,7 @@ function PremiosNovo({ user, onUserUpdate }) {
                       ) : (
                         <>
                           <FiX />
-                          Pontos Insuficientes
+                          Insuficiente
                         </>
                       )}
                     </BotaoResgatar>

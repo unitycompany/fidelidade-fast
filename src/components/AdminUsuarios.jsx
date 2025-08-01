@@ -879,7 +879,7 @@ function AdminUsuarios({ user }) {
                                         <FiUserCheck />
                                         Informações Pessoais
                                     </FormSectionTitle>
-                                    
+
                                     <FormRow>
                                         <FormGroup>
                                             <FormLabel>Nome Completo *</FormLabel>
@@ -893,7 +893,7 @@ function AdminUsuarios({ user }) {
                                             />
                                             {errors.nome && <ErrorMessage>{errors.nome}</ErrorMessage>}
                                         </FormGroup>
-                                        
+
                                         <FormGroup>
                                             <FormLabel>CPF {!usuarioEditando && '*'}</FormLabel>
                                             <FormInput
@@ -997,7 +997,7 @@ function AdminUsuarios({ user }) {
                                             <FiCheck />
                                             Informações da Loja
                                         </FormSectionTitle>
-                                        
+
                                         <FormRow $columns="1fr">
                                             <FormGroup>
                                                 <FormLabel>Loja/Local de Trabalho</FormLabel>
