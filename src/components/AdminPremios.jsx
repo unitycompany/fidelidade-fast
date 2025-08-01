@@ -33,6 +33,13 @@ const Header = styled.div`
     gap: 0.75rem;
     margin: 0;
   }
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
 `;
 
 const AddButton = styled.button`
@@ -58,6 +65,16 @@ const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.5rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
 `;
 
 const PremioCard = styled.div`
@@ -71,6 +88,14 @@ const PremioCard = styled.div`
   &:hover {
     transform: translateY(-4px);
     box-shadow: ${props => props.theme.shadows.xl};
+  }
+  
+  @media (max-width: 768px) {
+    padding: 1.25rem;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 1rem;
   }
 `;
 
@@ -125,6 +150,17 @@ const PremioInfo = styled.div`
   margin-bottom: 1rem;
 `;
 
+const PontosDisplay = styled.div`
+  color: #cc1515;
+  font-size: 1.2rem;
+  font-weight: 300;
+  margin-bottom: 0.5rem;
+  
+  @media (max-width: 480px) {
+    font-size: 1.1rem;
+  }
+`;
+
 const PremioImage = styled.div`
   width: 100%;
   height: 200px;
@@ -136,6 +172,7 @@ const PremioImage = styled.div`
   align-items: center;
   justify-content: center;
   border: 1px solid #e9ecef;
+  padding: 1rem;
   
   img {
     width: 100%;
@@ -146,6 +183,16 @@ const PremioImage = styled.div`
   
   &:hover img {
     transform: scale(1.02);
+  }
+  
+  @media (max-width: 768px) {
+    height: 180px;
+    padding: 0.75rem;
+  }
+  
+  @media (max-width: 480px) {
+    height: 160px;
+    padding: 0.5rem;
   }
 `;
 

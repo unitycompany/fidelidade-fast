@@ -34,7 +34,8 @@ const Container = styled.div`
   
   @media (max-width: 900px) {
     padding: 0.5rem;
-    min-height: calc(100vh - 64px);
+    height: auto;
+    margin-top: -10vh;
   }
 `;
 
@@ -54,8 +55,7 @@ const MinimalContainer = styled.div`
   margin: 0 auto;
   padding: 2rem;
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  border: 1px solid #e3e6ea;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -63,7 +63,6 @@ const MinimalContainer = styled.div`
   @media (max-width: 900px) {
     padding: 1rem;
     max-width: calc(100vw - 1rem);
-    border-radius: 4px;
   }
 `;
 
@@ -106,8 +105,7 @@ const MinimalUpload = styled.label`
   margin-bottom: 1rem;
   width: 100%;
   max-width: 500px;
-  border: 2px dashed #ddd;
-  border-radius: 8px;
+  border: 1px dashed #ddd;
   cursor: pointer;
   transition: all 0.3s ease;
   background: #fafafa;
@@ -115,7 +113,6 @@ const MinimalUpload = styled.label`
   &:hover {
     border-color: #A91918;
     background: #fff;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   }
   
   @media (max-width: 600px) {
@@ -152,13 +149,12 @@ const MinimalButton = styled.button`
 const MinimalResult = styled.div`
   width: 100%;
   max-width: 480px;
-  background: #f7f7f7;
-  border-radius: 8px;
+  background: #f9f9f9;
+  border: 1px solid #e3e6ea;
   padding: 1.5rem 1rem;
   margin-top: 1.5rem;
   text-align: center;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-  border-radius: 10px;
+
   @media (max-width: 600px) {
     max-width: 98vw;
     padding: 1rem 0.5rem;
@@ -210,21 +206,22 @@ const ExcelTable = styled.table`
   border-collapse: collapse;
   background: #fff;
   margin: 0;
-  box-shadow: 0 1px 8px rgba(0,0,0,0.03);
 `;
 const ExcelTd = styled.td`
   border: 1px solid #e3e6ea;
   padding: 12px 14px;
   font-size: 15px;
   color: #222;
-  background: #fafbfc;
+  background: #f9f9f9;
   vertical-align: middle;
+  text-align: left;
 `;
 const ExcelTh = styled.td`
   border: 1px solid #e3e6ea;
-  background: #f4f6fa;
-  color: #A91918;
-  font-weight: 700;
+  background: #fff;
+  text-align: left;
+  color: #1d1d1b;
+  font-weight: 500;
   padding: 12px 14px;
   font-size: 15px;
   min-width: 140px;
@@ -234,7 +231,6 @@ const ExcelTh = styled.td`
 const StatusBadge = styled.span`
   display: inline-block;
   padding: 2px 12px;
-  border-radius: 12px;
   font-weight: 600;
   font-size: 13px;
   color: #fff;
@@ -250,7 +246,6 @@ const CodigoBox = styled.div`
   gap: 10px;
   background: #f8f9fa;
   border: 1.5px dashed #A91918;
-  border-radius: 8px;
   padding: 12px 18px;
   font-size: 1.15rem;
   font-weight: 700;

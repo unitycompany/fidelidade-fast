@@ -28,6 +28,7 @@ const Container = styled.div`
   align-items: center;
   @media (max-width: 900px) {
     padding: 1rem 0;
+    margin-top: -10vh;
   }
 `;
 
@@ -46,8 +47,6 @@ const Header = styled.div`
   margin: 0 auto 2rem auto;
   padding: 2.5rem 2rem 2rem 2rem;
   background: linear-gradient(135deg, #A91918 0%, #c41e3a 100%);
-  border-radius: 16px;
-  box-shadow: 0 2px 16px rgba(169,25,24,0.10);
   color: #fff;
   text-align: center;
   animation: ${fadeInUp} 0.6s ease-out;
@@ -124,8 +123,6 @@ const ResgatesTable = styled.table`
   width: 100%;
   border-collapse: collapse;
   background: #fff;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
-  border-radius: 16px;
   overflow: hidden;
   
   @media (max-width: 768px) {
@@ -154,7 +151,6 @@ const ResgatesTd = styled.td`
 
 const ResgateCard = styled.div`
   background: #fff;
-  border-radius: 16px;
   padding: 1.5rem;
   box-shadow: 0 2px 16px rgba(0,0,0,0.07);
   border: 1px solid #e3e6ea;
@@ -235,7 +231,6 @@ const CardFooter = styled.div`
 const CardCode = styled.div`
   background: #f8f9fa;
   padding: 0.75rem;
-  border-radius: 8px;
   font-family: 'Courier New', monospace;
   font-size: 0.85rem;
   color: #666;
@@ -254,7 +249,6 @@ const EmptyState = styled.div`
   padding: 3rem 2rem;
   color: #666;
   background: #fff;
-  border-radius: 16px;
   box-shadow: 0 2px 16px rgba(0,0,0,0.07);
   margin: 2rem auto;
   max-width: 600px;
@@ -309,7 +303,6 @@ const StatusBadge = styled.span`
   align-items: center;
   gap: 0.25rem;
   padding: 6px 12px;
-  border-radius: 20px;
   font-weight: 600;
   font-size: 0.8rem;
   color: #fff;
@@ -498,7 +491,7 @@ function MeusResgates({ usuario, onClose, showAsSection = false }) {
   const ContainerComponent = showAsSection ? React.Fragment : Container;
   const content = (
     <>
-      {!showAsSection && (
+      {/* {!showAsSection && (
         <Header>
           <Title>Meus Resgates</Title>
           <Subtitle>Acompanhe o status dos seus resgates realizados</Subtitle>
@@ -510,7 +503,7 @@ function MeusResgates({ usuario, onClose, showAsSection = false }) {
           <h3>Nenhum resgate encontrado</h3>
           <p>Você ainda não realizou nenhum resgate de prêmios.</p>
         </EmptyState>
-      ) : (
+      ) : ( */}
         <ResgatesContainer>
           <ResgatesGrid>
             {/* Tabela para Desktop */}
@@ -606,7 +599,6 @@ function MeusResgates({ usuario, onClose, showAsSection = false }) {
             })}
           </ResgatesGrid>
         </ResgatesContainer>
-      )}
     </>
   );
 

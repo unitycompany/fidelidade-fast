@@ -87,7 +87,7 @@ const LogoImg = styled.img`
 
 const Points = styled.div`
   color: #1e1e1e;
-  font-weight: 600;
+  font-weight: 500;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -350,7 +350,6 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
           <LogoImg src="https://imagedelivery.net/1n9Gwvykoj9c9m8C_4GsGA/336e2c64-e66b-487b-d0e5-40df2b33d100/public" alt="Logo" />
           {userRole !== 'admin' ? (
             <Points>
-              <FiStar />
               {userAtualizado?.saldo_pontos?.toLocaleString() || '0'} <span>pts</span>
             </Points>
           ) : (

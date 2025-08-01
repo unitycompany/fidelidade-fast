@@ -31,6 +31,7 @@ const Container = styled.div`
   @media (max-width: 900px) {
     padding: 0.5rem;
     min-height: calc(100vh - 64px);
+    margin-top: -10vh;
   }
 `;
 
@@ -169,8 +170,7 @@ const PremiosContainer = styled.div`
 
 const PremioCard = styled.div`
   background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  border: 1px solid #E2E8F0;
   overflow: hidden;
   transition: all 0.3s ease;
   animation: ${fadeInUp} 0.6s ease-out;
@@ -185,7 +185,9 @@ const PremioCard = styled.div`
 const PremioImageContainer = styled.div`
   position: relative;
   width: 100%;
-  height: 200px;
+  height: 250px;
+  padding: 20px;
+  margin-bottom: -20px;
   background: #ffffff;
   overflow: hidden;
 `;
@@ -194,6 +196,7 @@ const PremioImage = styled.img`
   width: 100%;
   height: 100%;
   object-fit: contain;
+  padding-bottom: 20px;
   border-bottom: 1px solid #eee;
 `;
 
@@ -211,6 +214,10 @@ const PremioTitulo = styled.h3`
   font-weight: 600;
   margin: 0;
   line-height: 1.3;
+
+   @media (max-width: 768px){
+      font-size: 1.3rem;
+  }
 `;
 
 const PremioCategoria = styled.span`
@@ -220,12 +227,11 @@ const PremioCategoria = styled.span`
   background: rgba(255, 255, 255, 0.95);
   color: #4A5568;
   padding: 0.3rem 0.6rem;
-  border-radius: 6px;
+  border: 1px solid #CBD5E0;
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   backdrop-filter: blur(4px);
   z-index: 2;
 `;
@@ -233,8 +239,12 @@ const PremioCategoria = styled.span`
 const PremioDescricao = styled.p`
   color: #718096;
   font-size: 0.9rem;
-  line-height: 1.4;
+  line-height: 1.2;
   margin: 0 0 1rem 0;
+
+   @media (max-width: 768px){
+    font-size: 1rem;
+  }
 `;
 
 const PremioFooter = styled.div`
@@ -249,9 +259,13 @@ const PremioPontos = styled.div`
   align-items: center;
   gap: 0.3rem;
   color: #cc1515;
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 500;
+  font-size: 1rem;
   flex-shrink: 0;
+
+  @media (max-width: 768px){
+    font-size: 1.2rem;
+  }
 `;
 
 const BotaoResgatar = styled.button`
@@ -259,7 +273,6 @@ const BotaoResgatar = styled.button`
   color: ${props => props.disabled ? '#718096' : 'white'};
   border: none;
   padding: 0.6rem 1rem;
-  border-radius: 4px;
   font-weight: 600;
   font-size: 0.85rem;
   cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
@@ -313,7 +326,6 @@ const ModalOverlay = styled.div`
 
 const ModalContent = styled.div`
   background: white;
-  border-radius: 16px;
   padding: 2rem;
   max-width: 500px;
   width: 100%;
@@ -351,7 +363,6 @@ const ModalHeader = styled.div`
 
 const ModalPrizeInfo = styled.div`
   background: #f8f9fa;
-  border-radius: 12px;
   padding: 1.5rem;
   margin: 1.5rem 0;
   border-left: 4px solid #A91918;
@@ -398,7 +409,6 @@ const ModalButton = styled.button`
   flex: 1;
   padding: 0.75rem 1.5rem;
   border: none;
-  border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -435,6 +445,29 @@ function PremiosNovo({ user, onUserUpdate }) {
   const [filtroCategoria, setFiltroCategoria] = useState('todos');
   const [resgatandoPremio, setResgatandoPremio] = useState(null);
   const [modalConfirmacao, setModalConfirmacao] = useState(null);
+  const [userAtualizado, setUserAtualizado] = useState(user);
+
+  // Atualizar dados do usuário quando necessário
+  const atualizarDadosUsuario = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('clientes_fast')
+        .select('saldo_pontos, total_pontos_ganhos, total_pontos_gastos')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      const dadosAtualizados = { ...user, ...data };
+      setUserAtualizado(dadosAtualizados);
+
+    } catch (error) {
+      console.error('Erro ao atualizar dados do usuário:', error);
+      setUserAtualizado(user);
+    }
+  }, [user?.id]);
 
   const buscarPremios = useCallback(async () => {
     try {
@@ -459,13 +492,25 @@ function PremiosNovo({ user, onUserUpdate }) {
     buscarPremios();
   }, [buscarPremios]);
 
+  useEffect(() => {
+    atualizarDadosUsuario(); // Atualizar dados do usuário ao carregar
+  }, [user?.id]); // Só reexecutar quando o ID do usuário mudar
+
+  useEffect(() => {
+    setUserAtualizado(user); // Sincronizar com props
+  }, [user]);
+
   const premiosFiltrados = premios.filter(premio => {
     if (filtroCategoria === 'todos') return true;
     return premio.categoria === filtroCategoria;
   });
 
   const podeResgatar = (premio) => {
-    return user?.saldo_pontos >= premio.pontos_necessarios;
+    const usuarioParaUsar = userAtualizado || user;
+    const saldoUsuario = Number(usuarioParaUsar?.saldo_pontos) || 0;
+    const pontosNecessarios = Number(premio.pontos_necessarios) || 0;
+
+    return saldoUsuario >= pontosNecessarios;
   };
 
   const handleResgatar = async (premio) => {
@@ -602,7 +647,7 @@ function PremiosNovo({ user, onUserUpdate }) {
                     {CATEGORIAS_PREMIOS[premio.categoria]?.nome || premio.categoria}
                   </PremioCategoria>
                 </PremioImageContainer>
-                
+
                 <PremioContent>
                   <PremioHeader>
                     <PremioTitulo>{premio.nome}</PremioTitulo>
@@ -614,7 +659,6 @@ function PremiosNovo({ user, onUserUpdate }) {
 
                   <PremioFooter>
                     <PremioPontos>
-                      <FiStar />
                       {premio.pontos_necessarios?.toLocaleString()} pts
                     </PremioPontos>
 
@@ -668,12 +712,12 @@ function PremiosNovo({ user, onUserUpdate }) {
               </PrizePoints>
               <PrizePoints>
                 <span>Seu saldo atual:</span>
-                <span className="balance">{user?.saldo_pontos?.toLocaleString()} pts</span>
+                <span className="balance">{(userAtualizado || user)?.saldo_pontos?.toLocaleString()} pts</span>
               </PrizePoints>
               <PrizePoints>
                 <span>Saldo após resgate:</span>
                 <span className="balance">
-                  {(user?.saldo_pontos - modalConfirmacao.pontos_necessarios)?.toLocaleString()} pts
+                  {((userAtualizado || user)?.saldo_pontos - modalConfirmacao.pontos_necessarios)?.toLocaleString()} pts
                 </span>
               </PrizePoints>
             </ModalPrizeInfo>
