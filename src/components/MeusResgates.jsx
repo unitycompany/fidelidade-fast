@@ -28,7 +28,7 @@ const Container = styled.div`
   align-items: center;
   @media (max-width: 900px) {
     padding: 1rem 0;
-    margin-top: -10vh;
+    margin-top: -9vh;
   }
 `;
 

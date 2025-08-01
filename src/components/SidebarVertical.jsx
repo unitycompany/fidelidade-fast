@@ -329,7 +329,6 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
         <MobilePoints>
           {userRole !== 'admin' && (
             <>
-              <FiStar />
               {userAtualizado?.saldo_pontos?.toLocaleString() || '0'} pts
             </>
           )}
