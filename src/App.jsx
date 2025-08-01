@@ -14,6 +14,8 @@ import PremiosNovo from './components/PremiosNovo'
 import CriarTabelaPremios from './components/CriarTabelaPremios'
 import AdminResgates from './components/AdminResgates'
 import AdminPanelNovo from './components/AdminPanelNovo'
+import AdminUsuarios from './components/AdminUsuarios'
+import GerenteResgates from './components/GerenteResgates'
 import MeusResgates from './components/MeusResgates'
 import { inicializarProdutosElegiveis } from './utils/inicializarProdutos'
 import { inicializarPremios } from './utils/inicializarPremios'
@@ -48,7 +50,7 @@ function App() {
   // Verificar se há sessão salva ao carregar a página
   useEffect(() => {
     const initializeApp = async () => {
-      // Verificar URL especial para acesso admin
+      // Verificar URL especial para acesso admin (manter compatibilidade)
       const urlParams = new URLSearchParams(window.location.search)
       const adminAccess = urlParams.get('admin')
 
@@ -59,7 +61,7 @@ function App() {
           id: 'admin',
           nome: 'Administrador Fast',
           email: 'admin@fastsistemas.com.br',
-          isAdmin: true,
+          role: 'admin',
           saldo_pontos: 0
         }
         setUser(adminUser)
@@ -74,9 +76,13 @@ function App() {
           try {
             const userData = JSON.parse(savedUser)
             setUser(userData)
-            // Verificar se é admin salvo
-            if (userData.isAdmin) {
+            // Verificar role do usuário
+            const userRole = userData.role || 'cliente'
+            if (userRole === 'admin') {
               setIsAdminMode(true)
+              setCurrentPage('admin')
+            } else if (userRole === 'gerente') {
+              setCurrentPage('gerente-resgates')
             }
           } catch (error) {
             console.error('Erro ao carregar usuário salvo:', error)
@@ -123,8 +129,22 @@ function App() {
   }, [user, refreshTrigger]); // Adicionado refreshTrigger para atualizar quando houver resgate
 
   const handleLogin = (userData) => {
+    console.log('🔐 Login realizado:', userData.nome)
     setUser(userData)
     localStorage.setItem('clubeFastUser', JSON.stringify(userData))
+
+    // Determinar página inicial baseado no role
+    const userRole = userData.role || 'cliente'
+    if (userRole === 'admin') {
+      setIsAdminMode(true)
+      setCurrentPage('admin')
+    } else if (userRole === 'gerente') {
+      setIsAdminMode(false)
+      setCurrentPage('gerente-resgates')
+    } else {
+      setIsAdminMode(false)
+      setCurrentPage('upload')
+    }
   }
 
   const handleUserUpdate = (updatedUserData) => {
@@ -161,24 +181,69 @@ function App() {
     window.triggerGlobalRefresh = null
   }
 
+  // Função para verificar permissões
+  const temPermissao = (permissaoRequerida) => {
+    const userRole = user?.role || 'cliente'
+
+    switch (permissaoRequerida) {
+      case 'cliente':
+        return ['cliente', 'gerente', 'admin'].includes(userRole)
+      case 'gerente':
+        return ['gerente', 'admin'].includes(userRole)
+      case 'admin':
+        return userRole === 'admin'
+      default:
+        return false
+    }
+  }
+
   const renderPage = () => {
+    // Verificar permissões antes de renderizar páginas
     switch (currentPage) {
       case 'upload':
-        return <UploadPedidoNovo user={user} onUserUpdate={handleUserUpdate} />
+        return temPermissao('cliente') ? <UploadPedidoNovo user={user} onUserUpdate={handleUserUpdate} /> : <div>Acesso negado</div>
       case 'premios':
-        return <PremiosNovo user={user} onUserUpdate={handleUserUpdate} />
+        return temPermissao('cliente') ? <PremiosNovo user={user} onUserUpdate={handleUserUpdate} /> : <div>Acesso negado</div>
       case 'meus-resgates':
-        return <MeusResgates usuario={user} onClose={() => setCurrentPage('upload')} />
+        return temPermissao('cliente') ? <MeusResgates usuario={user} onClose={() => setCurrentPage('upload')} /> : <div>Acesso negado</div>
+
+      // Páginas de Admin
+      case 'admin':
       case 'admin-config':
-        return <AdminPanelNovo section="config" />
+        return temPermissao('admin') ? <AdminPanelNovo section="config" /> : <div>Acesso negado</div>
       case 'admin-resgates':
-        return <AdminPanelNovo section="resgates" />
+        return temPermissao('gerente') ? <AdminPanelNovo section="resgates" /> : <div>Acesso negado</div>
       case 'admin-catalogo':
-        return <AdminPanelNovo section="catalogo" />
+        return temPermissao('admin') ? <AdminPanelNovo section="catalogo" /> : <div>Acesso negado</div>
       case 'admin-estatisticas':
-        return <AdminPanelNovo section="estatisticas" />
+        return temPermissao('admin') ? <AdminPanelNovo section="estatisticas" /> : <div>Acesso negado</div>
+      case 'admin-usuarios':
+        return temPermissao('admin') ? <AdminUsuarios user={user} /> : <div>Acesso negado</div>
+
+      // Página específica para Gerentes
+      case 'gerente-resgates':
+        return temPermissao('gerente') ? <GerenteResgates user={user} /> : <div>Acesso negado</div>
+
+      // Páginas de debug/desenvolvimento (apenas admin)
+      case 'debug':
+        return temPermissao('admin') ? <DatabaseDebugNovo /> : <div>Acesso negado</div>
+      case 'test':
+        return temPermissao('admin') ? <TestConnection /> : <div>Acesso negado</div>
+      case 'debug-upload':
+        return temPermissao('admin') ? <DebugUpload /> : <div>Acesso negado</div>
+      case 'criar-premios':
+        return temPermissao('admin') ? <CriarTabelaPremios /> : <div>Acesso negado</div>
+
       default:
-        return <UploadPedidoNovo user={user} onUserUpdate={handleUserUpdate} />
+        // Redirecionar baseado no role
+        const userRole = user?.role || 'cliente'
+        if (userRole === 'gerente') {
+          return <GerenteResgates user={user} />
+        } else if (userRole === 'admin') {
+          return <AdminPanelNovo section="config" />
+        } else {
+          return <UploadPedidoNovo user={user} onUserUpdate={handleUserUpdate} />
+        }
     }
   }
 

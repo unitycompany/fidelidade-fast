@@ -319,10 +319,9 @@ function NavigationResponsivo({ currentPage, onPageChange, user, onLogout }) {
     };
   }, [user?.id]); // Apenas user.id como dependência
 
-  // Verificar se usuário é admin (agora usando CPF)
-  const isAdmin = user?.cpf_cnpj === '000.000.000-00' ||
+  // Verificar se usuário é admin baseado no role
+  const isAdmin = user?.role === 'admin' ||
     user?.email === 'admin@fastsistemas.com.br' ||
-    user?.is_admin === true ||
     false;
 
   // Combinar itens normais com admin se necessário

@@ -86,52 +86,52 @@ const SidebarMenuItem = styled.button`
 `;
 
 function getSidebarMenuItems(isAdmin) {
-    if (isAdmin) {
-        return [
-            { key: 'admin', label: 'Configuração de Pontos', icon: FiStar },
-            { key: 'admin-resgates', label: 'Resgates', icon: FiGift },
-            { key: 'admin-catalogo', label: 'Catálogo de Prêmios', icon: FiShoppingCart },
-            { key: 'admin-estatisticas', label: 'Estatísticas', icon: FiRefreshCw },
-        ];
-    }
+  if (isAdmin) {
     return [
-        { key: 'dashboard', label: 'Dashboard', icon: FiHome },
-        { key: 'upload', label: 'Enviar Nota', icon: FiUpload },
-        { key: 'premios', label: 'Prêmios', icon: FiGift },
-        { key: 'perfil', label: 'Perfil', icon: FiUser },
+      { key: 'admin', label: 'Configuração de Pontos', icon: FiStar },
+      { key: 'admin-resgates', label: 'Resgates', icon: FiGift },
+      { key: 'admin-catalogo', label: 'Catálogo de Prêmios', icon: FiShoppingCart },
+      { key: 'admin-estatisticas', label: 'Estatísticas', icon: FiRefreshCw },
     ];
+  }
+  return [
+    { key: 'dashboard', label: 'Dashboard', icon: FiHome },
+    { key: 'upload', label: 'Enviar Nota', icon: FiUpload },
+    { key: 'premios', label: 'Prêmios', icon: FiGift },
+    { key: 'perfil', label: 'Perfil', icon: FiUser },
+  ];
 }
 
 const UserSidebar = ({ currentPage, onPageChange, user }) => {
-    const isAdmin = user?.isAdmin || user?.is_admin || user?.email === 'admin@fastsistemas.com.br';
-    const menuItems = getSidebarMenuItems(isAdmin);
-    return (
-        <SidebarContainer>
-            <SidebarLogo src="https://imagedelivery.net/1n9Gwvykoj9c9m8C_4GsGA/336e2c64-e66b-487b-d0e5-40df2b33d100/public" alt="Logo Fast" />
-            <SidebarPoints>
-                <SidebarPointsValue>
-                    <FiStar style={{ marginRight: 6 }} />
-                    {user?.saldo_pontos || 0}
-                </SidebarPointsValue>
-                <SidebarPointsLabel>Pontos</SidebarPointsLabel>
-            </SidebarPoints>
-            <SidebarMenu>
-                {menuItems.map(item => {
-                    const Icon = item.icon;
-                    return (
-                        <SidebarMenuItem
-                            key={item.key}
-                            active={currentPage === item.key}
-                            onClick={() => onPageChange(item.key)}
-                        >
-                            <Icon />
-                            {item.label}
-                        </SidebarMenuItem>
-                    );
-                })}
-            </SidebarMenu>
-        </SidebarContainer>
-    );
+  const isAdmin = user?.role === 'admin' || user?.email === 'admin@fastsistemas.com.br';
+  const menuItems = getSidebarMenuItems(isAdmin);
+  return (
+    <SidebarContainer>
+      <SidebarLogo src="https://imagedelivery.net/1n9Gwvykoj9c9m8C_4GsGA/336e2c64-e66b-487b-d0e5-40df2b33d100/public" alt="Logo Fast" />
+      <SidebarPoints>
+        <SidebarPointsValue>
+          <FiStar style={{ marginRight: 6 }} />
+          {user?.saldo_pontos || 0}
+        </SidebarPointsValue>
+        <SidebarPointsLabel>Pontos</SidebarPointsLabel>
+      </SidebarPoints>
+      <SidebarMenu>
+        {menuItems.map(item => {
+          const Icon = item.icon;
+          return (
+            <SidebarMenuItem
+              key={item.key}
+              active={currentPage === item.key}
+              onClick={() => onPageChange(item.key)}
+            >
+              <Icon />
+              {item.label}
+            </SidebarMenuItem>
+          );
+        })}
+      </SidebarMenu>
+    </SidebarContainer>
+  );
 };
 
 export default UserSidebar;

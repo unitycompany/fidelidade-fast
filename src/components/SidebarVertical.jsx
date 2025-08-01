@@ -12,7 +12,10 @@ import {
   FiDatabase,
   FiBarChart2,
   FiDollarSign,
-  FiMenu
+  FiMenu,
+  FiUsers,
+  FiShield,
+  FiPackage
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 
@@ -174,18 +177,49 @@ const LogoutButton = styled.button`
   }
 `;
 
-const navigationItems = [
+// Itens de navegação para clientes
+const clienteItems = [
   { key: 'upload', label: 'Enviar Nota', icon: FiUpload },
   { key: 'premios', label: 'Prêmios', icon: FiGift }
 ];
 
-// Todas as opções do painel admin, apenas as que funcionam corretamente
+// Itens para gerentes (cliente + resgates admin)
+const gerenteItems = [
+  { key: 'upload', label: 'Enviar Nota', icon: FiUpload },
+  { key: 'premios', label: 'Prêmios', icon: FiGift },
+  { key: 'gerente-resgates', label: 'Resgates Admin', icon: FiSettings }
+];
+
+// Itens para admins (acesso total)
 const adminItems = [
   { key: 'admin-config', label: 'Configuração de Pontos', icon: FiDollarSign },
   { key: 'admin-resgates', label: 'Resgates Admin', icon: FiSettings },
   { key: 'admin-catalogo', label: 'Catálogo de Prêmios', icon: FiGift },
-  { key: 'admin-estatisticas', label: 'Estatísticas', icon: FiBarChart2 }
+  { key: 'admin-estatisticas', label: 'Estatísticas', icon: FiBarChart2 },
+  { key: 'admin-usuarios', label: 'Usuários', icon: FiUsers }
 ];
+
+// Função para obter os itens corretos baseado no role do usuário
+const getNavigationItems = (userRole, temResgates) => {
+  const role = userRole || 'cliente';
+
+  let items = [];
+
+  if (role === 'admin') {
+    items = [...adminItems];
+  } else if (role === 'gerente') {
+    items = [...gerenteItems];
+  } else {
+    items = [...clienteItems];
+  }
+
+  // Adicionar "Meus Resgates" se o usuário tiver resgates (exceto para admin)
+  if (temResgates && role !== 'admin') {
+    items.push({ key: 'meus-resgates', label: 'Meus Resgates', icon: FiStar });
+  }
+
+  return items;
+};
 
 const MobileHeader = styled.div`
   display: none;
@@ -223,16 +257,15 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
   const [userAtualizado, setUserAtualizado] = useState(user);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Verifica admin igual NavigationResponsivo
-  const isAdmin = user?.cpf_cnpj === '000.000.000-00' ||
-    user?.email === 'admin@fastsistemas.com.br' ||
-    user?.is_admin === true ||
-    user?.isAdmin === true ||
-    false;
+  // Determinar role do usuário
+  const userRole = user?.role || 'cliente';
 
-  // Busca pontos atualizados do usuário igual NavigationResponsivo
+  // Busca pontos atualizados do usuário (apenas para clientes e gerentes)
   const buscarDadosUsuario = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || userRole === 'admin') {
+      setUserAtualizado(user);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('clientes_fast')
@@ -244,19 +277,37 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
     } catch (error) {
       setUserAtualizado(user);
     }
-  }, [user]);
+  }, [user, userRole]);
 
-  useEffect(() => { buscarDadosUsuario(); }, [user?.id]);
+  useEffect(() => {
+    buscarDadosUsuario();
+  }, [buscarDadosUsuario]);
+
   useEffect(() => {
     const handler = () => buscarDadosUsuario();
     window.addEventListener('userUpdated', handler);
     return () => window.removeEventListener('userUpdated', handler);
-  }, [user?.id]);
+  }, [buscarDadosUsuario]);
 
   const getInitials = (name) => {
     if (!name) return 'U';
     return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
   };
+
+  const getUserRoleLabel = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Administrador';
+      case 'gerente':
+        return 'Gerente';
+      case 'cliente':
+      default:
+        return 'Cliente';
+    }
+  };
+
+  // Obter itens de navegação baseado no role do usuário
+  const navigationItems = getNavigationItems(userRole, temResgates);
 
   // Corrige o espaçamento do conteúdo principal para não ficar atrás do header mobile
   useEffect(() => {
@@ -276,7 +327,18 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
       <MobileHeader>
         <MobileLogo src="https://imagedelivery.net/1n9Gwvykoj9c9m8C_4GsGA/336e2c64-e66b-487b-d0e5-40df2b33d100/public" alt="Logo" />
         <MobilePoints>
-          {userAtualizado?.saldo_pontos?.toLocaleString() || '0'} pts
+          {userRole !== 'admin' && (
+            <>
+              <FiStar />
+              {userAtualizado?.saldo_pontos?.toLocaleString() || '0'} pts
+            </>
+          )}
+          {userRole === 'admin' && (
+            <>
+              <FiShield />
+              {getUserRoleLabel()}
+            </>
+          )}
         </MobilePoints>
         <MobileSidebarToggle onClick={() => setMobileOpen(true)}>
           <FiMenu />
@@ -286,31 +348,28 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
       <SidebarContainer open={mobileOpen}>
         <LogoSection>
           <LogoImg src="https://imagedelivery.net/1n9Gwvykoj9c9m8C_4GsGA/336e2c64-e66b-487b-d0e5-40df2b33d100/public" alt="Logo" />
-          <Points>
-            {userAtualizado?.saldo_pontos?.toLocaleString() || '0'} pts
-          </Points>
+          {userRole !== 'admin' ? (
+            <Points>
+              <FiStar />
+              {userAtualizado?.saldo_pontos?.toLocaleString() || '0'} <span>pts</span>
+            </Points>
+          ) : (
+            <Points style={{ color: '#cc1515' }}>
+              <FiShield />
+              {getUserRoleLabel()}
+            </Points>
+          )}
         </LogoSection>
         <NavList>
-          <NavItem>
-            <NavButton $active={currentPage === 'upload'} onClick={() => { onPageChange('upload'); setMobileOpen(false); }}>
-              <FiUpload /> Enviar Nota
-            </NavButton>
-          </NavItem>
-          <NavItem>
-            <NavButton $active={currentPage === 'premios'} onClick={() => { onPageChange('premios'); setMobileOpen(false); }}>
-              <FiGift /> Prêmios
-            </NavButton>
-          </NavItem>
-          {temResgates && (
-            <NavItem>
-              <NavButton $active={currentPage === 'meus-resgates'} onClick={() => { onPageChange('meus-resgates'); setMobileOpen(false); }}>
-                <FiList /> Meus Resgates
-              </NavButton>
-            </NavItem>
-          )}
-          {isAdmin && adminItems.map(item => (
+          {navigationItems.map(item => (
             <NavItem key={item.key}>
-              <NavButton $active={currentPage === item.key} onClick={() => { onPageChange(item.key); setMobileOpen(false); }}>
+              <NavButton
+                $active={currentPage === item.key}
+                onClick={() => {
+                  onPageChange(item.key);
+                  setMobileOpen(false);
+                }}
+              >
                 <item.icon />
                 {item.label}
               </NavButton>
@@ -320,7 +379,13 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
         <UserSection>
           <UserAvatar>{getInitials(user?.nome)}</UserAvatar>
           <UserName>{user?.nome?.split(' ')[0] || 'Usuário'}</UserName>
-          <LogoutButton onClick={() => { onLogout(); setMobileOpen(false); }}><FiLogOut /> Sair</LogoutButton>
+          <div style={{ fontSize: '0.8rem', color: '#718096', marginBottom: '0.5rem' }}>
+            {getUserRoleLabel()}
+            {user?.lojas?.nome && ` - ${user.lojas.nome}`}
+          </div>
+          <LogoutButton onClick={() => { onLogout(); setMobileOpen(false); }}>
+            <FiLogOut /> Sair
+          </LogoutButton>
         </UserSection>
       </SidebarContainer>
     </>

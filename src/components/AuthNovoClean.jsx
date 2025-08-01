@@ -403,7 +403,7 @@ const AuthNovoClean = ({ onLogin }) => {
                     saldo_pontos: 0,
                     total_pontos_ganhos: 0,
                     total_pontos_gastos: 0,
-                    is_admin: false
+                    role: 'cliente' // Novo usuário sempre começa como cliente
                 }])
                 .select()
                 .single();
