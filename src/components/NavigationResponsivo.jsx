@@ -73,6 +73,7 @@ const NavLink = styled.button`
   background: ${props => props.$active ? props.theme.colors.primary : 'transparent'};
   color: ${props => props.$active ? 'white' : props.theme.colors.text};
   border: none;
+  border-radius: 0px!important;
   padding: 0.75rem 1rem;
   font-weight: 600;
   cursor: pointer;
@@ -160,7 +161,6 @@ const LogoutButton = styled.button`
   color: white;
   border: none;
   padding: 0.5rem;
-  border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
@@ -217,7 +217,6 @@ const MobileNavLink = styled.button`
   color: ${props => props.$active ? 'white' : props.theme.colors.text};
   border: none;
   padding: 1rem;
-  border-radius: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;

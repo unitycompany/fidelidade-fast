@@ -717,12 +717,7 @@ export const redeemPrize = async (customerId, prizeId, pointsCost) => {
         throw new Error('Pontos insuficientes')
     }
 
-    if (prize.estoque <= 0) {
-        throw new Error('Prêmio fora de estoque')
-    }
-
     const newBalance = customer.saldo_pontos - pointsCost
-    const newStock = prize.estoque - 1
     const newTotalGastos = (customer.total_pontos_gastos || 0) + pointsCost
 
     // Atualizar saldo do cliente e total de pontos gastos
@@ -736,27 +731,21 @@ export const redeemPrize = async (customerId, prizeId, pointsCost) => {
 
     if (balanceError) throw balanceError
 
-    // Atualizar estoque do prêmio
-    const { error: stockError } = await supabase
-        .from('premios_catalogo')
-        .update({ estoque: newStock })
-        .eq('id', prizeId)
-
-    if (stockError) throw stockError
-
-    // Registrar resgate
+    // Registrar resgate (o trigger irá gerar o código automaticamente)
     const { data: redemption, error: redemptionError } = await supabase
         .from('resgates')
         .insert({
             cliente_id: customerId,
             premio_id: prizeId,
-            pontos_gastos: pointsCost,
-            status: 'processando'
+            pontos_utilizados: pointsCost,
+            status: 'confirmado'
         })
-        .select()
+        .select('id, codigo_resgate, created_at')
         .single()
 
     if (redemptionError) throw redemptionError
+
+    console.log('✅ Resgate criado com código:', redemption.codigo_resgate)
 
     // Registrar no histórico
     await supabase

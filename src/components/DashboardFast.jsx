@@ -29,41 +29,52 @@ const bounce = keyframes`
 `;
 
 // Styled Components
+// Ajuste do Container para responsividade máxima
 const Container = styled.div`
   min-height: 100vh;
-  background: #f1f1f1;
-  /* background: linear-gradient(135deg, #f1f1f1 0%, #e8e8e8 50%, #f1f1f1 100%); */
-  padding: 2rem;
+  background: #f8fafc;
+  padding: 2rem 0;
   font-family: 'Montserrat', sans-serif;
-  
-  @media (max-width: 768px) {
-    padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  @media (max-width: 900px) {
+    padding: 1rem 0;
   }
 `;
 
-const MainContent = styled.div`
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  animation: ${slideIn} 0.8s ease-out;
+const Layout = styled.div`
+  display: flex;
+  min-height: 100vh;
+  background: #f8fafc;
 `;
 
+const MainContentSidebar = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 0;
+  @media (max-width: 900px) {
+    padding: 1rem 0;
+  }
+`;
+
+// Ajuste do WelcomeCard para responsividade
 const WelcomeCard = styled.div`
-  background: linear-gradient(135deg, #A91918, #d32f2f);
-  border: 2px dashed #ffffff70;
-  color: white;
-  padding: 2rem;
-  border-radius: 5px;
-  margin-bottom: 2rem;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto 2rem auto;
+  padding: 2.5rem 2rem 2rem 2rem;
+  background: linear-gradient(135deg, #A91918 0%, #d32f2f 100%);
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(169,25,24,0.10);
+  color: #fff;
   text-align: center;
-  box-shadow: 0 20px 40px rgba(169, 25, 24, 0.2);
-  position: relative;
-  overflow: hidden;
   animation: ${fadeIn} 0.6s ease-out;
-  
-  @media (max-width: 768px) {
-    padding: 1.5rem;
-    border-radius: 12px;
+  @media (max-width: 600px) {
+    max-width: 98vw;
+    padding: 1.5rem 0.5rem 1rem 0.5rem;
   }
 `;
 
@@ -403,7 +414,7 @@ const DashboardTd = styled.td`
   text-align: left;
 `;
 
-const DashboardFast = ({ user, setCurrentView, setSelectedUpload, refreshTrigger }) => {
+const DashboardFast = ({ user, setCurrentView, refreshTrigger, currentPage = 'dashboard', onPageChange }) => {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [stats, setStats] = useState({
@@ -540,17 +551,17 @@ const DashboardFast = ({ user, setCurrentView, setSelectedUpload, refreshTrigger
 
   if (loading) {
     return (
-      <Container>
-        <LoadingContainer>
+      <Layout>
+        <MainContentSidebar>
           <Loading />
-        </LoadingContainer>
-      </Container>
-    )
+        </MainContentSidebar>
+      </Layout>
+    );
   }
 
   return (
-    <Container>
-      <MainContent>
+    <Layout>
+      <MainContentSidebar>
         <WelcomeCard style={{ background: '#fff', color: '#222', border: 'none', boxShadow: 'none', marginBottom: 32 }}>
           <WelcomeTitle style={{ color: '#222', fontSize: 22, marginBottom: 8 }}>Pontos Disponíveis</WelcomeTitle>
           <DashboardTable>
@@ -566,9 +577,9 @@ const DashboardFast = ({ user, setCurrentView, setSelectedUpload, refreshTrigger
           <MeusResgates usuario={user} onClose={() => { }} showAsSection={true} />
         )}
         {/* Removido ActionGrid de atalhos */}
-      </MainContent>
-    </Container>
-  )
+      </MainContentSidebar>
+    </Layout>
+  );
 }
 
 export default DashboardFast

@@ -11,41 +11,50 @@ const fadeIn = keyframes`
   to { opacity: 1; transform: translateY(0); }
 `;
 
+// Ajuste do Container para responsividade máxima
 const Container = styled.div`
   min-height: 100vh;
   background: #f8fafc;
-  padding: 2rem;
+  padding: 2rem 0;
+  font-family: 'Montserrat', sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   
-  @media (max-width: 768px) {
-    padding: 1rem;
+  @media (max-width: 900px) {
+    padding: 1rem 0;
   }
 `;
 
+// Ajuste do Content para centralização e responsividade
 const Content = styled.div`
-  max-width: 1200px;
+  width: 100%;
+  max-width: 1000px;
   margin: 0 auto;
   animation: ${fadeIn} 0.6s ease-out;
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 2rem;
   
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     grid-template-columns: 1fr;
     gap: 1rem;
+    max-width: 98vw;
   }
 `;
 
-// Card principal do perfil
+// Ajuste do ProfileCard para responsividade
 const ProfileCard = styled.div`
   background: linear-gradient(145deg, #ffffff 0%, #fafbfc 100%);
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 2rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+  border: 1px solid #f1f1f1;
   height: fit-content;
   
-  @media (max-width: 768px) {
-    padding: 1.5rem;
+  @media (max-width: 900px) {
+    padding: 1.2rem 0.5rem 1rem 0.5rem;
+    border-radius: 12px;
   }
 `;
 
@@ -150,16 +159,17 @@ const StatCard = styled.div`
   }
 `;
 
-// Card de informações detalhadas
+// Ajuste do InfoCard para responsividade
 const InfoCard = styled.div`
   background: linear-gradient(145deg, #ffffff 0%, #fafbfc 100%);
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 2rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+  border: 1px solid #f1f1f1;
   
-  @media (max-width: 768px) {
-    padding: 1.5rem;
+  @media (max-width: 900px) {
+    padding: 1.2rem 0.5rem 1rem 0.5rem;
+    border-radius: 12px;
   }
 `;
 
@@ -400,12 +410,6 @@ function Perfil() {
 
       if (error) throw error
 
-      // Contar pedidos analisados
-      const { count } = await supabase
-        .from('pedidos_fast')
-        .select('*', { count: 'exact', head: true })
-        .eq('cliente_id', user.id)
-
       // Calcular validade dos pontos (1 ano após a data de cadastro dos pontos)
       const validadePontos = new Date()
       validadePontos.setFullYear(validadePontos.getFullYear() + 1)
@@ -414,7 +418,7 @@ function Perfil() {
         saldoAtual: cliente.saldo_pontos || 0,
         totalGanhos: cliente.total_pontos_ganhos || 0,
         totalGastos: cliente.total_pontos_gastos || 0,
-        pedidosAnalisados: count || 0,
+        pedidosAnalisados: cliente.pedidos_analisados || 0,
         dataUltimoLogin: cliente.ultimo_login ? new Date(cliente.ultimo_login) : null,
         dataCadastro: cliente.created_at ? new Date(cliente.created_at) : null,
         validadePontos

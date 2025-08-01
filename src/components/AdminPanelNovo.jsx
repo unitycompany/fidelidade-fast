@@ -7,67 +7,62 @@ import AdminEstatisticasNovo from './AdminEstatisticasNovo';
 import { getPointsPerReal, setPointsPerReal } from '../utils/config';
 
 const Container = styled.div`
-  display: flex;
   min-height: 100vh;
-  @media (max-width: ${props => props.theme.breakpoints.md}) {
-    flex-direction: column;
-  }
-`;
-
-const Sidebar = styled.div`
-  width: 240px;
-  background: ${props => props.theme.colors.backgroundSecondary};
-  border-right: 1px solid ${props => props.theme.colors.gray200};
-  @media (max-width: ${props => props.theme.breakpoints.md}) {
-    width: 100%;
-    display: flex;
-    overflow-x: auto;
-    border-right: none;
-    border-bottom: 1px solid ${props => props.theme.colors.gray200};
-  }
-`;
-
-const MenuItem = styled.button`
-  width: 100%;
-  background: ${props => props.active ? props.theme.colors.gradientPrimary : 'transparent'};
-  color: ${props => props.active ? 'white' : props.theme.colors.text};
+  background: #f8fafc;
   padding: 1rem;
-  border: none;
-  text-align: left;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  &:hover {
-    background: ${props => props.active ? props.theme.colors.gradientPrimary : props.theme.colors.background};
+  
+  @media (max-width: 900px) {
+    padding: 0.5rem;
+    min-height: calc(100vh - 64px);
   }
-  @media (max-width: ${props => props.theme.breakpoints.md}) {
-    flex: 1;
-    justify-content: center;
-    text-align: center;
-  }
-`;
-
-const Content = styled.div`
-  flex: 1;
-  padding: 2rem;
-  background: ${props => props.theme.colors.background};
 `;
 
 const ConfigSection = styled.div`
-  max-width: 400px;
+  max-width: 800px;
+  background: #fff;
+  padding: 2rem;
   margin: 0 auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
+  
+  @media (max-width: 900px) {
+    padding: 1rem;
+    max-width: calc(100vw - 1rem);
+    border-radius: 4px;
+  }
+  
+  h2 {
+    color: #2D3748;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  label {
+    color: #4A5568;
+    font-weight: 500;
+    font-size: 1rem;
+  }
 `;
 
 const Input = styled.input`
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
   border: 1px solid ${props => props.theme.colors.gray300};
-  border-radius: ${props => props.theme.borderRadius.base};
+  border-radius: 4px;
   font-size: ${props => props.theme.fontSizes.base};
+  transition: border-color 0.2s ease;
+  
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 0 0 3px rgba(204, 21, 21, 0.1);
+  }
 `;
 
 const Button = styled.button`
@@ -75,65 +70,53 @@ const Button = styled.button`
   background: ${props => props.theme.colors.primary};
   color: white;
   border: none;
-  border-radius: ${props => props.theme.borderRadius.base};
+  font-size: 16px;
+  border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
+  
   &:hover {
-    opacity: 0.9;
+    background: ${props => props.theme.colors.primaryDark};
+    transform: translateY(-1px);
   }
 `;
 
-function AdminPanelNovo() {
-    const [section, setSection] = useState('config');
-    const [pointsPerRealState, setPointsPerRealState] = useState(1);
+function AdminPanelNovo({ section = 'config' }) {
+  const [pointsPerRealState, setPointsPerRealState] = useState(1);
 
-    useEffect(() => {
-        const current = getPointsPerReal();
-        setPointsPerRealState(current);
-    }, []);
+  useEffect(() => {
+    const current = getPointsPerReal();
+    setPointsPerRealState(current);
+  }, []);
 
-    const handleSaveConfig = () => {
-        setPointsPerReal(pointsPerRealState);
-        window.alert('Configuração salva!');
-    };
+  const handleSaveConfig = () => {
+    setPointsPerReal(pointsPerRealState);
+    window.alert('Configuração salva com sucesso!');
+  };
 
-    return (
-        <Container>
-            <Sidebar>
-                <MenuItem active={section === 'config'} onClick={() => setSection('config')}>
-                    <FiDollarSign /> Valor por R$
-                </MenuItem>
-                <MenuItem active={section === 'resgates'} onClick={() => setSection('resgates')}>
-                    <FiSettings /> Resgates
-                </MenuItem>
-                <MenuItem active={section === 'catalogo'} onClick={() => setSection('catalogo')}>
-                    <FiGift /> Catálogo de Prêmios
-                </MenuItem>
-                <MenuItem active={section === 'estatisticas'} onClick={() => setSection('estatisticas')}>
-                    <FiBarChart2 /> Estatísticas
-                </MenuItem>
-            </Sidebar>
-            <Content>
-                {section === 'config' && (
-                    <ConfigSection>
-                        <h2>Configuração de Pontos</h2>
-                        <label>Quantidade de pontos por R$1,00 gasto:</label>
-                        <Input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={pointsPerRealState}
-                            onChange={e => setPointsPerRealState(parseFloat(e.target.value) || 0)}
-                        />
-                        <Button onClick={handleSaveConfig}>Salvar</Button>
-                    </ConfigSection>
-                )}
-                {section === 'resgates' && <AdminResgates />}
-                {section === 'catalogo' && <AdminPremios />}
-                {section === 'estatisticas' && <AdminEstatisticasNovo />}
-            </Content>
-        </Container>
-    );
+  return (
+    <Container>
+      {section === 'config' && (
+        <ConfigSection>
+          <h2><FiDollarSign /> Configuração de Pontos</h2>
+          <label>Quantidade de pontos por R$1,00 gasto:</label>
+          <Input
+            type="number"
+            min="0"
+            step="0.1"
+            value={pointsPerRealState}
+            onChange={e => setPointsPerRealState(parseFloat(e.target.value) || 0)}
+            placeholder="Ex: 1.5"
+          />
+          <Button onClick={handleSaveConfig}>Salvar Configuração</Button>
+        </ConfigSection>
+      )}
+      {section === 'resgates' && <AdminResgates />}
+      {section === 'catalogo' && <AdminPremios />}
+      {section === 'estatisticas' && <AdminEstatisticasNovo />}
+    </Container>
+  );
 }
 
 export default AdminPanelNovo;

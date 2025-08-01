@@ -22,17 +22,19 @@ const pulse = keyframes`
   50% { opacity: 0.5; }
 `;
 
-// Container igual ao dashboard
+// Container otimizado para responsividade
 const Container = styled.div`
   min-height: 100vh;
-  background: #f1f1f1;
-  padding: 2rem 0;
+  background: #f8fafc;
+  padding: 1rem;
   font-family: 'Montserrat', sans-serif;
   display: flex;
   flex-direction: column;
   align-items: center;
-  @media (max-width: 768px) {
-    padding: 1rem 0;
+  
+  @media (max-width: 900px) {
+    padding: 0.5rem;
+    min-height: calc(100vh - 64px);
   }
 `;
 
@@ -48,20 +50,20 @@ const MainContent = styled.div`
 
 const MinimalContainer = styled.div`
   width: 100%;
-  min-width: 320px;
-  max-width: 600px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 2.5rem 2rem 2rem 2rem;
+  padding: 2rem;
   background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
-  margin-top: 2.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
   align-items: center;
+  
   @media (max-width: 900px) {
-    padding: 1.5rem 0.5rem;
-    max-width: 98vw;
+    padding: 1rem;
+    max-width: calc(100vw - 1rem);
+    border-radius: 4px;
   }
 `;
 
@@ -69,20 +71,30 @@ const MinimalHeader = styled.div`
   width: 100%;
   text-align: center;
   margin-bottom: 2rem;
+  
   h1 {
     font-size: 1.7rem;
     font-weight: 700;
     color: #A91918;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+    
+    @media (max-width: 600px) {
+      font-size: 1.4rem;
+    }
   }
+  
   p {
     color: #555;
     font-size: 1rem;
     margin: 0;
+    
+    @media (max-width: 600px) {
+      font-size: 0.9rem;
+    }
   }
 `;
 
@@ -90,21 +102,25 @@ const MinimalUpload = styled.label`
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #f7f7f7;
-  border-radius: 10px;
-  padding: 2.2rem 1.2rem 1.5rem 1.2rem;
-  margin-bottom: 1.5rem;
+  padding: 2rem;
+  margin-bottom: 1rem;
   width: 100%;
-  max-width: 420px;
-  box-shadow: 0 1px 8px rgba(0,0,0,0.03);
-  border: none;
-  transition: box-shadow 0.2s;
-  @media (max-width: 600px) {
-    max-width: 98vw;
-    padding: 1.2rem 0.5rem 1rem 0.5rem;
-  }
+  max-width: 500px;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #fafafa;
+  
   &:hover {
-    box-shadow: 0 2px 16px rgba(169,25,24,0.08);
+    border-color: #A91918;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  
+  @media (max-width: 600px) {
+    padding: 1.5rem 1rem;
+    max-width: 100%;
   }
 `;
 
@@ -112,7 +128,6 @@ const MinimalButton = styled.button`
   background: #A91918;
   color: #fff;
   border: none;
-  border-radius: 6px;
   padding: 0.9rem 1.5rem;
   font-size: 1.08rem;
   font-weight: 600;
@@ -707,7 +722,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       <MainContent>
         <MinimalContainer>
           <MinimalHeader>
-            <h1><FiUpload /> Enviar Nota Fiscal</h1>
+            <h1>Enviar Nota Fiscal</h1>
             <p>Faça upload da nota fiscal para processar seus pontos.</p>
           </MinimalHeader>
           <MinimalUpload htmlFor="file-upload">

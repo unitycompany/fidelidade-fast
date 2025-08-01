@@ -15,7 +15,6 @@ import {
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
-import ClienteDetalhes from './ClienteDetalhes';
 
 // Animações
 const fadeInUp = keyframes`
@@ -31,91 +30,100 @@ const pulse = keyframes`
 
 // Styled Components
 const Container = styled.div`
-  padding: 2rem;
-  max-width: 1200px;
+  padding: 1rem;
+  max-width: 1400px;
   margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  
+  @media (min-width: 768px) {
+    padding: 2rem;
+  }
 `;
 
 const Header = styled.div`
   background: linear-gradient(135deg, #A91918, #8B1510);
   color: white;
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: 12px;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   text-align: center;
   animation: ${fadeInUp} 0.6s ease-out;
   
   h1 {
     font-family: 'Urbanist', sans-serif;
-    font-size: 2.2rem;
+    font-size: 1.5rem;
     margin-bottom: 0.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 1rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    
+    @media (min-width: 768px) {
+      font-size: 2.2rem;
+      gap: 1rem;
+    }
   }
   
   p {
     opacity: 0.9;
-    font-size: 1.1rem;
+    font-size: 1rem;
     margin: 0;
-  }
-`;
-
-// Seção de filtros e exportação
-const FiltersSection = styled.div`
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: end;
-  animation: ${fadeInUp} 0.6s ease-out 0.1s both;
-`;
-
-const FilterGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  
-  label {
-    font-weight: 600;
-    color: #4a5568;
-    font-size: 0.9rem;
-  }
-  
-  input {
-    padding: 0.5rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    font-size: 0.9rem;
     
-    &:focus {
-      outline: none;
-      border-color: #A91918;
-      box-shadow: 0 0 0 3px rgba(169, 25, 24, 0.1);
+    @media (min-width: 768px) {
+      font-size: 1.1rem;
     }
   }
+  
+  @media (min-width: 768px) {
+    padding: 2rem;
+    margin-bottom: 2rem;
+  }
 `;
+
+// Seção de filtros e exportação - REMOVIDO
+// FilterGroup - REMOVIDO
+// FiltersSection - REMOVIDO
 
 const StatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
   animation: ${fadeInUp} 0.6s ease-out 0.2s both;
+  
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  @media (min-width: 1280px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
 `;
 
 const StatCard = styled.div`
   background: white;
   border-radius: 12px;
-  padding: 1.5rem;
+  padding: 1.25rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   border-left: 4px solid ${props => props.color || '#A91918'};
   transition: all 0.3s ease;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  
+  @media (min-width: 768px) {
+    padding: 1.5rem;
+    min-height: 140px;
+  }
   
   &:hover {
     transform: translateY(-4px);
@@ -130,47 +138,78 @@ const StatHeader = styled.div`
 `;
 
 const StatIcon = styled.div`
-  width: 50px;
-  height: 50px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
   background: ${props => props.color}15;
   color: ${props => props.color};
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   animation: ${pulse} 2s infinite;
+  flex-shrink: 0;
+  
+  @media (min-width: 768px) {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    font-size: 1.5rem;
+  }
 `;
 
 const StatContent = styled.div`
   flex: 1;
-  margin-left: 1rem;
+  margin-left: 0.75rem;
+  min-width: 0;
+  
+  @media (min-width: 768px) {
+    margin-left: 1rem;
+  }
 `;
 
 const StatTitle = styled.h3`
   color: #4a5568;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.25rem 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  line-height: 1.2;
+  
+  @media (min-width: 768px) {
+    font-size: 0.9rem;
+    margin: 0 0 0.5rem 0;
+  }
 `;
 
 const StatValue = styled.div`
   color: ${props => props.color || '#A91918'};
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: bold;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.1rem;
+  line-height: 1;
+  word-break: break-all;
+  
+  @media (min-width: 768px) {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+  }
 `;
 
 const StatSubtitle = styled.p`
   color: #718096;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   margin: 0;
+  line-height: 1.2;
+  
+  @media (min-width: 768px) {
+    font-size: 0.85rem;
+  }
 `;
 
 const Button = styled.button`
-  padding: 0.75rem 1.5rem;
+  padding: 0.5rem 1rem;
   border: none;
   border-radius: 8px;
   font-weight: 600;
@@ -178,7 +217,16 @@ const Button = styled.button`
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
+  width: 100%;
+  font-size: 0.9rem;
+  
+  @media (min-width: 768px) {
+    padding: 0.75rem 1.5rem;
+    width: auto;
+    font-size: 1rem;
+  }
   
   ${props => props.variant === 'primary' ? `
     background: linear-gradient(135deg, #A91918, #8B1510);
@@ -216,49 +264,95 @@ const Button = styled.button`
 const Section = styled.div`
   background: white;
   border-radius: 12px;
-  padding: 2rem;
+  padding: 1rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   animation: ${fadeInUp} 0.6s ease-out 0.3s both;
+  
+  @media (min-width: 768px) {
+    padding: 2rem;
+    margin-bottom: 2rem;
+  }
 `;
 
 const SectionHeader = styled.div`
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  flex-direction: column;
+  gap: 1rem;
+  
+  @media (min-width: 768px) {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    gap: 0;
+  }
   
   h2 {
     color: #A91918;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     margin: 0;
     font-family: 'Urbanist', sans-serif;
     font-weight: 700;
+    
+    @media (min-width: 768px) {
+      font-size: 1.5rem;
+    }
+  }
+`;
+
+const TableContainer = styled.div`
+  overflow-x: auto;
+  margin-top: 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  
+  @media (max-width: 767px) {
+    -webkit-overflow-scrolling: touch;
   }
 `;
 
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
-  margin-top: 1rem;
+  min-width: 600px;
+  
+  @media (max-width: 767px) {
+    min-width: 500px;
+  }
 `;
 
 const Th = styled.th`
   text-align: left;
-  padding: 1rem;
+  padding: 0.75rem;
   background: #f8fafc;
   color: #4a5568;
   font-weight: 600;
   border-bottom: 2px solid #e2e8f0;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  
+  @media (min-width: 768px) {
+    padding: 1rem;
+    font-size: 1rem;
+  }
 `;
 
 const Td = styled.td`
-  padding: 1rem;
+  padding: 0.75rem;
   border-bottom: 1px solid #e2e8f0;
   color: #4a5568;
+  font-size: 0.9rem;
+  
+  @media (min-width: 768px) {
+    padding: 1rem;
+    font-size: 1rem;
+  }
 `;
 
 const Tr = styled.tr`
@@ -267,13 +361,6 @@ const Tr = styled.tr`
   
   &:hover {
     background: #f8fafc;
-  }
-`;
-
-const ClickableRow = styled(Tr)`
-  &:hover {
-    background: #e3f2fd;
-    transform: translateX(2px);
   }
 `;
 
@@ -289,18 +376,8 @@ function AdminEstatisticasNovo() {
         valorMedioResgates: 0
     });
 
-    const [topClientes, setTopClientes] = useState([]);
     const [premiosPopulares, setPremiosPopulares] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [exporting, setExporting] = useState(false);
-    const [clienteSelecionado, setClienteSelecionado] = useState(null);
-
-    // Filtros para exportação
-    const [filters, setFilters] = useState({
-        dataInicio: '',
-        dataFim: '',
-        tipoRelatorio: 'clientes' // clientes, resgates, pontos
-    });
 
     useEffect(() => {
         loadStats();
@@ -331,7 +408,7 @@ function AdminEstatisticasNovo() {
 
             // Prêmios ativos
             const { count: premiosAtivos } = await supabase
-                .from('premios')
+                .from('premios_catalogo')
                 .select('*', { count: 'exact', head: true })
                 .eq('ativo', true);
 
@@ -381,28 +458,19 @@ function AdminEstatisticasNovo() {
                 valorMedioResgates: Math.round(valorMedioResgates)
             });
 
-            // Top clientes
-            const { data: topClientesData } = await supabase
-                .from('clientes_fast')
-                .select('nome, email, saldo_pontos, total_pontos_ganhos')
-                .order('total_pontos_ganhos', { ascending: false })
-                .limit(5);
-
-            setTopClientes(topClientesData || []);
-
             // Prêmios mais populares
             const { data: premiosData } = await supabase
                 .from('resgates')
                 .select(`
                     premio_id,
-                    premios (nome)
+                    premios_catalogo (nome)
                 `)
                 .eq('status', 'confirmado');
 
             // Contar popularidade dos prêmios
             const premiosCount = {};
             premiosData?.forEach(resgate => {
-                const premioNome = resgate.premios?.nome;
+                const premioNome = resgate.premios_catalogo?.nome;
                 if (premioNome) {
                     premiosCount[premioNome] = (premiosCount[premioNome] || 0) + 1;
                 }
@@ -421,154 +489,6 @@ function AdminEstatisticasNovo() {
         } finally {
             setLoading(false);
         }
-    };
-
-    const exportToCSV = async () => {
-        try {
-            setExporting(true);
-
-            let data = [];
-            let filename = '';
-            let headers = [];
-
-            const { dataInicio, dataFim, tipoRelatorio } = filters;
-
-            // Construir filtros de data
-            let query = supabase;
-            let whereClause = '';
-
-            if (dataInicio && dataFim) {
-                whereClause = `created_at >= '${dataInicio}' AND created_at <= '${dataFim} 23:59:59'`;
-            }
-
-            switch (tipoRelatorio) {
-                case 'clientes':
-                    const { data: clientesData } = await supabase
-                        .from('clientes_fast')
-                        .select(`
-                            nome,
-                            email,
-                            telefone,
-                            saldo_pontos,
-                            total_pontos_ganhos,
-                            total_pontos_gastos,
-                            created_at
-                        `)
-                        .order('created_at', { ascending: false });
-
-                    data = clientesData || [];
-                    filename = 'clientes_fast';
-                    headers = ['Nome', 'Email', 'Telefone', 'Saldo Pontos', 'Total Ganho', 'Total Gasto', 'Data Cadastro'];
-                    break;
-
-                case 'resgates':
-                    let resgatesQuery = supabase
-                        .from('resgates')
-                        .select(`
-                            created_at,
-                            pontos_utilizados,
-                            status,
-                            clientes_fast (nome, email),
-                            premios (nome, pontos_necessarios)
-                        `);
-
-                    if (dataInicio && dataFim) {
-                        resgatesQuery = resgatesQuery
-                            .gte('created_at', dataInicio)
-                            .lte('created_at', dataFim + ' 23:59:59');
-                    }
-
-                    const { data: resgatesData } = await resgatesQuery.order('created_at', { ascending: false });
-
-                    data = resgatesData?.map(resgate => ({
-                        data: new Date(resgate.created_at).toLocaleDateString('pt-BR'),
-                        cliente: resgate.clientes_fast?.nome || '',
-                        email: resgate.clientes_fast?.email || '',
-                        premio: resgate.premios?.nome || '',
-                        pontos_utilizados: resgate.pontos_utilizados,
-                        status: resgate.status
-                    })) || [];
-
-                    filename = 'resgates_fast';
-                    headers = ['Data', 'Cliente', 'Email', 'Prêmio', 'Pontos Utilizados', 'Status'];
-                    break;
-
-                case 'pontos':
-                    let pontosQuery = supabase
-                        .from('historico_pontos')
-                        .select(`
-                            created_at,
-                            pontos,
-                            tipo,
-                            descricao,
-                            clientes_fast (nome, email)
-                        `);
-
-                    if (dataInicio && dataFim) {
-                        pontosQuery = pontosQuery
-                            .gte('created_at', dataInicio)
-                            .lte('created_at', dataFim + ' 23:59:59');
-                    }
-
-                    const { data: pontosData } = await pontosQuery.order('created_at', { ascending: false });
-
-                    data = pontosData?.map(ponto => ({
-                        data: new Date(ponto.created_at).toLocaleDateString('pt-BR'),
-                        cliente: ponto.clientes_fast?.nome || '',
-                        email: ponto.clientes_fast?.email || '',
-                        pontos: ponto.pontos,
-                        tipo: ponto.tipo,
-                        descricao: ponto.descricao
-                    })) || [];
-
-                    filename = 'historico_pontos_fast';
-                    headers = ['Data', 'Cliente', 'Email', 'Pontos', 'Tipo', 'Descrição'];
-                    break;
-            }
-
-            if (data.length === 0) {
-                toast.error('Nenhum dado encontrado para exportar');
-                return;
-            }
-
-            // Converter para CSV
-            const csvContent = [
-                headers.join(','),
-                ...data.map(row =>
-                    headers.map(header => {
-                        const key = header.toLowerCase().replace(/\s+/g, '_');
-                        const value = typeof row === 'object' ? Object.values(row)[headers.indexOf(header)] : row[key];
-                        return `"${String(value || '').replace(/"/g, '""')}"`;
-                    }).join(',')
-                )
-            ].join('\n');
-
-            // Download do arquivo
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            toast.success('Relatório exportado com sucesso!');
-
-        } catch (error) {
-            console.error('Erro ao exportar relatório:', error);
-            toast.error('Erro ao exportar relatório');
-        } finally {
-            setExporting(false);
-        }
-    };
-
-    const handleFilterChange = (field, value) => {
-        setFilters(prev => ({
-            ...prev,
-            [field]: value
-        }));
     };
 
     if (loading) {
@@ -593,54 +513,6 @@ function AdminEstatisticasNovo() {
                 </h1>
                 <p>Relatórios e métricas do programa de fidelidade</p>
             </Header>
-
-            {/* Filtros e Exportação */}
-            <FiltersSection>
-                <FilterGroup>
-                    <label>Data Início</label>
-                    <input
-                        type="date"
-                        value={filters.dataInicio}
-                        onChange={(e) => handleFilterChange('dataInicio', e.target.value)}
-                    />
-                </FilterGroup>
-
-                <FilterGroup>
-                    <label>Data Fim</label>
-                    <input
-                        type="date"
-                        value={filters.dataFim}
-                        onChange={(e) => handleFilterChange('dataFim', e.target.value)}
-                    />
-                </FilterGroup>
-
-                <FilterGroup>
-                    <label>Tipo de Relatório</label>
-                    <select
-                        value={filters.tipoRelatorio}
-                        onChange={(e) => handleFilterChange('tipoRelatorio', e.target.value)}
-                        style={{ padding: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '6px' }}
-                    >
-                        <option value="clientes">Clientes</option>
-                        <option value="resgates">Resgates</option>
-                        <option value="pontos">Histórico de Pontos</option>
-                    </select>
-                </FilterGroup>
-
-                <Button
-                    variant="success"
-                    onClick={exportToCSV}
-                    disabled={exporting}
-                >
-                    <FiDownload />
-                    {exporting ? 'Exportando...' : 'Exportar CSV'}
-                </Button>
-
-                <Button onClick={loadStats} disabled={loading}>
-                    <FiRefreshCw />
-                    Atualizar
-                </Button>
-            </FiltersSection>
 
             {/* Grid de Estatísticas */}
             <StatsGrid>
@@ -749,41 +621,6 @@ function AdminEstatisticasNovo() {
                 </StatCard>
             </StatsGrid>
 
-            {/* Top Clientes */}
-            <Section>
-                <SectionHeader>
-                    <h2>
-                        <FiUsers />
-                        Top Clientes
-                    </h2>
-                </SectionHeader>
-
-                <Table>
-                    <thead>
-                        <tr>
-                            <Th>Cliente</Th>
-                            <Th>Email</Th>
-                            <Th>Pontos Atuais</Th>
-                            <Th>Total Ganho</Th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {topClientes.map((cliente, index) => (
-                            <ClickableRow
-                                key={index}
-                                onClick={() => setClienteSelecionado(cliente)}
-                                title="Clique para ver detalhes completos"
-                            >
-                                <Td>{cliente.nome}</Td>
-                                <Td>{cliente.email}</Td>
-                                <Td>{(cliente.saldo_pontos || 0).toLocaleString()}</Td>
-                                <Td>{(cliente.total_pontos_ganhos || 0).toLocaleString()}</Td>
-                            </ClickableRow>
-                        ))}
-                    </tbody>
-                </Table>
-            </Section>
-
             {/* Prêmios Populares */}
             <Section>
                 <SectionHeader>
@@ -791,33 +628,31 @@ function AdminEstatisticasNovo() {
                         <FiGift />
                         Prêmios Mais Populares
                     </h2>
+                    <Button onClick={loadStats} disabled={loading}>
+                        <FiRefreshCw />
+                        Atualizar
+                    </Button>
                 </SectionHeader>
 
-                <Table>
-                    <thead>
-                        <tr>
-                            <Th>Prêmio</Th>
-                            <Th>Total de Resgates</Th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {premiosPopulares.map((premio, index) => (
-                            <Tr key={index}>
-                                <Td>{premio.nome}</Td>
-                                <Td>{premio.resgates}</Td>
-                            </Tr>
-                        ))}
-                    </tbody>
-                </Table>
+                <TableContainer>
+                    <Table>
+                        <thead>
+                            <tr>
+                                <Th>Prêmio</Th>
+                                <Th>Total de Resgates</Th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {premiosPopulares.map((premio, index) => (
+                                <Tr key={index}>
+                                    <Td>{premio.nome}</Td>
+                                    <Td>{premio.resgates}</Td>
+                                </Tr>
+                            ))}
+                        </tbody>
+                    </Table>
+                </TableContainer>
             </Section>
-
-            {/* Modal de detalhes do cliente */}
-            {clienteSelecionado && (
-                <ClienteDetalhes
-                    cliente={clienteSelecionado}
-                    onClose={() => setClienteSelecionado(null)}
-                />
-            )}
         </Container>
     );
 }

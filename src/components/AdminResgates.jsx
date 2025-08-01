@@ -297,19 +297,58 @@ function AdminResgates() {
         try {
             setLoading(true);
 
-            const { data, error } = await supabase
-                .from('admin_resgates_view')
-                .select('*');
+            // Buscar resgates com joins para ter dados completos
+            const { data: resgatesData, error: resgatesError } = await supabase
+                .from('resgates')
+                .select(`
+                    *,
+                    premios_catalogo!inner(
+                        id,
+                        nome,
+                        categoria,
+                        descricao,
+                        pontos_necessarios
+                    ),
+                    clientes_fast!inner(
+                        id,
+                        nome,
+                        email,
+                        telefone
+                    )
+                `)
+                .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (resgatesError) throw resgatesError;
 
-            setResgates(data || []);
+            // Formatar dados para o admin
+            const resgatesFormatados = resgatesData?.map(resgate => ({
+                id: resgate.id,
+                codigo_resgate: resgate.codigo_resgate || `RES-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${resgate.id.substring(0, 4).toUpperCase()}`, // Gerar código temporário se não existir
+                data_resgate: resgate.created_at,
+                coletado: resgate.coletado || false,
+                data_coleta: resgate.data_coleta,
+                pontos_utilizados: resgate.pontos_utilizados,
+                status: resgate.status,
+                // Dados do cliente
+                cliente_nome: resgate.clientes_fast.nome,
+                cliente_email: resgate.clientes_fast.email,
+                cliente_telefone: resgate.clientes_fast.telefone,
+                // Dados do prêmio
+                premio_nome: resgate.premios_catalogo.nome,
+                premio_categoria: resgate.premios_catalogo.categoria,
+                premio_descricao: resgate.premios_catalogo.descricao,
+                premio_pontos: resgate.premios_catalogo.pontos_necessarios,
+                // Status formatado
+                status_coleta: resgate.coletado ? 'Coletado' : 'Aguardando Coleta'
+            })) || [];
+
+            setResgates(resgatesFormatados);
 
             // Calcular estatísticas
-            const total = data?.length || 0;
-            const pendentes = data?.filter(r => !r.coletado).length || 0;
-            const coletados = data?.filter(r => r.coletado).length || 0;
-            const hoje = data?.filter(r => {
+            const total = resgatesFormatados?.length || 0;
+            const pendentes = resgatesFormatados?.filter(r => !r.coletado).length || 0;
+            const coletados = resgatesFormatados?.filter(r => r.coletado).length || 0;
+            const hoje = resgatesFormatados?.filter(r => {
                 const dataResgate = new Date(r.data_resgate);
                 const hoje = new Date();
                 return dataResgate.toDateString() === hoje.toDateString();
@@ -333,11 +372,16 @@ function AdminResgates() {
         try {
             setProcessando(true);
 
+            // Atualizar resgate como coletado usando o código
             const { data, error } = await supabase
-                .rpc('marcar_resgate_coletado', {
-                    p_codigo_resgate: codigo,
-                    p_observacoes_admin: `Resgatado via painel administrativo em ${new Date().toLocaleString()}`
-                });
+                .from('resgates')
+                .update({
+                    coletado: true,
+                    data_coleta: new Date().toISOString()
+                })
+                .eq('codigo_resgate', codigo)
+                .select()
+                .single();
 
             if (error) throw error;
 

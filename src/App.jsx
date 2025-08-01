@@ -17,6 +17,8 @@ import AdminPanelNovo from './components/AdminPanelNovo'
 import MeusResgates from './components/MeusResgates'
 import { inicializarProdutosElegiveis } from './utils/inicializarProdutos'
 import { inicializarPremios } from './utils/inicializarPremios'
+import SidebarVertical from './components/SidebarVertical'
+import { supabase } from './services/supabase'
 
 // Contexto para autenticação e estado global
 const AuthContext = createContext()
@@ -30,11 +32,13 @@ export const useAuth = () => {
 }
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [currentPage, setCurrentPage] = useState('upload')
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [isAdminMode, setIsAdminMode] = useState(false)
+  // Novo: mostrar campo 'meus resgates' se houver resgates
+  const [temResgates, setTemResgates] = useState(false);
 
   // Função global para forçar refresh de dados
   const triggerGlobalRefresh = () => {
@@ -101,6 +105,23 @@ function App() {
     initializeApp()
   }, [])
 
+  // Novo: verificar se há resgates na conta do usuário
+  useEffect(() => {
+    async function checarResgates() {
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from('resgates')
+          .select('id')
+          .eq('cliente_id', user.id)
+          .limit(1);
+        setTemResgates(data && data.length > 0);
+      } else {
+        setTemResgates(false);
+      }
+    }
+    checarResgates();
+  }, [user, refreshTrigger]); // Adicionado refreshTrigger para atualizar quando houver resgate
+
   const handleLogin = (userData) => {
     setUser(userData)
     localStorage.setItem('clubeFastUser', JSON.stringify(userData))
@@ -142,28 +163,22 @@ function App() {
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'dashboard':
-        return <DashboardFast user={user} setCurrentView={setCurrentPage} refreshTrigger={refreshTrigger} />
       case 'upload':
         return <UploadPedidoNovo user={user} onUserUpdate={handleUserUpdate} />
       case 'premios':
         return <PremiosNovo user={user} onUserUpdate={handleUserUpdate} />
-      case 'resgates':
-        return <MeusResgates usuario={user} onClose={() => setCurrentPage('dashboard')} />
+      case 'meus-resgates':
+        return <MeusResgates usuario={user} onClose={() => setCurrentPage('upload')} />
+      case 'admin-config':
+        return <AdminPanelNovo section="config" />
       case 'admin-resgates':
-        return <AdminResgates />
-      case 'admin': // Painel administrativo completo
-        return <AdminPanelNovo />
-      case 'criar-tabelas':
-        return <CriarTabelaPremios />
-      case 'test':
-        return <TestConnection />
-      case 'debug':
-        return <DebugUpload />
-      case 'db-debug':
-        return <DatabaseDebugNovo />
+        return <AdminPanelNovo section="resgates" />
+      case 'admin-catalogo':
+        return <AdminPanelNovo section="catalogo" />
+      case 'admin-estatisticas':
+        return <AdminPanelNovo section="estatisticas" />
       default:
-        return <DashboardFast user={user} setCurrentView={setCurrentPage} refreshTrigger={refreshTrigger} />
+        return <UploadPedidoNovo user={user} onUserUpdate={handleUserUpdate} />
     }
   }
 
@@ -204,14 +219,34 @@ function App() {
     <ThemeProvider theme={themeFast}>
       <GlobalStyle />
       <AuthContext.Provider value={{ user, logout: handleLogout }}>
-        <NavigationResponsivo
-          currentPage={currentPage}
-          onPageChange={setCurrentPage}
-          user={user}
-          onLogout={handleLogout}
-          isAdminMode={isAdminMode}
-        />
-        {renderPage()}
+        {/* Layout responsivo com sidebar */}
+        <div style={{ display: 'flex', minHeight: '100vh' }}>
+          <SidebarVertical
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            user={user}
+            onLogout={handleLogout}
+            isAdminMode={isAdminMode}
+            temResgates={temResgates}
+          />
+          <div style={{
+            flex: 1,
+            marginLeft: '250px',
+            transition: 'margin-left 0.3s ease'
+          }}
+            className="main-content-area"
+          >
+            {renderPage()}
+          </div>
+        </div>
+        <style jsx global>{`
+          @media (max-width: 900px) {
+            .main-content-area {
+              margin-left: 0 !important;
+              padding-top: 64px !important;
+            }
+          }
+        `}</style>
       </AuthContext.Provider>
       <Toaster position="top-right" />
     </ThemeProvider>

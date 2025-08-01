@@ -132,6 +132,46 @@ export const GlobalStyle = createGlobalStyle`
   .animate-fadeIn {
     animation: fadeIn 0.3s ease-out;
   }
+
+  /* Layout responsivo otimizado */
+  .main-content-area {
+    margin-left: 250px;
+    transition: margin-left 0.3s ease;
+  }
+  
+  /* Responsividade global para layout com sidebar */
+  @media (max-width: 900px) {
+    .main-content-area {
+      margin-left: 0 !important;
+      padding-top: 64px !important;
+    }
+    
+    body {
+      overflow-x: hidden;
+    }
+  }
+
+  /* Otimizações para dispositivos móveis */
+  @media (max-width: 600px) {
+    html {
+      font-size: 14px;
+    }
+    
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .main-content-area {
+      margin-left: 0 !important;
+      padding-top: 64px !important;
+    }
+    
+    body {
+      overflow-x: hidden;
+    }
+  }
 `
 
 // Container principal
