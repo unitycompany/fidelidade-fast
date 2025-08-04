@@ -17,6 +17,7 @@ import AdminPanelNovo from './components/AdminPanelNovo'
 import AdminUsuarios from './components/AdminUsuarios'
 import GerenteResgates from './components/GerenteResgates'
 import MeusResgates from './components/MeusResgates'
+import TesteUploadImagem from './components/TesteUploadImagem'
 import { inicializarProdutosElegiveis } from './utils/inicializarProdutos'
 import { inicializarPremios } from './utils/inicializarPremios'
 import SidebarVertical from './components/SidebarVertical'
@@ -235,6 +236,8 @@ function App() {
         return temPermissao('admin') ? <TestConnection /> : <div>Acesso negado</div>
       case 'debug-upload':
         return temPermissao('admin') ? <DebugUpload /> : <div>Acesso negado</div>
+      case 'teste-imagem':
+        return temPermissao('admin') ? <TesteUploadImagem /> : <div>Acesso negado</div>
       case 'criar-premios':
         return temPermissao('admin') ? <CriarTabelaPremios /> : <div>Acesso negado</div>
 
