@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled, { keyframes, css } from 'styled-components';
-import { FiUpload, FiFile, FiCheck, FiX, FiStar, FiInfo } from 'react-icons/fi';
+import { FiUpload, FiFile, FiCheck, FiX, FiStar, FiInfo, FiEye, FiTarget, FiDatabase, FiGift } from 'react-icons/fi';
 import { analyzeOrderWithGemini } from '../services/geminiService';
 import { processOrderResult, validateOrder, validarPontosCalculados } from '../utils/pedidosFast'; // removed getProdutosElegiveis import
 import { saveOrder, saveOrderItems, addPointsToCustomer, checkOrderExists } from '../services/supabase';
 import { getPointsPerReal } from '../utils/config';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeIn = keyframes`
@@ -20,6 +21,28 @@ const spin = keyframes`
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+`;
+
+const slideOutUp = keyframes`
+  from { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+  to { 
+    opacity: 0; 
+    transform: translateY(-30px); 
+  }
+`;
+
+const slideInUp = keyframes`
+  from { 
+    opacity: 0; 
+    transform: translateY(30px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
 `;
 
 // Container otimizado para responsividade
@@ -146,6 +169,28 @@ const MinimalButton = styled.button`
   }
 `;
 
+const SecondaryButton = styled.button`
+  background: transparent;
+  color: #A91918;
+  border: 2px solid #A91918;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  width: 100%;
+  max-width: 320px;
+  align-self: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  @media (max-width: 600px) {
+    max-width: 98vw;
+  }
+  &:hover {
+    background: #A91918;
+    color: #fff;
+  }
+`;
+
 const MinimalResult = styled.div`
   width: 100%;
   max-width: 480px;
@@ -267,11 +312,129 @@ const CodigoAviso = styled.div`
   font-weight: 500;
 `;
 
+const ProcessingContainer = styled.div`
+  width: 100%;
+  max-width: 500px;
+  background: transparent;
+  padding: 2rem;
+  margin-top: 1.5rem;
+  text-align: center;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+`;
+
+const CurrentStep = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2rem;
+`;
+
+const StepSpinnerLarge = styled.div`
+  width: 80px;
+  height: 80px;
+  border: 4px solid #f0f0f0;
+  border-top: 4px solid #A91918;
+  border-right: 4px solid #A91918;
+  border-radius: 50%;
+  animation: ${spin} 2s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+  position: relative;
+  background: radial-gradient(circle, rgba(169, 25, 24, 0.1) 0%, transparent 70%);
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    border: 2px solid transparent;
+    border-top: 2px solid #A91918;
+    border-left: 2px solid rgba(169, 25, 24, 0.5);
+    border-radius: 50%;
+    animation: ${spin} 1.5s linear infinite reverse;
+  }
+  
+  &::after {
+    content: '';
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    right: 18px;
+    bottom: 18px;
+    border: 1px solid transparent;
+    border-top: 1px solid #ff6b6b;
+    border-right: 1px solid rgba(255, 107, 107, 0.6);
+    border-radius: 50%;
+    animation: ${spin} 2.5s ease-in-out infinite;
+  }
+`;
+
+const StepText = styled.div`
+  color: #A91918;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  animation: ${slideInUp} 0.6s ease-out;
+  min-height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const StepIcon = styled.div`
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: ${props => props.completed ? '#28a745' : props.active ? '#A91918' : '#ccc'};
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+  min-width: 24px;
+`;
+
 function UploadPedidoNovo({ user, onUserUpdate }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [currentStep, setCurrentStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState([]);
+  const [stepTextKey, setStepTextKey] = useState(0);
+  const [showResult, setShowResult] = useState(false);
+
+  const processingSteps = [
+    { id: 1, text: 'Analisando documento', icon: FiEye },
+    { id: 2, text: 'Extraindo informações', icon: FiFile },
+    { id: 3, text: 'Calculando pontos', icon: FiTarget },
+    { id: 4, text: 'Salvando no sistema', icon: FiDatabase },
+    { id: 5, text: 'Creditando pontos', icon: FiGift }
+  ];
+
+  const updateProcessingStep = (stepId, completed = false) => {
+    setCurrentStep(stepId);
+    setStepTextKey(prev => prev + 1); // Força re-render da animação
+    if (completed) {
+      setCompletedSteps(prev => [...prev, stepId]);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedFile(null);
+    setIsProcessing(false);
+    setResult(null);
+    setError('');
+    setCurrentStep(0);
+    setCompletedSteps([]);
+    setStepTextKey(0);
+    setShowResult(false);
+  };
 
   const handleFileInput = (e) => {
     const file = e.target.files[0];
@@ -294,10 +457,18 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
     setIsProcessing(true);
     setError('');
     setResult(null);
+    setShowResult(false);
+    setCurrentStep(0);
+    setCompletedSteps([]);
 
     try {
+      // Etapa 1: Analisando documento
+      updateProcessingStep(1);
+      await new Promise(resolve => setTimeout(resolve, 1200)); // Pausa para mostrar a etapa
+
       // Converter arquivo para base64
       const base64 = await fileToBase64(selectedFile);
+      updateProcessingStep(1, true); // Marca como concluída
 
       let aiResult;
       let dailyLimitExceeded = false;
@@ -307,11 +478,14 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       let processingMethod = 'gemini'; // Método padrão
 
       try {
+        // Etapa 2: Extraindo informações
+        updateProcessingStep(2);
         console.log('🤖 Analisando nota fiscal com Google Gemini...');
         aiResult = await analyzeOrderWithGemini(base64, selectedFile.type);
 
         if (aiResult.success) {
           console.log('✅ Gemini analisou com sucesso');
+          updateProcessingStep(2, true); // Marca como concluída
         } else {
           throw new Error(aiResult.error || 'Erro na análise do documento');
         }
@@ -342,6 +516,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
             error: true,
             errorMessage: 'Limite diário do Google Gemini excedido.'
           });
+          setShowResult(true);
           return;
 
           // Verificar se é erro de JSON malformado
@@ -359,6 +534,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
 
             if (aiResult.success) {
               console.log('✅ Sucesso na segunda tentativa');
+              updateProcessingStep(2, true); // Marca como concluída
             } else {
               throw new Error('Falha na segunda tentativa');
             }
@@ -375,6 +551,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
               error: true,
               errorMessage: 'Erro no processamento da imagem. O documento pode estar muito borrado ou com formato não suportado. Tente uma imagem mais nítida.'
             });
+            setShowResult(true);
             return;
           }
         } else {
@@ -391,9 +568,14 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
             error: true,
             errorMessage: 'Erro no processamento da imagem. O documento pode estar muito borrado ou com formato não suportado. Tente uma imagem mais nítida.'
           });
+          setShowResult(true);
           return;
         }
       }
+
+      // Etapa 3: Calculando pontos
+      updateProcessingStep(3);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Pausa para mostrar transição
 
       // Aguardando o processamento de dados pela IA
       const processedOrder = await processOrderResult(aiResult.data); // Garantir que a promise seja resolvida
@@ -426,6 +608,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       const calculatedPoints = Math.floor((processedOrder.totalValue || 0) * multiplier);
       processedOrder.totalPoints = calculatedPoints;
       console.log('🔧 Pontos calculados por valor total:', { totalValue: processedOrder.totalValue, multiplier, calculatedPoints });
+      updateProcessingStep(3, true); // Marca cálculo de pontos como concluído
 
       // Validar pedido
       const validation = await validateOrder(processedOrder);
@@ -454,6 +637,10 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
           console.warn('⚠️ Erro na validação de pontos, mas prosseguindo...', validationError);
         }
       }
+
+      // Etapa 4: Salvando no sistema
+      updateProcessingStep(4);
+      await new Promise(resolve => setTimeout(resolve, 800)); // Pausa para mostrar transição
 
       // Salvar no banco
       const customerId = user.id;
@@ -513,6 +700,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
           });
         }
       }
+      updateProcessingStep(4, true); // Marca salvamento como concluído
 
       // 🔍 LOG FINAL: Dados que serão exibidos na interface
       console.log('🎯 DADOS PARA A INTERFACE:', {
@@ -560,6 +748,10 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
 
       // Adicionar pontos ao cliente (apenas se houver pontos)
       if (resultadoFinal.totalPoints > 0) {
+        // Etapa 5: Creditando pontos
+        updateProcessingStep(5);
+        await new Promise(resolve => setTimeout(resolve, 700)); // Pausa para mostrar transição
+
         try {
           console.log('💰 Iniciando crédito de pontos para o cliente:', {
             customerId,
@@ -602,6 +794,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
 
           // Incluir saldo atualizado no resultado para interface
           resultadoFinal.saldoAtualizado = updatedCustomer.saldo_pontos;
+          updateProcessingStep(5, true); // Marca crédito como concluído
 
         } catch (error) {
           console.error('❌ Erro ao creditar pontos:', error);
@@ -611,6 +804,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
             error: true,
             errorMessage: 'Erro ao creditar pontos no banco de dados. Tente novamente.'
           });
+          setShowResult(true);
           return;
         }
       } else {
@@ -657,6 +851,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         'resultadoSeguro completo': resultadoSeguro
       });
       setResult(resultadoSeguro);
+      setShowResult(true);
       console.log('✅ RESULTADO APLICADO COM SUCESSO');
 
     } catch (err) {
@@ -677,6 +872,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
           error: true,
           errorMessage: 'Limite diário da API excedido.'
         });
+        setShowResult(true);
         return;
       }
 
@@ -692,6 +888,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         error: true,
         errorMessage: 'Erro no processamento da imagem. O documento pode estar muito borrado ou com formato não suportado. Tente uma imagem mais nítida.'
       });
+      setShowResult(true);
     } finally {
       setIsProcessing(false);
     }
@@ -716,75 +913,95 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
     <Container>
       <MainContent>
         <MinimalContainer>
-          <MinimalHeader>
-            <h1>Enviar Nota Fiscal</h1>
-            <p>Faça upload da nota fiscal para processar seus pontos.</p>
-          </MinimalHeader>
-          <MinimalUpload htmlFor="file-upload">
-            <input id="file-upload" type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }} onChange={handleFileInput} />
-            <FiFile size={38} color={selectedFile ? '#28a745' : '#A91918'} style={{ marginBottom: 8 }} />
-            <div style={{ color: '#444', fontWeight: 500, marginBottom: 4 }}>
-              {selectedFile ? selectedFile.name : 'Arraste ou clique para selecionar'}
-            </div>
-            <div style={{ color: '#888', fontSize: 13 }}>
-              {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : 'JPG, PNG ou PDF, até 10MB'}
-            </div>
-          </MinimalUpload>
-          <MinimalButton disabled={!selectedFile || isProcessing} onClick={handleProcess}>
-            {isProcessing ? 'Processando...' : 'Processar Nota'}
-          </MinimalButton>
-          {isProcessing && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 10, width: '100%', maxWidth: 420 }}>
-              <div style={{ border: '4px solid #eee', borderTop: '4px solid #A91918', borderRadius: '50%', width: 38, height: 38, animation: 'spin 1s linear infinite', alignSelf: 'center' }} />
-              <span style={{ color: '#A91918', marginTop: 8, fontSize: 15 }}>Processando nota, aguarde...</span>
-            </div>
-          )}
-          {error && <div style={{ color: '#A91918', marginTop: 10, fontSize: 15, textAlign: 'center', width: '100%', maxWidth: 420 }}>{error}</div>}
-          {result && (
-            <MinimalResult>
-              <h2 className={result.error ? 'error' : 'success'} style={{ justifyContent: 'flex-start', fontSize: 18, marginBottom: 18 }}>
-                {result.error ? <FiX /> : <FiCheck />} {result.error ? 'Erro' : 'Nota processada'}
-              </h2>
-              <div className="summary" style={{ margin: 0 }}>
-                <ExcelTable>
-                  <tbody>
-                    <tr>
-                      <ExcelTh>Pedido</ExcelTh>
-                      <ExcelTd>{result.orderNumber}</ExcelTd>
-                    </tr>
-                    <tr>
-                      <ExcelTh>Data de Expedição</ExcelTh>
-                      <ExcelTd>{result.orderDate ? new Date(result.orderDate).toLocaleDateString('pt-BR') : '-'}</ExcelTd>
-                    </tr>
-                    <tr>
-                      <ExcelTh>Pontos Recebidos</ExcelTh>
-                      <ExcelTd>{result.totalPoints}</ExcelTd>
-                    </tr>
-                    <tr>
-                      <ExcelTh>Valor Total da Nota</ExcelTh>
-                      <ExcelTd>R$ {Number(result.totalValue).toFixed(2)}</ExcelTd>
-                    </tr>
-                  </tbody>
-                </ExcelTable>
-                <div style={{ color: '#555', fontSize: 14, marginTop: 12, textAlign: 'left' }}>
-                  {result.totalPoints} pontos recebidos para {Number(result.totalValue).toFixed(2)} reais
+          {!isProcessing && !showResult && (
+            <>
+              <MinimalHeader>
+                <h1>Enviar Nota Fiscal</h1>
+                <p>Faça upload da nota fiscal para processar seus pontos.</p>
+              </MinimalHeader>
+              <MinimalUpload htmlFor="file-upload">
+                <input id="file-upload" type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }} onChange={handleFileInput} />
+                <FiFile size={38} color={selectedFile ? '#28a745' : '#A91918'} style={{ marginBottom: 8 }} />
+                <div style={{ color: '#444', fontWeight: 500, marginBottom: 4 }}>
+                  {selectedFile ? selectedFile.name : 'Arraste ou clique para selecionar'}
                 </div>
-                {/* Exibir código de retirada se existir */}
-                {result.codigo_resgate && (
+                <div style={{ color: '#888', fontSize: 13 }}>
+                  {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : 'JPG, PNG ou PDF, até 10MB'}
+                </div>
+              </MinimalUpload>
+              <MinimalButton disabled={!selectedFile} onClick={handleProcess}>
+                Processar Nota
+              </MinimalButton>
+              {error && <div style={{ color: '#A91918', marginTop: 10, fontSize: 15, textAlign: 'center', width: '100%', maxWidth: 420 }}>{error}</div>}
+            </>
+          )}
+          
+          {isProcessing && (
+            <ProcessingContainer>
+              <CurrentStep>
+                {currentStep > 0 && (
                   <>
-                    <CodigoAviso><FiInfo style={{ fontSize: 18, color: '#A91918' }} /> Apresente este código para retirar seu produto em uma loja credenciada:</CodigoAviso>
-                    <CodigoBox>{result.codigo_resgate}</CodigoBox>
+                    <StepSpinnerLarge />
+                    <StepText key={stepTextKey}>
+                      {processingSteps.find(step => step.id === currentStep)?.text || 'Processando...'}
+                    </StepText>
                   </>
                 )}
-                {/* Exemplo de status visual, se necessário */}
-                {result.status && (
-                  <div style={{ marginTop: 8 }}>
-                    <StatusBadge status={result.status}>{result.status}</StatusBadge>
-                  </div>
-                )}
-              </div>
-            </MinimalResult>
+              </CurrentStep>
+            </ProcessingContainer>
           )}
+          
+          {showResult && result && (
+            <>
+              <MinimalResult>
+                <h2 className={result.error ? 'error' : 'success'} style={{ justifyContent: 'flex-start', fontSize: 18, marginBottom: 18 }}>
+                  {result.error ? <FiX /> : <FiCheck />} {result.error ? 'Erro' : 'Nota processada'}
+                </h2>
+                <div className="summary" style={{ margin: 0 }}>
+                  <ExcelTable>
+                    <tbody>
+                      <tr>
+                        <ExcelTh>Pedido</ExcelTh>
+                        <ExcelTd>{result.orderNumber}</ExcelTd>
+                      </tr>
+                      <tr>
+                        <ExcelTh>Data de Expedição</ExcelTh>
+                        <ExcelTd>{result.orderDate ? new Date(result.orderDate).toLocaleDateString('pt-BR') : '-'}</ExcelTd>
+                      </tr>
+                      <tr>
+                        <ExcelTh>Pontos Recebidos</ExcelTh>
+                        <ExcelTd>{result.totalPoints}</ExcelTd>
+                      </tr>
+                      <tr>
+                        <ExcelTh>Valor Total da Nota</ExcelTh>
+                        <ExcelTd>R$ {Number(result.totalValue).toFixed(2)}</ExcelTd>
+                      </tr>
+                    </tbody>
+                  </ExcelTable>
+                  <div style={{ color: '#555', fontSize: 14, marginTop: 12, textAlign: 'left' }}>
+                    {result.totalPoints} pontos recebidos para {Number(result.totalValue).toFixed(2)} reais
+                  </div>
+                  {/* Exibir código de retirada se existir */}
+                  {result.codigo_resgate && (
+                    <>
+                      <CodigoAviso><FiInfo style={{ fontSize: 18, color: '#A91918' }} /> Apresente este código para retirar seu produto em uma loja credenciada:</CodigoAviso>
+                      <CodigoBox>{result.codigo_resgate}</CodigoBox>
+                    </>
+                  )}
+                  {/* Exemplo de status visual, se necessário */}
+                  {result.status && (
+                    <div style={{ marginTop: 8 }}>
+                      <StatusBadge status={result.status}>{result.status}</StatusBadge>
+                    </div>
+                  )}
+                </div>
+              </MinimalResult>
+              <SecondaryButton onClick={resetForm}>
+                Processar outra nota
+              </SecondaryButton>
+            </>
+          )}
+          
           <style>{`@keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }`}</style>
         </MinimalContainer>
       </MainContent>

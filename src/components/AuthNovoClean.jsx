@@ -16,6 +16,11 @@ const pulseGlow = keyframes`
   50% { box-shadow: 0 0 30px rgba(169, 25, 24, 0.5); }
 `;
 
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
+
 // Styled Components
 const Container = styled.div`
   min-height: 100vh;
@@ -167,6 +172,15 @@ const Input = styled.input`
     padding: 0.75rem 1rem 0.75rem 2.5rem;
     font-size: 0.9rem;
   }
+`;
+
+const Spinner = styled.div`
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: ${spin} 1s linear infinite;
 `;
 
 const Button = styled.button`
@@ -483,11 +497,7 @@ const AuthNovoClean = ({ onLogin }) => {
                         <Button type="submit" disabled={loading}>
                             {loading ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <img
-                                        src={require('../assets/gif-carregando.gif')}
-                                        alt="Carregando..."
-                                        style={{ width: '20px', height: '20px' }}
-                                    />
+                                    <Spinner />
                                     Entrando...
                                 </div>
                             ) : (
@@ -608,11 +618,7 @@ const AuthNovoClean = ({ onLogin }) => {
                         <Button type="submit" disabled={loading}>
                             {loading ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <img
-                                        src={require('../assets/gif-carregando.gif')}
-                                        alt="Carregando..."
-                                        style={{ width: '20px', height: '20px' }}
-                                    />
+                                    <Spinner />
                                     Cadastrando...
                                 </div>
                             ) : (
