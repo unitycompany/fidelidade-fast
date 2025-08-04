@@ -61,7 +61,7 @@ npm run preview
 1. Resgatar um prêmio
 2. Receberá notificação: "Parabéns! Prêmio resgatado! 🎉"
 
-#### **Inatividade (Simulação):**
+#### **Inatividade (Simulação Rápida):**
 1. No console do navegador:
 ```javascript
 // Simular usuário inativo há 7 dias
@@ -69,6 +69,16 @@ import('./src/services/notificationManager.js').then(module => {
   module.notificationManager.sendInactivityNotification(7);
 });
 ```
+
+### **📊 Tabela Resumo - Tempos das Notificações:**
+
+| Tipo | Tempo | Condição | Frequência |
+|------|-------|----------|------------|
+| 🔔 **Permissão** | 1 minuto | Após carregar app | Uma vez |
+| ⭐ **Pontos Creditados** | Imediata | Upload de nota | Sempre |
+| 🎉 **Prêmio Resgatado** | Imediata | Resgatar prêmio | Sempre |
+| 🛒 **Inatividade** | 24h depois | 7+ dias sem nota | Diária |
+| 🚫 **Cooldown** | 24 horas | Por tipo | Anti-spam |
 
 ---
 
@@ -94,31 +104,41 @@ import('./src/services/notificationManager.js').then(module => {
 
 ---
 
-## 🔔 **Sistema de Notificações:**
+## 🔔 **Sistema de Notificações - Tempos Detalhados:**
 
-### **Tipos de Notificação:**
+### **⏱️ Quando as Notificações Chegam:**
 
-1. **Pontos Creditados** (Imediata)
-   - Trigger: Após upload e processamento de nota
-   - Mensagem: "Pontos creditados! ⭐ Você ganhou X pontos!"
+#### **1. Permissão de Notificações**
+- **Tempo**: 1 minuto após carregar o app
+- **Ação**: Pergunta educada se quer receber notificações
+- **Notificação de Boas-vindas**: Imediatamente após aceitar
 
-2. **Prêmio Resgatado** (Imediata)
-   - Trigger: Após resgatar prêmio
-   - Mensagem: "Parabéns! Prêmio resgatado! 🎉 Dirija-se até uma loja Fast"
+#### **2. Notificação de Pontos Creditados**
+- **Tempo**: **IMEDIATA** (menos de 1 segundo)
+- **Trigger**: Logo após processar nota fiscal com sucesso
+- **Mensagem**: "Pontos creditados! ⭐ Você ganhou X pontos!"
 
-3. **Inatividade Semanal** (Automática)
-   - Trigger: 7+ dias sem cadastrar nota
-   - Mensagens rotativas:
-     - "Ei! Compre na Fast e ganhe pontos! 🛒"
-     - "Seus pontos estão esperando! ⭐"
-     - "Fast Fidelidade: Hora de acumular! 🎯"
-     - "Que tal uma nova compra? 🏪"
+#### **3. Notificação de Prêmio Resgatado**
+- **Tempo**: **IMEDIATA** (menos de 1 segundo)
+- **Trigger**: Logo após confirmar resgate do prêmio
+- **Mensagem**: "Parabéns! Prêmio resgatado! 🎉 Dirija-se até uma loja Fast"
 
-### **Configurações Inteligentes:**
-- ✅ Não repete notificação em 24h
-- ✅ Só notifica se app não estiver ativo
-- ✅ Permissão solicitada após 1 minuto de uso
-- ✅ Notificações pausam se usuário recusar
+#### **4. Notificações de Inatividade**
+- **Primeira verificação**: 24 horas após instalar
+- **Frequência**: Verifica diariamente às 00:00
+- **Condição**: 7+ dias sem cadastrar nota fiscal
+- **Limite**: Máximo 1 notificação por dia (mesmo tipo)
+- **Mensagens rotativas**:
+  - 7 dias: "Ei! Compre na Fast e ganhe pontos! 🛒"
+  - 14 dias: "Seus pontos estão esperando! ⭐"
+  - 21 dias: "Fast Fidelidade: Hora de acumular! 🎯"
+  - 30+ dias: "Que tal uma nova compra? 🏪"
+
+### **🚫 Proteções Anti-Spam:**
+- ✅ **Cooldown de 24h**: Mesma notificação não repete em 24 horas
+- ✅ **Detecção de aba ativa**: Não notifica se usuário já está usando
+- ✅ **Limite por tipo**: Cada categoria tem seu próprio cooldown
+- ✅ **Pausar se recusado**: Para de tentar se usuário negar permissão
 
 ---
 

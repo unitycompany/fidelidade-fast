@@ -42,10 +42,17 @@ class NotificationManager {
                 this.isEnabled = permission === 'granted';
 
                 if (this.isEnabled) {
+                    console.log('✅ Permissão de notificações concedida');
                     this.sendWelcomeNotification();
                     this.scheduleNotifications();
+                } else {
+                    console.log('❌ Permissão de notificações negada');
                 }
             }
+        } else if (Notification.permission === 'granted') {
+            this.isEnabled = true;
+            this.scheduleNotifications();
+            console.log('✅ Notificações já estavam habilitadas');
         }
     }
 
@@ -187,8 +194,8 @@ class NotificationManager {
 
         const options = {
             body,
-            icon: '/src/assets/icon.png',
-            badge: '/src/assets/icon.png',
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
             vibrate: [200, 100, 200],
             data: {
                 url,
@@ -196,12 +203,35 @@ class NotificationManager {
             },
             tag,
             requireInteraction: false,
-            silent: false
+            silent: false,
+            actions: [
+                {
+                    action: 'view',
+                    title: 'Ver no app'
+                },
+                {
+                    action: 'close',
+                    title: 'Fechar'
+                }
+            ]
         };
 
-        // Verificar se o usuário está ativo na aba
-        if (document.hidden || !document.hasFocus()) {
-            new Notification(title, options);
+        // Usar Service Worker para notificações reais
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then((registration) => {
+                registration.showNotification(title, options);
+            }).catch((error) => {
+                console.error('Erro ao mostrar notificação via Service Worker:', error);
+                // Fallback para notificação simples
+                if (Notification.permission === 'granted') {
+                    new Notification(title, options);
+                }
+            });
+        } else {
+            // Fallback para navegadores sem Service Worker
+            if (Notification.permission === 'granted') {
+                new Notification(title, options);
+            }
         }
     }
 
@@ -233,6 +263,17 @@ class NotificationManager {
 
         return this.isEnabled;
     }
+
+    // Método para testar notificações
+    testNotification() {
+        console.log('🧪 Testando notificação...');
+        this.sendNotification(
+            'Teste de Notificação 🧪',
+            'Se você está vendo esta notificação, o sistema está funcionando perfeitamente!',
+            '/dashboard',
+            'test'
+        );
+    }
 }
 
 // Instância global do gerenciador de notificações
@@ -245,6 +286,10 @@ export const notifyPrizeRedeemed = (prizeName) => {
 
 export const notifyPointsEarned = (points) => {
     notificationManager.onPointsEarned(points);
+};
+
+export const testNotifications = () => {
+    notificationManager.testNotification();
 };
 
 export default notificationManager;

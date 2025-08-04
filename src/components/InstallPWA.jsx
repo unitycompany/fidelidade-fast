@@ -42,7 +42,17 @@ const InstallPWA = () => {
 
     const handleInstall = async () => {
         try {
-            if (isMobile && 'BeforeInstallPromptEvent' in window === false) {
+            // Para desktop, sempre tentar o prompt nativo primeiro
+            if (!isMobile) {
+                const result = await showInstallPrompt();
+                if (result) {
+                    setShowInstall(false);
+                }
+                return;
+            }
+
+            // Para mobile, verificar se é iOS/Safari
+            if (isMobile && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
                 // No iOS/Safari, guiar para instalação manual
                 alert(
                     '📱 Para instalar o app:\n\n' +
@@ -54,6 +64,7 @@ const InstallPWA = () => {
                 return;
             }
 
+            // Para Android mobile, tentar prompt nativo
             const result = await showInstallPrompt();
             if (result) {
                 setShowInstall(false);
@@ -63,6 +74,8 @@ const InstallPWA = () => {
             // Fallback para instalação manual
             if (isMobile) {
                 alert('📱 Use o menu do seu navegador para "Adicionar à tela inicial"');
+            } else {
+                alert('💻 Use o ícone de instalação na barra de endereços ou menu do navegador');
             }
         }
     };

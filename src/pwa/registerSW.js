@@ -34,32 +34,40 @@ export function registerSW() {
 let deferredPrompt;
 
 export function setupInstallPrompt() {
-    window.addEventListener('beforeinstallprompt', (e) => {
-        console.log('💾 Prompt de instalação disponível');
-        // Previne o Chrome de mostrar o prompt automaticamente
-        e.preventDefault();
-        // Salva o evento para usar depois
-        deferredPrompt = e;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('💾 Prompt de instalação disponível (desktop/Android)');
+    // Previne o Chrome de mostrar o prompt automaticamente
+    e.preventDefault();
+    // Salva o evento para usar depois
+    deferredPrompt = e;
+    
+    // Dispara evento customizado para componentes React
+    window.dispatchEvent(new CustomEvent('pwa-install-available'));
+  });
 
-        // Dispara evento customizado para componentes React
-        window.dispatchEvent(new CustomEvent('pwa-install-available'));
+  // Quando o app é instalado
+  window.addEventListener('appinstalled', () => {
+    console.log('🎉 PWA instalado com sucesso!');
+    localStorage.setItem('pwa-installed', 'true');
+    deferredPrompt = null;
+    showInstallSuccess();
+  });
+
+  // Escutar evento customizado de instalação
+  window.addEventListener('pwa-installed', () => {
+    localStorage.setItem('pwa-installed', 'true');
+  });
+
+  // Log inicial para debug
+  setTimeout(() => {
+    console.log('🔍 Debug PWA:', {
+      isInstalled: isPWAInstalled(),
+      hasPrompt: !!deferredPrompt,
+      isStandalone: window.matchMedia('(display-mode: standalone)').matches,
+      userAgent: navigator.userAgent.substring(0, 50)
     });
-
-    // Quando o app é instalado
-    window.addEventListener('appinstalled', () => {
-        console.log('🎉 PWA instalado com sucesso!');
-        localStorage.setItem('pwa-installed', 'true');
-        deferredPrompt = null;
-        showInstallSuccess();
-    });
-
-    // Escutar evento customizado de instalação
-    window.addEventListener('pwa-installed', () => {
-        localStorage.setItem('pwa-installed', 'true');
-    });
-}
-
-// Função para mostrar o prompt de instalação
+  }, 2000);
+}// Função para mostrar o prompt de instalação
 export async function showInstallPrompt() {
     if (!deferredPrompt) {
         console.log('Prompt de instalação não disponível');
@@ -130,20 +138,23 @@ export async function showInstallPrompt() {
 export function isPWAInstalled() {
     // Verificar display mode (funciona na maioria dos navegadores)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-
+    
     // Verificar se é Safari standalone (iOS)
     const isIOSStandalone = window.navigator.standalone === true;
-
-    // Verificar se já foi instalado via prompt (Android)
+    
+    // No desktop, ser mais conservador na detecção
+    const isDesktop = !/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isDesktop) {
+        // No desktop, só considerar instalado se realmente estiver em modo standalone
+        return isStandalone;
+    }
+    
+    // No mobile, verificar também localStorage para casos especiais
     const wasInstalledViaPrompt = localStorage.getItem('pwa-installed') === 'true';
-
-    // Verificar user agent para detectar app instalado
-    const isInAppBrowser = /Instagram|FBAN|FBAV/.test(navigator.userAgent);
-
-    return (isStandalone || isIOSStandalone || wasInstalledViaPrompt) && !isInAppBrowser;
-}
-
-// Mostrar notificação de atualização disponível
+    
+    return isStandalone || isIOSStandalone || wasInstalledViaPrompt;
+}// Mostrar notificação de atualização disponível
 function showUpdateAvailable() {
     // Pode implementar um toast ou modal aqui
     if (confirm('Nova versão disponível! Deseja atualizar?')) {
