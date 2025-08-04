@@ -5,6 +5,7 @@ import { supabase, redeemPrize } from '../services/supabase';
 import { CATEGORIAS_PREMIOS } from '../utils/inicializarPremios';
 import toast from 'react-hot-toast';
 import LoadingGif from './LoadingGif';
+import { notifyPrizeRedeemed } from '../services/notificationManager.js';
 
 // Animações
 const fadeInUp = keyframes`
@@ -548,6 +549,9 @@ function PremiosNovo({ user, onUserUpdate }) {
       }
 
       toast.success(`🎉 Resgate realizado com sucesso!\n${premio.nome} - ${premio.pontos_necessarios} pontos`);
+
+      // Enviar notificação de prêmio resgatado
+      notifyPrizeRedeemed(premio.nome);
 
       // Recarregar prêmios para atualizar a interface
       buscarPremios();

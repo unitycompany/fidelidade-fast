@@ -7,6 +7,7 @@ import { saveOrder, saveOrderItems, addPointsToCustomer, checkOrderExists } from
 import { getPointsPerReal } from '../utils/config';
 import { sefazValidationService } from '../services/sefazValidation';
 import LoadingGif from './LoadingGif';
+import { notifyPointsEarned } from '../services/notificationManager.js';
 
 // Animações
 const fadeIn = keyframes`
@@ -1016,6 +1017,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
             novoSaldo: updatedCustomer.saldo_pontos,
             validationType: resultadoFinal.validationType
           });
+
+          // Enviar notificação de pontos creditados
+          notifyPointsEarned(resultadoFinal.totalPoints);
 
           // Atualizar contexto global do usuário para refletir novos pontos
           if (window.updateUserContext) {

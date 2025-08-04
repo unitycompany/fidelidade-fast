@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../App';
 import { processOrderResult } from '../utils/pedidosFast';
 import { saveOrder, saveOrderItems, addPointsToCustomer } from '../services/supabase';
+import { notifyPointsEarned } from '../services/notificationManager.js';
 
 const Container = styled.div`
   padding: 2rem;
@@ -101,6 +102,9 @@ export default function UploadNotaAI() {
 
             setResult(processed);
             toast.success('Pedido processado e pontos adicionados!');
+            
+            // Enviar notificação de pontos creditados
+            notifyPointsEarned(processed.totalPoints);
         } catch (err) {
             console.error(err);
             toast.error(err.message || 'Erro ao processar nota');

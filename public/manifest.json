@@ -11,9 +11,15 @@
     "lang": "pt-BR",
     "categories": [
         "shopping",
-        "lifestyle",
+        "lifestyle", 
         "finance"
     ],
+    "prefer_related_applications": false,
+    "dir": "ltr",
+    "display_override": ["window-controls-overlay", "standalone"],
+    "edge_side_panel": {
+        "preferred_width": 400
+    },
     "icons": [
         {
             "src": "/src/assets/icon.png",
@@ -60,35 +66,39 @@
     ],
     "screenshots": [
         {
-            "src": "/src/assets/icon.png",
-            "sizes": "512x512",
-            "type": "image/png"
+            "src": "/src/assets/screenshot-mobile.png",
+            "sizes": "375x812",
+            "type": "image/png",
+            "form_factor": "narrow"
+        },
+        {
+            "src": "/src/assets/screenshot-desktop.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide"
         }
     ],
     "shortcuts": [
         {
             "name": "Meus Pontos",
             "short_name": "Pontos",
-            "description": "Ver saldo de pontos",
+            "description": "Ver meus pontos acumulados",
             "url": "/pontos",
-            "icons": [
-                {
-                    "src": "/src/assets/icon.png",
-                    "sizes": "96x96"
-                }
-            ]
+            "icons": [{ "src": "/src/assets/icon.png", "sizes": "192x192" }]
         },
         {
-            "name": "Catálogo",
-            "short_name": "Prêmios",
-            "description": "Ver prêmios disponíveis",
+            "name": "Resgatar Prêmios",
+            "short_name": "Prêmios", 
+            "description": "Trocar pontos por prêmios",
             "url": "/premios",
-            "icons": [
-                {
-                    "src": "/src/assets/icon.png",
-                    "sizes": "96x96"
-                }
-            ]
+            "icons": [{ "src": "/src/assets/icon.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Escanear Nota",
+            "short_name": "Scan",
+            "description": "Escanear nota fiscal",
+            "url": "/scan",
+            "icons": [{ "src": "/src/assets/icon.png", "sizes": "192x192" }]
         }
     ]
 }

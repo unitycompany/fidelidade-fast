@@ -17,6 +17,7 @@ import AdminPanelNovo from './components/AdminPanelNovo'
 import AdminUsuarios from './components/AdminUsuarios'
 import GerenteResgates from './components/GerenteResgates'
 import MeusResgates from './components/MeusResgates'
+import InstallPWA from './components/InstallPWA'
 import { inicializarProdutosElegiveis } from './utils/inicializarProdutos'
 import { inicializarPremios } from './utils/inicializarPremios'
 import SidebarVertical from './components/SidebarVertical'
@@ -349,6 +350,7 @@ function App() {
           }
         `}</style>
       </AuthContext.Provider>
+      <InstallPWA />
       <Toaster position="top-right" />
     </ThemeProvider>
   )
