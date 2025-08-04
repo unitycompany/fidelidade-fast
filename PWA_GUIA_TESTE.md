@@ -23,9 +23,39 @@
 - ✅ Atalhos no menu (Pontos, Prêmios, Scan)
 - ✅ Atualização automática
 
----
+## 🔔 **CORREÇÃO: Notificações Reais do Sistema**
 
-## 🧪 **Como Testar:**
+### **❗ IMPORTANTE - Sobre as Notificações:**
+- ✅ **Corrigido**: Agora usa notificações REAIS do sistema operacional
+- ✅ **Service Worker**: Notificações via Service Worker (funcionam mesmo com aba fechada)  
+- ✅ **Persistent**: Aparecem na área de notificações do Windows/Android/iOS
+- ✅ **Interactive**: Botões "Ver no app" e "Fechar"
+
+### **🧪 TESTE COMPLETO:**
+
+#### **1. Página de Teste Dedicada:**
+```
+http://localhost:5173/test-notifications.html
+```
+
+#### **2. Passos para Testar:**
+1. **Abrir a página de teste**
+2. **Solicitar permissão** (botão vermelho)
+3. **Aceitar notificações** quando o navegador perguntar
+4. **Testar cada tipo** com os botões
+5. **Minimizar/trocar de aba** para ver as notificações reais
+
+#### **3. O que Esperar:**
+- 🔔 **Windows**: Notificação no canto inferior direito
+- 📱 **Android**: Notificação na barra de status
+- 🍎 **iOS**: Notificação no topo da tela
+- 💻 **Desktop**: Badge no ícone do app se instalado
+
+### **🚫 Diferença das Antigas:**
+- ❌ **Antes**: Pop-ups dentro do site (apenas com aba ativa)
+- ✅ **Agora**: Notificações reais do sistema (funcionam sempre)
+
+---
 
 ### **1. Testar Instalação (Desktop)**
 ```bash
@@ -53,6 +83,12 @@ npm run preview
 
 ### **3. Testar Notificações**
 
+#### **🧪 Teste Rápido (NOVO!):**
+1. Acesse: `http://localhost:5173/test-notifications.html`
+2. Clique em "Solicitar Permissão de Notificações" e aceite
+3. Teste cada tipo de notificação com os botões
+4. **IMPORTANTE**: As notificações aparecem mesmo se você mudar de aba!
+
 #### **Pontos Creditados:**
 1. Fazer upload de nota fiscal
 2. Quando processar, receberá notificação: "Pontos creditados! ⭐"
@@ -61,12 +97,21 @@ npm run preview
 1. Resgatar um prêmio
 2. Receberá notificação: "Parabéns! Prêmio resgatado! 🎉"
 
-#### **Inatividade (Simulação Rápida):**
-1. No console do navegador:
+#### **Teste Manual no Console:**
 ```javascript
-// Simular usuário inativo há 7 dias
+// Testar notificação básica
 import('./src/services/notificationManager.js').then(module => {
-  module.notificationManager.sendInactivityNotification(7);
+  module.testNotifications();
+});
+
+// Simular pontos creditados
+import('./src/services/notificationManager.js').then(module => {
+  module.notifyPointsEarned(150);
+});
+
+// Simular prêmio resgatado
+import('./src/services/notificationManager.js').then(module => {
+  module.notifyPrizeRedeemed('Smartphone Samsung');
 });
 ```
 
