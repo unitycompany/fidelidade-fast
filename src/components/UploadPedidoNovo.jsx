@@ -687,9 +687,21 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       let finalOrderData = processedOrder;
 
       try {
-        // Tentar validar via SEFAZ usando texto OCR original
+        // 🔑 PROCESSAR CHAVE NFE EXTRAÍDA PELO GEMINI
+        let chaveNFeGemini = null;
+        if (aiResult.data?.chaveNFe?.chaveCompleta && aiResult.data.chaveNFe.chaveCompleta !== 'N/A') {
+          chaveNFeGemini = aiResult.data.chaveNFe.chaveCompleta;
+          console.log('🤖 Gemini extraiu chave NFe:', {
+            chave: chaveNFeGemini,
+            encontradaAbaixoCodigoBarras: aiResult.data.chaveNFe.encontradaAbaixoCodigoBarras,
+            uf: aiResult.data.chaveNFe.uf,
+            validade: aiResult.data.chaveNFe.validadeVisual
+          });
+        }
+
+        // Tentar validar via SEFAZ usando texto OCR original + chave NFe do Gemini
         const ocrText = aiResult.rawText || JSON.stringify(aiResult.data);
-        validationResult = await sefazValidationService.validateNotaFiscal(ocrText, processedOrder);
+        validationResult = await sefazValidationService.validateNotaFiscal(ocrText, processedOrder, chaveNFeGemini);
 
         if (validationResult.success && !validationResult.useOCR) {
           // ✅ DADOS OFICIAIS SEFAZ - 100% CONFIÁVEIS
@@ -1250,62 +1262,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
                     </div>
                   )}
 
-                  {/* Informações de Validação Anti-Fraude */}
-                  {showAnimatedRows && result.antifraudValidated && (
-                    <div style={{
-                      marginTop: 16,
-                      padding: '8px 12px',
-                      background: result.validationType === 'sefaz_official' ? '#e8f5e8' :
-                        result.validationType === 'ocr_limited' ? '#fff3cd' : '#f8f9fa',
-                      border: `1px solid ${result.validationType?.includes('sefaz') ? '#28a745' :
-                        result.validationType === 'ocr_limited' ? '#ffc107' : '#dee2e6'}`,
-                      fontSize: 12,
-                      color: '#555',
-                      textAlign: 'center'
-                    }} className="fade-in-security">
-                      {result.validationType?.includes('sefaz') && (
-                        <div>
-                          ✅ Validado oficialmente via SEFAZ
-                          {result.extractionMethod === 'barcode_extraction' && (
-                            <div style={{ fontSize: 11, marginTop: 2, color: '#0066cc' }}>
-                              📊 Chave extraída de código de barras
-                            </div>
-                          )}
-                          {result.extractionMethod === 'generated_key' && (
-                            <div style={{ fontSize: 11, marginTop: 2, color: '#0066cc' }}>
-                              🎯 Chave gerada e validada
-                            </div>
-                          )}
-                          {!result.extractionMethod && (
-                            <div style={{ fontSize: 11, marginTop: 2, color: '#0066cc' }}>
-                              🔑 Chave encontrada no texto
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {result.validationType === 'cnpj_validated' && (
-                        <div>🏛️ Validado via CNPJ da Receita Federal</div>
-                      )}
-                      {result.validationType === 'ocr_validated' && (
-                        <div>🔍 Validado com verificações anti-fraude</div>
-                      )}
-                      {result.validationType === 'ocr_limited' && (
-                        <>
-                          <div>⚠️ Pontos limitados por segurança</div>
-                          {result.originalPoints && (
-                            <div style={{ fontSize: 11, marginTop: 4 }}>
-                              Pontos originais: {result.originalPoints} → Creditados: {result.totalPoints}
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {result.chaveNFe && (
-                        <div style={{ marginTop: 4, fontSize: 11, fontFamily: 'monospace' }}>
-                          NFe: {result.chaveNFe.substring(0, 8)}...{result.chaveNFe.substring(result.chaveNFe.length - 8)}
-                        </div>
-                      )}
-                    </div>
-                  )}                  {/* Exibir código de retirada se existir */}
+                  {/* Exibir código de retirada se existir */}
                   {result.codigo_resgate && showAnimatedRows && (
                     <div className="fade-in-codigo">
                       <CodigoAviso><FiInfo style={{ fontSize: 18, color: '#A91918' }} /> Apresente este código para retirar seu produto em uma loja credenciada:</CodigoAviso>
@@ -1347,24 +1304,19 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
               animation-delay: 1.8s;
               animation-fill-mode: both;
             }
-            .fade-in-security {
-              animation: fadeInRow 0.6s ease-out;
-              animation-delay: 2s;
-              animation-fill-mode: both;
-            }
             .fade-in-codigo {
               animation: fadeInRow 0.6s ease-out;
-              animation-delay: 2.2s;
+              animation-delay: 2.0s;
               animation-fill-mode: both;
             }
             .fade-in-status {
               animation: fadeInRow 0.6s ease-out;
-              animation-delay: 2.4s;
+              animation-delay: 2.2s;
               animation-fill-mode: both;
             }
             .fade-in-button {
               animation: fadeInRow 0.6s ease-out;
-              animation-delay: 2.6s;
+              animation-delay: 2.4s;
               animation-fill-mode: both;
             }
           `}</style>

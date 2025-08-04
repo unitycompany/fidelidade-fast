@@ -15,104 +15,71 @@ class GeminiService {
     // Prompt especializado para Pedidos de Vendas Fast Sistemas
     getPromptNotaFiscal() {
         return `
-ANÁLISE COMPLETA DE DOCUMENTOS COMERCIAIS - FAST SISTEMAS
+ANÁLISE SIMPLIFICADA DE NOTAS FISCAIS - FAST SISTEMAS
 
-Você é um especialista em análise de documentos da construção civil. Sua missão é extrair TODOS os produtos da nota/pedido, não apenas os elegíveis.
+Você é um especialista em análise de documentos fiscais. Sua missão é extrair APENAS as informações essenciais da nota fiscal.
 
-ETAPA 1 - EXTRAÇÃO COMPLETA:
-1. Leia TODO o documento linha por linha
-2. Identifique TODOS os produtos listados (elegíveis E não elegíveis)
-3. Para cada produto, extraia: código, descrição, quantidade, valor unitário, valor total
-4. NÃO ignore produtos - liste TUDO que encontrar
+IMPORTANTE: NÃO EXTRAIA PRODUTOS INDIVIDUAIS - APENAS DADOS GERAIS E VALOR TOTAL!
 
-ETAPA 2 - CÓDIGO DE BARRAS E CHAVE NFE:
-1. Procure por códigos de barras (sequências longas de números)
-2. Procure por "Chave de Acesso NFe" ou similar
-3. Se encontrar código de barras, extraia TODOS os números
-4. Códigos de barras NFe têm 44 dígitos numéricos
+ETAPA 1 - INFORMAÇÕES BÁSICAS:
+1. Número da nota fiscal
+2. Data de emissão
+3. Nome do fornecedor/emitente
+4. VALOR TOTAL da nota (campo mais importante)
+5. CNPJ do emitente (se visível)
 
-ETAPA 3 - CLASSIFICAÇÃO:
-Produtos Fast Sistemas elegíveis para pontos:
-- Placa ST (DW00057, DW00058) → 0,5 pontos/R$
-- Guia Drywall (DW00074) → 1 ponto/R$
-- Montante Drywall (DW00087) → 1 ponto/R$
-- Placa RU (DW00007, DW00075) → 1 ponto/R$
-- Placa Glasroc X (GR00001, GR00002) → 2 pontos/R$
-- Placomix (PM00001, PM00002) → 1 ponto/R$
-- Malha Glasroc (MT00001, MT00002) → 2 pontos/R$
-- Basecoat (BC00001, BC00002) → 2 pontos/R$
+ETAPA 2 - CÓDIGO DE BARRAS E CHAVE NFE (PRIORITÁRIO):
+1. Procure por códigos de barras (barras pretas e brancas visuais)
+2. IMPORTANTE: Logo ABAIXO do código de barras há uma sequência de 44 DÍGITOS NUMÉRICOS
+3. Este código de 44 dígitos é a CHAVE DE ACESSO da NFe (ex: 31230614200166000187550010000000417005140820)
+4. Procure também por "Chave de Acesso NFe", "Consulta via leitor QR Code", ou textos similares
+5. Extraia EXATAMENTE os 44 dígitos sequenciais (sem espaços, traços ou formatação)
+6. Se encontrar o código de barras visual, procure os números logo abaixo dele
+7. A chave sempre começa com 2 dígitos do estado (31=MG, 35=SP, 41=PR, etc.)
 
-ETAPA 4 - TOLERÂNCIA A ERROS OCR:
-- "PLAGA ST" = "PLACA ST"
-- "DW0O057" = "DW00057" (O maiúsculo = zero)
-- "1OO,OO" = "100,00" (O maiúsculo = zero)
-- Aceite variações de grafia e espaços
+ETAPA 3 - VALOR TOTAL (ESSENCIAL):
+1. Procure por "VALOR TOTAL", "TOTAL GERAL", "TOTAL DA NOTA"
+2. Pode estar em campos como "Valor Total dos Produtos", "Valor Total da NF-e"
+3. Formato comum: R$ 1.250,50 ou 1250.50 ou 125050 (centavos)
+4. Se houver múltiplos valores, pegue o MAIOR (valor total final)
 
-REGRAS DE EXTRAÇÃO:
-1. Se encontrar tabela de produtos, liste TODOS
-2. Se quantidade não especificada = 1
-3. Se valor não claro, use qualquer valor numérico da linha
-4. Se código ausente, use descrição
-5. NUNCA ignore um produto por falta de dados
-6. SEMPRE extraia códigos de barras e chaves NFe quando visíveis
+REGRAS IMPORTANTES:
+- NÃO extraia produtos individuais (não perdemos tempo com isso)
+- FOQUE no valor total e chave NFe
+- Se não encontrar chave NFe, tudo bem - extraia pelo menos o valor total
+- Seja tolerante com erros de OCR nos números
+- Converta valores para formato decimal (ex: R$ 1.250,50 = 1250.50)
 
-IMPORTANTE - EXTRAÇÃO MÁXIMA:
-- Prefira incluir produtos com dados incompletos a perdê-los
-- Se ver "ITEM 1, ITEM 2, ITEM 3..." liste todos
-- Se ver lista numerada, extraia todos os itens
-- Se tabela tem 10+ linhas, retorne 10+ produtos
-- Foque em produtos de construção a seco/drywall
-- Calcule pontos conservadoramente
-- Se houver dúvida sobre elegibilidade, inclua com observação
+TOLERÂNCIA A ERROS OCR:
+- "R$ 1OO,OO" = "R$ 100,00" (O maiúsculo = zero)
+- "125O,5O" = "1250,50" (O maiúsculo = zero)
+- Espaços extras, pontos e vírgulas mal formatados
 
-RETORNE APENAS JSON VÁLIDO com TODOS os produtos encontrados:
+RETORNE APENAS JSON VÁLIDO (SEM PRODUTOS):
 {
   "numeroPedido": "número encontrado ou 'N/A'",
   "dataEmissao": "data no formato dd/mm/aaaa",
-  "fornecedor": "nome do fornecedor",
-  "cliente": "nome do cliente",
+  "fornecedor": "nome do fornecedor/emitente",
+  "cnpjEmitente": "CNPJ do emitente ou 'N/A'",
   "valorTotalPedido": 0.00,
-  "produtos": [
-    {
-      "sequencia": 1,
-      "codigo": "código do produto ou 'N/A'",
-      "nome": "descrição COMPLETA do produto",
-      "descricao": "descrição detalhada",
-      "unidade": "UN/M2/ML/KG",
-      "quantidade": 1,
-      "valorUnitario": 0.00,
-      "valorTotal": 0.00,
-      "categoria": "construção/material/outros",
-      "observacao": "detalhes extras se houver"
-    }
-  ],
-  "produtosFast": [
-    {
-      "sequencia": 1,
-      "codigo": "código do produto",
-      "nome": "descrição do produto Fast",
-      "produtoOficial": "categoria Fast identificada",
-      "unidade": "unidade",
-      "quantidade": 1,
-      "valorUnitario": 0.00,
-      "valorTotal": 0.00,
-      "pontosPorReal": 0.5,
-      "pontosCalculados": 0,
-      "categoria": "drywall/glasroc/acabamento"
-    }
-  ],
+  "chaveNFe": {
+    "chaveCompleta": "sequência de 44 dígitos ou 'N/A'",
+    "encontradaAbaixoCodigoBarras": true,
+    "uf": "código UF extraído (primeiros 2 dígitos)",
+    "validadeVisual": "ok/suspeita/inválida"
+  },
   "resumo": {
-    "totalProdutos": 0,
-    "totalProdutosFast": 0.00,
-    "totalPontosGanhos": 0,
-    "produtosElegiveis": 0,
-    "produtosTotais": 0
+    "valorTotalConfirmado": 0.00,
+    "chaveNFeEncontrada": true,
+    "confiancaExtracao": 95
   },
   "debug": {
-    "produtosExtraidos": 0,
-    "linhasAnalisadas": 0,
-    "confiancaExtracao": 85
+    "codigoBarrasEncontrado": false,
+    "chaveNFeEncontrada": false,
+    "valorTotalLocalizado": true,
+    "metodoExtracao": "valor_total_apenas"
   }
+}
 }
 
 ⚠️ ATENÇÃO: RETORNE APENAS JSON VÁLIDO!
@@ -123,8 +90,8 @@ RETORNE APENAS JSON VÁLIDO com TODOS os produtos encontrados:
 - NÃO adicione texto antes ou depois do JSON
 - TESTE o JSON mentalmente antes de enviar
 
-FORMATO FINAL OBRIGATÓRIO:
-{"numeroPedido":"valor","dataEmissao":"valor",...}
+FORMATO FINAL OBRIGATÓRIO - APENAS DADOS ESSENCIAIS:
+{"numeroPedido":"valor","dataEmissao":"dd/mm/aaaa","valorTotalPedido":1250.50,"chaveNFe":{"chaveCompleta":"44dígitos","encontradaAbaixoCodigoBarras":true}}
 `
     }
 
