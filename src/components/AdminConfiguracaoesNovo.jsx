@@ -18,6 +18,7 @@ import {
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -495,8 +496,21 @@ function AdminConfiguracaoesNovo() {
               onClick={searchClients}
               disabled={loading}
             >
-              <FiSearch />
-              {loading ? 'Buscando...' : 'Buscar'}
+              {loading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <img
+                    src={require('../assets/gif-carregando.gif')}
+                    alt="Carregando..."
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  Buscando...
+                </div>
+              ) : (
+                <>
+                  <FiSearch />
+                  Buscar
+                </>
+              )}
             </button>
           </ClientSearch>
 

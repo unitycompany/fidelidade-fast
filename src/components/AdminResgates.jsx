@@ -3,6 +3,7 @@ import styled, { keyframes } from 'styled-components';
 import { FiSearch, FiCheck, FiClock, FiUser, FiGift, FiEye, FiEdit3, FiFilter } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -270,27 +271,27 @@ const CodigoDestaque = styled.div`
 `;
 
 function AdminResgates({ user }) {
-    const [resgates, setResgates] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [filtroStatus, setFiltroStatus] = useState('todos');
-    const [busca, setBusca] = useState('');
-    const [modalDetalhes, setModalDetalhes] = useState(null);
-    const [processando, setProcessando] = useState(false);
-    const [stats, setStats] = useState({
-        total: 0,
-        pendentes: 0,
-        coletados: 0,
-        hoje: 0
-    });
+  const [resgates, setResgates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [busca, setBusca] = useState('');
+  const [modalDetalhes, setModalDetalhes] = useState(null);
+  const [processando, setProcessando] = useState(false);
+  const [stats, setStats] = useState({
+    total: 0,
+    pendentes: 0,
+    coletados: 0,
+    hoje: 0
+  });
 
-    const carregarResgates = async () => {
-        try {
-            setLoading(true);
+  const carregarResgates = async () => {
+    try {
+      setLoading(true);
 
-            // Buscar resgates com joins para ter dados completos
-            const { data: resgatesData, error: resgatesError } = await supabase
-                .from('resgates')
-                .select(`
+      // Buscar resgates com joins para ter dados completos
+      const { data: resgatesData, error: resgatesError } = await supabase
+        .from('resgates')
+        .select(`
                     *,
                     premios_catalogo!inner(
                         id,
@@ -306,322 +307,333 @@ function AdminResgates({ user }) {
                         telefone
                     )
                 `)
-                .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
-            if (resgatesError) throw resgatesError;
+      if (resgatesError) throw resgatesError;
 
-            // Formatar dados para o admin
-            const resgatesFormatados = resgatesData?.map(resgate => ({
-                id: resgate.id,
-                codigo_resgate: resgate.codigo_resgate || `RES-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${resgate.id.substring(0, 4).toUpperCase()}`, // Gerar código temporário se não existir
-                data_resgate: resgate.created_at,
-                coletado: resgate.coletado || false,
-                data_coleta: resgate.data_coleta,
-                gerente_retirada: resgate.gerente_retirada,
-                usuario_retirada_id: resgate.usuario_retirada_id,
-                pontos_utilizados: resgate.pontos_utilizados,
-                status: resgate.status,
-                // Dados do cliente
-                cliente_nome: resgate.clientes_fast.nome,
-                cliente_email: resgate.clientes_fast.email,
-                cliente_telefone: resgate.clientes_fast.telefone,
-                // Dados do prêmio
-                premio_nome: resgate.premios_catalogo.nome,
-                premio_categoria: resgate.premios_catalogo.categoria,
-                premio_descricao: resgate.premios_catalogo.descricao,
-                premio_pontos: resgate.premios_catalogo.pontos_necessarios,
-                // Status formatado
-                status_retirada: resgate.coletado ? 'Retirado' : 'Aguardando Retirada'
-            })) || [];
+      // Formatar dados para o admin
+      const resgatesFormatados = resgatesData?.map(resgate => {
+        // Calcular dias desde o resgate
+        const dataResgate = new Date(resgate.created_at);
+        const hoje = new Date();
+        const diferenca = hoje.getTime() - dataResgate.getTime();
+        const diasDesdeResgate = Math.floor(diferenca / (1000 * 3600 * 24));
 
-            setResgates(resgatesFormatados);
+        return {
+          id: resgate.id,
+          codigo_resgate: resgate.codigo_resgate || `RES-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${resgate.id.substring(0, 4).toUpperCase()}`, // Gerar código temporário se não existir
+          data_resgate: resgate.created_at,
+          coletado: resgate.coletado || false,
+          data_coleta: resgate.data_coleta,
+          gerente_retirada: resgate.gerente_retirada,
+          usuario_retirada_id: resgate.usuario_retirada_id,
+          pontos_utilizados: resgate.pontos_utilizados,
+          status: resgate.status,
+          dias_desde_resgate: diasDesdeResgate,
+          // Dados do cliente
+          cliente_nome: resgate.clientes_fast.nome,
+          cliente_email: resgate.clientes_fast.email,
+          cliente_telefone: resgate.clientes_fast.telefone,
+          // Dados do prêmio
+          premio_nome: resgate.premios_catalogo.nome,
+          premio_categoria: resgate.premios_catalogo.categoria,
+          premio_descricao: resgate.premios_catalogo.descricao,
+          premio_pontos: resgate.premios_catalogo.pontos_necessarios,
+          // Status formatado
+          status_retirada: resgate.coletado ? 'Retirado' : 'Aguardando Retirada'
+        };
+      }) || [];
 
-            // Calcular estatísticas
-            const total = resgatesFormatados?.length || 0;
-            const pendentes = resgatesFormatados?.filter(r => !r.coletado).length || 0;
-            const retirados = resgatesFormatados?.filter(r => r.coletado).length || 0;
-            const hoje = resgatesFormatados?.filter(r => {
-                const dataResgate = new Date(r.data_resgate);
-                const hoje = new Date();
-                return dataResgate.toDateString() === hoje.toDateString();
-            }).length || 0;
+      setResgates(resgatesFormatados);
 
-            setStats({ total, pendentes, coletados: retirados, hoje });
+      // Calcular estatísticas
+      const total = resgatesFormatados?.length || 0;
+      const pendentes = resgatesFormatados?.filter(r => !r.coletado).length || 0;
+      const retirados = resgatesFormatados?.filter(r => r.coletado).length || 0;
+      const hoje = resgatesFormatados?.filter(r => {
+        const dataResgate = new Date(r.data_resgate);
+        const hoje = new Date();
+        return dataResgate.toDateString() === hoje.toDateString();
+      }).length || 0;
 
-        } catch (error) {
-            console.error('Erro ao carregar resgates:', error);
-            toast.error('Erro ao carregar resgates');
-        } finally {
-            setLoading(false);
-        }
-    };
+      setStats({ total, pendentes, coletados: retirados, hoje });
 
-    useEffect(() => {
-        carregarResgates();
-    }, []);
-
-    const marcarComoResgatado = async (codigo) => {
-        try {
-            setProcessando(true);
-
-            // Preparar informações do gerente e loja
-            const gerenteNome = user?.nome || 'Gerente';
-            const lojaNome = user?.lojas?.nome || 'Loja';
-            const gerenteInfo = `${gerenteNome} | ${lojaNome}`;
-
-            // Atualizar resgate como retirado usando o código
-            const { data, error } = await supabase
-                .from('resgates')
-                .update({
-                    coletado: true,
-                    data_coleta: new Date().toISOString(),
-                    gerente_retirada: gerenteInfo,
-                    usuario_retirada_id: user?.id
-                })
-                .eq('codigo_resgate', codigo)
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            if (data) {
-                toast.success('Resgate marcado como entregue!');
-                carregarResgates(); // Recarregar dados
-                setModalDetalhes(null);
-            } else {
-                toast.error('Resgate não encontrado ou já foi entregue');
-            }
-
-        } catch (error) {
-            console.error('Erro ao marcar como resgatado:', error);
-            toast.error('Erro ao marcar como entregue');
-        } finally {
-            setProcessando(false);
-        }
-    };
-
-    const resgatesFiltrados = resgates.filter(resgate => {
-        const matchBusca = busca === '' ||
-            resgate.codigo_resgate.toLowerCase().includes(busca.toLowerCase()) ||
-            resgate.cliente_nome.toLowerCase().includes(busca.toLowerCase()) ||
-            resgate.premio_nome.toLowerCase().includes(busca.toLowerCase());
-
-        const matchStatus = filtroStatus === 'todos' ||
-            (filtroStatus === 'pendentes' && !resgate.coletado) ||
-            (filtroStatus === 'retirados' && resgate.coletado);
-
-        return matchBusca && matchStatus;
-    });
-
-    if (loading) {
-        return (
-            <Container>
-                <Header>
-                    <h1><FiGift /> Carregando...</h1>
-                </Header>
-            </Container>
-        );
+    } catch (error) {
+      console.error('Erro ao carregar resgates:', error);
+      toast.error('Erro ao carregar resgates');
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
+    carregarResgates();
+  }, []);
+
+  const marcarComoResgatado = async (codigo) => {
+    try {
+      setProcessando(true);
+
+      // Preparar informações do gerente e loja
+      const gerenteNome = user?.nome || 'Gerente';
+      const lojaNome = user?.lojas?.nome || 'Loja';
+      const gerenteInfo = `${gerenteNome} | ${lojaNome}`;
+
+      // Atualizar resgate como retirado usando o código
+      const { data, error } = await supabase
+        .from('resgates')
+        .update({
+          coletado: true,
+          data_coleta: new Date().toISOString(),
+          gerente_retirada: gerenteInfo,
+          usuario_retirada_id: user?.id
+        })
+        .eq('codigo_resgate', codigo)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        toast.success('Resgate marcado como entregue!');
+        carregarResgates(); // Recarregar dados
+        setModalDetalhes(null);
+      } else {
+        toast.error('Resgate não encontrado ou já foi entregue');
+      }
+
+    } catch (error) {
+      console.error('Erro ao marcar como resgatado:', error);
+      toast.error('Erro ao marcar como entregue');
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const resgatesFiltrados = resgates.filter(resgate => {
+    const matchBusca = busca === '' ||
+      resgate.codigo_resgate.toLowerCase().includes(busca.toLowerCase()) ||
+      resgate.cliente_nome.toLowerCase().includes(busca.toLowerCase()) ||
+      resgate.premio_nome.toLowerCase().includes(busca.toLowerCase());
+
+    const matchStatus = filtroStatus === 'todos' ||
+      (filtroStatus === 'pendentes' && !resgate.coletado) ||
+      (filtroStatus === 'retirados' && resgate.coletado);
+
+    return matchBusca && matchStatus;
+  });
+
+  if (loading) {
     return (
-        <Container>
-
-            <Stats>
-                <StatCard color="#007bff" delay="0.1s">
-                    <div className="value">{stats.total}</div>
-                    <div className="label">Total de Resgates</div>
-                </StatCard>
-                <StatCard color="#ffc107" delay="0.2s">
-                    <div className="value">{stats.pendentes}</div>
-                    <div className="label">Aguardando Entrega</div>
-                </StatCard>
-                <StatCard color="#28a745" delay="0.3s">
-                    <div className="value">{stats.coletados}</div>
-                    <div className="label">Entregues</div>
-                </StatCard>
-                <StatCard color="#17a2b8" delay="0.4s">
-                    <div className="value">{stats.hoje}</div>
-                    <div className="label">Entregas Hoje</div>
-                </StatCard>
-            </Stats>
-
-            <Filters>
-                <SearchInput
-                    type="text"
-                    placeholder="Buscar por código, cliente ou prêmio..."
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                />
-                <FilterSelect
-                    value={filtroStatus}
-                    onChange={(e) => setFiltroStatus(e.target.value)}
-                >
-                    <option value="todos">Todos os Status</option>
-                    <option value="pendentes">Aguardando</option>
-                    <option value="retirados">Entregues</option>
-                </FilterSelect>
-            </Filters>
-
-            <ResgatesTable>
-                <TableHeader>
-                    <div>Código</div>
-                    <div>Cliente</div>
-                    <div>Prêmio</div>
-                    <div>Data Resgate</div>
-                    <div>Pontos</div>
-                    <div>Status</div>
-                    <div>Ações</div>
-                </TableHeader>
-
-                {resgatesFiltrados.map((resgate, index) => (
-                    <TableRow key={resgate.id}>
-                        <CodigoDestaque style={{ margin: 0, padding: '0.5rem', display: 'inline-block' }}>
-                            <div className="codigo" style={{ fontSize: '0.9rem' }}>
-                                {resgate.codigo_resgate}
-                            </div>
-                        </CodigoDestaque>
-
-                        <div>
-                            <div style={{ fontWeight: '600' }}>{resgate.cliente_nome}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#666' }}>{resgate.cliente_email}</div>
-                        </div>
-
-                        <div>
-                            <div style={{ fontWeight: '600' }}>{resgate.premio_nome}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#666' }}>{resgate.premio_categoria}</div>
-                        </div>
-
-                        <div>
-                            {new Date(resgate.data_resgate).toLocaleDateString('pt-BR')}
-                            <div style={{ fontSize: '0.8rem', color: '#666' }}>
-                                {resgate.dias_desde_resgate} dias atrás
-                            </div>
-                        </div>
-
-                        <div style={{ fontWeight: '600' }}>
-                            {resgate.pontos_utilizados} pts
-                        </div>
-
-                        <div>
-                            <StatusBadge status={resgate.coletado ? 'resgatado' : 'pendente'}>
-                                {resgate.status_retirada}
-                            </StatusBadge>
-                            {resgate.coletado && resgate.data_coleta && (
-                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
-                                    <div style={{ fontWeight: '500' }}>
-                                        Data da Entrega: {new Date(resgate.data_coleta).toLocaleDateString('pt-BR')}
-                                    </div>
-                                </div>
-                            )}
-                            {resgate.coletado && resgate.gerente_retirada && (
-                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
-                                    <div style={{ fontWeight: '500' }}>
-                                        Retirado por: {resgate.gerente_retirada}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <ActionButton
-                                variant="info"
-                                onClick={() => setModalDetalhes(resgate)}
-                            >
-                                <FiEye />
-                                Ver
-                            </ActionButton>
-
-                            {!resgate.coletado && (
-                                <ActionButton
-                                    variant="success"
-                                    onClick={() => marcarComoResgatado(resgate.codigo_resgate)}
-                                    disabled={processando}
-                                >
-                                    <FiCheck />
-                                    Entregar
-                                </ActionButton>
-                            )}
-                        </div>
-                    </TableRow>
-                ))}
-
-                {resgatesFiltrados.length === 0 && (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
-                        Nenhum resgate encontrado com os filtros aplicados.
-                    </div>
-                )}
-            </ResgatesTable>
-
-            {/* Modal de Detalhes */}
-            {modalDetalhes && (
-                <Modal onClick={() => setModalDetalhes(null)}>
-                    <ModalContent onClick={e => e.stopPropagation()}>
-                        <h3>Detalhes do Resgate</h3>
-
-                        <CodigoDestaque>
-                            <div className="codigo">{modalDetalhes.codigo_resgate}</div>
-                        </CodigoDestaque>
-
-                        <div style={{ marginBottom: '1rem' }}>
-                            <strong>Cliente:</strong> {modalDetalhes.cliente_nome}<br />
-                            <strong>Email:</strong> {modalDetalhes.cliente_email}<br />
-                            <strong>Telefone:</strong> {modalDetalhes.cliente_telefone || 'Não informado'}
-                        </div>
-
-                        <div style={{ marginBottom: '1rem' }}>
-                            <strong>Prêmio:</strong> {modalDetalhes.premio_nome}<br />
-                            <strong>Categoria:</strong> {modalDetalhes.premio_categoria}<br />
-                            <strong>Descrição:</strong> {modalDetalhes.premio_descricao}
-                        </div>
-
-                        <div style={{ marginBottom: '1rem' }}>
-                            <strong>Data do Resgate:</strong> {new Date(modalDetalhes.data_resgate).toLocaleString('pt-BR')}<br />
-                            <strong>Pontos Utilizados:</strong> {modalDetalhes.pontos_utilizados}<br />
-                            <strong>Status:</strong> {modalDetalhes.status_retirada}
-                        </div>
-
-                        {modalDetalhes.coletado && modalDetalhes.data_coleta && (
-                            <div style={{ marginBottom: '1rem' }}>
-                                <strong>Data da Entrega:</strong> {new Date(modalDetalhes.data_coleta).toLocaleString('pt-BR')}
-                                {modalDetalhes.gerente_retirada && (
-                                    <>
-                                        <br />
-                                        <strong>Retirado por:</strong> {modalDetalhes.gerente_retirada}
-                                    </>
-                                )}
-                            </div>
-                        )}
-
-                        {modalDetalhes.observacoes_admin && (
-                            <div style={{ marginBottom: '1rem' }}>
-                                <strong>Observações:</strong> {modalDetalhes.observacoes_admin}
-                            </div>
-                        )}
-
-                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem' }}>
-                            {!modalDetalhes.coletado && (
-                                <ActionButton
-                                    variant="success"
-                                    onClick={() => marcarComoResgatado(modalDetalhes.codigo_resgate)}
-                                    disabled={processando}
-                                >
-                                    <FiCheck />
-                                    {processando ? 'Processando...' : 'Marcar como entregue'}
-                                </ActionButton>
-                            )}
-
-                            <ActionButton
-                                variant="info"
-                                onClick={() => setModalDetalhes(null)}
-                            >
-                                Fechar
-                            </ActionButton>
-                        </div>
-                    </ModalContent>
-                </Modal>
-            )}
-        </Container>
+      <Container>
+        <LoadingGif
+          text="Carregando resgates..."
+          size="120px"
+          mobileSize="100px"
+        />
+      </Container>
     );
+  }
+
+  return (
+    <Container>
+
+      <Stats>
+        <StatCard color="#007bff" delay="0.1s">
+          <div className="value">{stats.total}</div>
+          <div className="label">Total de Resgates</div>
+        </StatCard>
+        <StatCard color="#ffc107" delay="0.2s">
+          <div className="value">{stats.pendentes}</div>
+          <div className="label">Aguardando Entrega</div>
+        </StatCard>
+        <StatCard color="#28a745" delay="0.3s">
+          <div className="value">{stats.coletados}</div>
+          <div className="label">Entregues</div>
+        </StatCard>
+        <StatCard color="#17a2b8" delay="0.4s">
+          <div className="value">{stats.hoje}</div>
+          <div className="label">Entregas Hoje</div>
+        </StatCard>
+      </Stats>
+
+      <Filters>
+        <SearchInput
+          type="text"
+          placeholder="Buscar por código, cliente ou prêmio..."
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        <FilterSelect
+          value={filtroStatus}
+          onChange={(e) => setFiltroStatus(e.target.value)}
+        >
+          <option value="todos">Todos os Status</option>
+          <option value="pendentes">Aguardando</option>
+          <option value="retirados">Entregues</option>
+        </FilterSelect>
+      </Filters>
+
+      <ResgatesTable>
+        <TableHeader>
+          <div>Código</div>
+          <div>Cliente</div>
+          <div>Prêmio</div>
+          <div>Data Resgate</div>
+          <div>Pontos</div>
+          <div>Status</div>
+          <div>Ações</div>
+        </TableHeader>
+
+        {resgatesFiltrados.map((resgate, index) => (
+          <TableRow key={resgate.id}>
+            <CodigoDestaque style={{ margin: 0, padding: '0.5rem', display: 'inline-block' }}>
+              <div className="codigo" style={{ fontSize: '0.9rem' }}>
+                {resgate.codigo_resgate}
+              </div>
+            </CodigoDestaque>
+
+            <div>
+              <div style={{ fontWeight: '600' }}>{resgate.cliente_nome}</div>
+              <div style={{ fontSize: '0.8rem', color: '#666' }}>{resgate.cliente_email}</div>
+            </div>
+
+            <div>
+              <div style={{ fontWeight: '600' }}>{resgate.premio_nome}</div>
+              <div style={{ fontSize: '0.8rem', color: '#666' }}>{resgate.premio_categoria}</div>
+            </div>
+
+            <div>
+              {new Date(resgate.data_resgate).toLocaleDateString('pt-BR')}
+              <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                {resgate.dias_desde_resgate} dias atrás
+              </div>
+            </div>
+
+            <div style={{ fontWeight: '600' }}>
+              {resgate.pontos_utilizados} pts
+            </div>
+
+            <div>
+              <StatusBadge status={resgate.coletado ? 'resgatado' : 'pendente'}>
+                {resgate.status_retirada}
+              </StatusBadge>
+              {resgate.coletado && resgate.data_coleta && (
+                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                  <div style={{ fontWeight: '500' }}>
+                    Data da Entrega: {new Date(resgate.data_coleta).toLocaleDateString('pt-BR')}
+                  </div>
+                </div>
+              )}
+              {resgate.coletado && resgate.gerente_retirada && (
+                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                  <div style={{ fontWeight: '500' }}>
+                    Retirado por: {resgate.gerente_retirada}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <ActionButton
+                variant="info"
+                onClick={() => setModalDetalhes(resgate)}
+              >
+                <FiEye />
+                Ver
+              </ActionButton>
+
+              {!resgate.coletado && (
+                <ActionButton
+                  variant="success"
+                  onClick={() => marcarComoResgatado(resgate.codigo_resgate)}
+                  disabled={processando}
+                >
+                  <FiCheck />
+                  Entregar
+                </ActionButton>
+              )}
+            </div>
+          </TableRow>
+        ))}
+
+        {resgatesFiltrados.length === 0 && (
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+            Nenhum resgate encontrado com os filtros aplicados.
+          </div>
+        )}
+      </ResgatesTable>
+
+      {/* Modal de Detalhes */}
+      {modalDetalhes && (
+        <Modal onClick={() => setModalDetalhes(null)}>
+          <ModalContent onClick={e => e.stopPropagation()}>
+            <h3>Detalhes do Resgate</h3>
+
+            <CodigoDestaque>
+              <div className="codigo">{modalDetalhes.codigo_resgate}</div>
+            </CodigoDestaque>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <strong>Cliente:</strong> {modalDetalhes.cliente_nome}<br />
+              <strong>Email:</strong> {modalDetalhes.cliente_email}<br />
+              <strong>Telefone:</strong> {modalDetalhes.cliente_telefone || 'Não informado'}
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <strong>Prêmio:</strong> {modalDetalhes.premio_nome}<br />
+              <strong>Categoria:</strong> {modalDetalhes.premio_categoria}<br />
+              <strong>Descrição:</strong> {modalDetalhes.premio_descricao}
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <strong>Data do Resgate:</strong> {new Date(modalDetalhes.data_resgate).toLocaleString('pt-BR')}<br />
+              <strong>Pontos Utilizados:</strong> {modalDetalhes.pontos_utilizados}<br />
+              <strong>Status:</strong> {modalDetalhes.status_retirada}
+            </div>
+
+            {modalDetalhes.coletado && modalDetalhes.data_coleta && (
+              <div style={{ marginBottom: '1rem' }}>
+                <strong>Data da Entrega:</strong> {new Date(modalDetalhes.data_coleta).toLocaleString('pt-BR')}
+                {modalDetalhes.gerente_retirada && (
+                  <>
+                    <br />
+                    <strong>Retirado por:</strong> {modalDetalhes.gerente_retirada}
+                  </>
+                )}
+              </div>
+            )}
+
+            {modalDetalhes.observacoes_admin && (
+              <div style={{ marginBottom: '1rem' }}>
+                <strong>Observações:</strong> {modalDetalhes.observacoes_admin}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem' }}>
+              {!modalDetalhes.coletado && (
+                <ActionButton
+                  variant="success"
+                  onClick={() => marcarComoResgatado(modalDetalhes.codigo_resgate)}
+                  disabled={processando}
+                >
+                  <FiCheck />
+                  {processando ? 'Processando...' : 'Marcar como entregue'}
+                </ActionButton>
+              )}
+
+              <ActionButton
+                variant="info"
+                onClick={() => setModalDetalhes(null)}
+              >
+                Fechar
+              </ActionButton>
+            </div>
+          </ModalContent>
+        </Modal>
+      )}
+    </Container>
+  );
 }
 
 export default AdminResgates;

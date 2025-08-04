@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
 import {
-    FiPackage, FiCheck, FiX, FiClock, FiUser,
-    FiGift, FiStar, FiFilter, FiRefreshCw, FiLoader,
-    FiAlertCircle, FiCheckCircle, FiShield
+  FiPackage, FiCheck, FiX, FiClock, FiUser,
+  FiGift, FiStar, FiFilter, FiRefreshCw, FiLoader,
+  FiAlertCircle, FiCheckCircle, FiShield
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -83,9 +84,9 @@ const HeaderActions = styled.div`
 
 const ActionButton = styled.button`
   background: ${props => props.$variant === 'primary'
-        ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-        : 'white'
-    };
+    ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+    : 'white'
+  };
   color: ${props => props.$variant === 'primary' ? 'white' : '#4A5568'};
   border: ${props => props.$variant === 'primary' ? 'none' : '2px solid #E2E8F0'};
   padding: 0.75rem 1.5rem;
@@ -190,13 +191,13 @@ const ResgateCard = styled.div`
   overflow: hidden;
   animation: ${fadeInUp} 0.6s ease-out;
   border-left: 4px solid ${props => {
-        switch (props.$status) {
-            case 'pendente': return '#F59E0B';
-            case 'entregue': return '#10B981';
-            case 'cancelado': return '#EF4444';
-            default: return '#6B7280';
-        }
-    }};
+    switch (props.$status) {
+      case 'pendente': return '#F59E0B';
+      case 'entregue': return '#10B981';
+      case 'cancelado': return '#EF4444';
+      default: return '#6B7280';
+    }
+  }};
   
   &:hover {
     transform: translateY(-2px);
@@ -264,13 +265,13 @@ const ResgateStatus = styled.div`
 
 const StatusBadge = styled.span`
   background: ${props => {
-        switch (props.$status) {
-            case 'pendente': return '#F59E0B';
-            case 'entregue': return '#10B981';
-            case 'cancelado': return '#EF4444';
-            default: return '#6B7280';
-        }
-    }};
+    switch (props.$status) {
+      case 'pendente': return '#F59E0B';
+      case 'entregue': return '#10B981';
+      case 'cancelado': return '#EF4444';
+      default: return '#6B7280';
+    }
+  }};
   color: white;
   padding: 0.375rem 0.75rem;
   border-radius: 20px;
@@ -338,12 +339,12 @@ const ResgateActions = styled.div`
 
 const ProcessButton = styled.button`
   background: ${props => {
-        switch (props.$action) {
-            case 'entregar': return 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
-            case 'cancelar': return 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)';
-            default: return 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)';
-        }
-    }};
+    switch (props.$action) {
+      case 'entregar': return 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
+      case 'cancelar': return 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)';
+      default: return 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)';
+    }
+  }};
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -396,25 +397,25 @@ const EmptyContainer = styled.div`
 `;
 
 function GerenteResgates({ user }) {
-    const [resgates, setResgates] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [filtroStatus, setFiltroStatus] = useState('todos');
-    const [processando, setProcessando] = useState({});
-    const [stats, setStats] = useState({
-        pendentes: 0,
-        entregues: 0,
-        cancelados: 0,
-        total: 0
-    });
+  const [resgates, setResgates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [processando, setProcessando] = useState({});
+  const [stats, setStats] = useState({
+    pendentes: 0,
+    entregues: 0,
+    cancelados: 0,
+    total: 0
+  });
 
-    const carregarResgates = useCallback(async () => {
-        try {
-            setLoading(true);
+  const carregarResgates = useCallback(async () => {
+    try {
+      setLoading(true);
 
-            // Buscar resgates
-            let query = supabase
-                .from('resgates_premios')
-                .select(`
+      // Buscar resgates
+      let query = supabase
+        .from('resgates_premios')
+        .select(`
           *,
           premios_catalogo (
             nome,
@@ -429,299 +430,300 @@ function GerenteResgates({ user }) {
             email
           )
         `)
-                .order('data_resgate', { ascending: false });
+        .order('data_resgate', { ascending: false });
 
-            // Se for gerente, filtrar por loja (implementar lógica específica se necessário)
-            if (user?.role === 'gerente' && user?.loja_id) {
-                // Por enquanto, gerente vê todos os resgates
-                // Pode implementar filtro por loja se necessário
-            }
+      // Se for gerente, filtrar por loja (implementar lógica específica se necessário)
+      if (user?.role === 'gerente' && user?.loja_id) {
+        // Por enquanto, gerente vê todos os resgates
+        // Pode implementar filtro por loja se necessário
+      }
 
-            const { data, error } = await query;
+      const { data, error } = await query;
 
-            if (error) throw error;
+      if (error) throw error;
 
-            setResgates(data || []);
+      setResgates(data || []);
 
-            // Calcular estatísticas
-            const resgatesTotais = data || [];
-            setStats({
-                pendentes: resgatesTotais.filter(r => r.status === 'pendente').length,
-                entregues: resgatesTotais.filter(r => r.status === 'entregue').length,
-                cancelados: resgatesTotais.filter(r => r.status === 'cancelado').length,
-                total: resgatesTotais.length
-            });
+      // Calcular estatísticas
+      const resgatesTotais = data || [];
+      setStats({
+        pendentes: resgatesTotais.filter(r => r.status === 'pendente').length,
+        entregues: resgatesTotais.filter(r => r.status === 'entregue').length,
+        cancelados: resgatesTotais.filter(r => r.status === 'cancelado').length,
+        total: resgatesTotais.length
+      });
 
-        } catch (error) {
-            console.error('Erro ao carregar resgates:', error);
-            toast.error('Erro ao carregar resgates');
-        } finally {
-            setLoading(false);
-        }
-    }, [user]);
-
-    useEffect(() => {
-        carregarResgates();
-    }, [carregarResgates]);
-
-    const resgatesFiltrados = resgates.filter(resgate => {
-        if (filtroStatus === 'todos') return true;
-        return resgate.status === filtroStatus;
-    });
-
-    const processarResgate = async (resgateId, novoStatus) => {
-        const resgate = resgates.find(r => r.id === resgateId);
-        if (!resgate) return;
-
-        const confirmMessage = novoStatus === 'entregue'
-            ? `Confirmar entrega do prêmio "${resgate.premios_catalogo.nome}" para ${resgate.clientes_fast.nome}?`
-            : `Cancelar o resgate do prêmio "${resgate.premios_catalogo.nome}"?`;
-
-        if (!confirm(confirmMessage)) return;
-
-        setProcessando(prev => ({ ...prev, [resgateId]: true }));
-
-        try {
-            const updateData = {
-                status: novoStatus,
-                data_processamento: new Date().toISOString()
-            };
-
-            // Se está entregando, adicionar informações do gerente
-            if (novoStatus === 'entregue') {
-                updateData.processado_por = user.id;
-                updateData.observacoes_gerente = `Entregue por ${user.nome} - ${user.lojas?.nome || 'Sistema'}`;
-            }
-
-            const { error } = await supabase
-                .from('resgates_premios')
-                .update(updateData)
-                .eq('id', resgateId);
-
-            if (error) throw error;
-
-            const statusText = novoStatus === 'entregue' ? 'entregue' : 'cancelado';
-            toast.success(`Resgate ${statusText} com sucesso!`);
-
-            // Atualizar a lista
-            carregarResgates();
-
-        } catch (error) {
-            console.error('Erro ao processar resgate:', error);
-            toast.error('Erro ao processar resgate');
-        } finally {
-            setProcessando(prev => ({ ...prev, [resgateId]: false }));
-        }
-    };
-
-    const formatarData = (data) => {
-        return new Date(data).toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'pendente': return <FiClock />;
-            case 'entregue': return <FiCheckCircle />;
-            case 'cancelado': return <FiX />;
-            default: return <FiAlertCircle />;
-        }
-    };
-
-    const getStatusText = (status) => {
-        switch (status) {
-            case 'pendente': return 'Pendente';
-            case 'entregue': return 'Entregue';
-            case 'cancelado': return 'Cancelado';
-            default: return 'Desconhecido';
-        }
-    };
-
-    if (loading) {
-        return (
-            <Container>
-                <LoadingContainer>
-                    <FiLoader className="animate-spin" size={32} />
-                    <p style={{ marginTop: '1rem' }}>Carregando resgates...</p>
-                </LoadingContainer>
-            </Container>
-        );
+    } catch (error) {
+      console.error('Erro ao carregar resgates:', error);
+      toast.error('Erro ao carregar resgates');
+    } finally {
+      setLoading(false);
     }
+  }, [user]);
 
+  useEffect(() => {
+    carregarResgates();
+  }, [carregarResgates]);
+
+  const resgatesFiltrados = resgates.filter(resgate => {
+    if (filtroStatus === 'todos') return true;
+    return resgate.status === filtroStatus;
+  });
+
+  const processarResgate = async (resgateId, novoStatus) => {
+    const resgate = resgates.find(r => r.id === resgateId);
+    if (!resgate) return;
+
+    const confirmMessage = novoStatus === 'entregue'
+      ? `Confirmar entrega do prêmio "${resgate.premios_catalogo.nome}" para ${resgate.clientes_fast.nome}?`
+      : `Cancelar o resgate do prêmio "${resgate.premios_catalogo.nome}"?`;
+
+    if (!confirm(confirmMessage)) return;
+
+    setProcessando(prev => ({ ...prev, [resgateId]: true }));
+
+    try {
+      const updateData = {
+        status: novoStatus,
+        data_processamento: new Date().toISOString()
+      };
+
+      // Se está entregando, adicionar informações do gerente
+      if (novoStatus === 'entregue') {
+        updateData.processado_por = user.id;
+        updateData.observacoes_gerente = `Entregue por ${user.nome} - ${user.lojas?.nome || 'Sistema'}`;
+      }
+
+      const { error } = await supabase
+        .from('resgates_premios')
+        .update(updateData)
+        .eq('id', resgateId);
+
+      if (error) throw error;
+
+      const statusText = novoStatus === 'entregue' ? 'entregue' : 'cancelado';
+      toast.success(`Resgate ${statusText} com sucesso!`);
+
+      // Atualizar a lista
+      carregarResgates();
+
+    } catch (error) {
+      console.error('Erro ao processar resgate:', error);
+      toast.error('Erro ao processar resgate');
+    } finally {
+      setProcessando(prev => ({ ...prev, [resgateId]: false }));
+    }
+  };
+
+  const formatarData = (data) => {
+    return new Date(data).toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'pendente': return <FiClock />;
+      case 'entregue': return <FiCheckCircle />;
+      case 'cancelado': return <FiX />;
+      default: return <FiAlertCircle />;
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pendente': return 'Pendente';
+      case 'entregue': return 'Entregue';
+      case 'cancelado': return 'Cancelado';
+      default: return 'Desconhecido';
+    }
+  };
+
+  if (loading) {
     return (
-        <Container>
-            <MainContent>
-                <Header>
-                    <HeaderContent>
-                        <div>
-                            <HeaderTitle>
-                                <FiPackage />
-                                Resgates para Entrega
-                            </HeaderTitle>
-                            <HeaderSubtitle>
-                                Gerencie os resgates de prêmios dos clientes
-                                {user?.lojas?.nome && ` - ${user.lojas.nome}`}
-                            </HeaderSubtitle>
-                        </div>
-                        <HeaderActions>
-                            <ActionButton onClick={carregarResgates} $variant="primary">
-                                <FiRefreshCw />
-                                Atualizar
-                            </ActionButton>
-                        </HeaderActions>
-                    </HeaderContent>
-                </Header>
-
-                <StatsContainer>
-                    <StatCard $color="#F59E0B">
-                        <StatValue>{stats.pendentes}</StatValue>
-                        <StatLabel>Resgates Pendentes</StatLabel>
-                    </StatCard>
-                    <StatCard $color="#10B981">
-                        <StatValue>{stats.entregues}</StatValue>
-                        <StatLabel>Resgates Entregues</StatLabel>
-                    </StatCard>
-                    <StatCard $color="#EF4444">
-                        <StatValue>{stats.cancelados}</StatValue>
-                        <StatLabel>Resgates Cancelados</StatLabel>
-                    </StatCard>
-                    <StatCard $color="#6B7280">
-                        <StatValue>{stats.total}</StatValue>
-                        <StatLabel>Total de Resgates</StatLabel>
-                    </StatCard>
-                </StatsContainer>
-
-                <FiltersContainer>
-                    <FiltersRow>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <FiFilter />
-                            <span style={{ fontWeight: '600', color: '#4A5568' }}>Filtrar por status:</span>
-                        </div>
-                        <FilterSelect
-                            value={filtroStatus}
-                            onChange={(e) => setFiltroStatus(e.target.value)}
-                        >
-                            <option value="todos">Todos os Status</option>
-                            <option value="pendente">Pendentes</option>
-                            <option value="entregue">Entregues</option>
-                            <option value="cancelado">Cancelados</option>
-                        </FilterSelect>
-                    </FiltersRow>
-                </FiltersContainer>
-
-                <ResgatesContainer>
-                    {resgatesFiltrados.length === 0 ? (
-                        <EmptyContainer>
-                            <FiPackage size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
-                            <h3>Nenhum resgate encontrado</h3>
-                            <p>Não há resgates para o filtro selecionado.</p>
-                        </EmptyContainer>
-                    ) : (
-                        resgatesFiltrados.map((resgate) => (
-                            <ResgateCard
-                                key={resgate.id}
-                                $status={resgate.status}
-                                $urgent={resgate.status === 'pendente' &&
-                                    new Date() - new Date(resgate.data_resgate) > 24 * 60 * 60 * 1000}
-                            >
-                                <ResgateHeader>
-                                    <ResgateInfo>
-                                        <ResgateId>#{resgate.id.slice(-8).toUpperCase()}</ResgateId>
-                                        <ResgateTitle>
-                                            <FiGift />
-                                            {resgate.premios_catalogo.nome}
-                                        </ResgateTitle>
-                                        <ResgateCliente>
-                                            <FiUser />
-                                            {resgate.clientes_fast.nome}
-                                            {resgate.clientes_fast.telefone && ` - ${resgate.clientes_fast.telefone}`}
-                                        </ResgateCliente>
-                                    </ResgateInfo>
-                                    <ResgateStatus>
-                                        <StatusBadge $status={resgate.status}>
-                                            {getStatusIcon(resgate.status)}
-                                            {getStatusText(resgate.status)}
-                                        </StatusBadge>
-                                        <ResgateData>
-                                            {formatarData(resgate.data_resgate)}
-                                        </ResgateData>
-                                    </ResgateStatus>
-                                </ResgateHeader>
-
-                                <ResgateBody>
-                                    <ResgateDetalhes>
-                                        {resgate.premios_catalogo.descricao && (
-                                            <DetalheItem>
-                                                <FiGift />
-                                                {resgate.premios_catalogo.descricao}
-                                            </DetalheItem>
-                                        )}
-
-                                        <PontosInfo>
-                                            <FiStar />
-                                            {resgate.pontos_utilizados?.toLocaleString()} pontos utilizados
-                                        </PontosInfo>
-
-                                        {resgate.observacoes_gerente && (
-                                            <DetalheItem>
-                                                <FiShield />
-                                                {resgate.observacoes_gerente}
-                                            </DetalheItem>
-                                        )}
-                                    </ResgateDetalhes>
-
-                                    {resgate.status === 'pendente' && (
-                                        <ResgateActions>
-                                            <ProcessButton
-                                                $action="entregar"
-                                                onClick={() => processarResgate(resgate.id, 'entregue')}
-                                                disabled={processando[resgate.id]}
-                                            >
-                                                {processando[resgate.id] ? (
-                                                    <>
-                                                        <FiLoader className="animate-spin" />
-                                                        Processando...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <FiCheck />
-                                                        Entregar
-                                                    </>
-                                                )}
-                                            </ProcessButton>
-
-                                            <ProcessButton
-                                                $action="cancelar"
-                                                onClick={() => processarResgate(resgate.id, 'cancelado')}
-                                                disabled={processando[resgate.id]}
-                                            >
-                                                {processando[resgate.id] ? (
-                                                    <>
-                                                        <FiLoader className="animate-spin" />
-                                                        Processando...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <FiX />
-                                                        Cancelar
-                                                    </>
-                                                )}
-                                            </ProcessButton>
-                                        </ResgateActions>
-                                    )}
-                                </ResgateBody>
-                            </ResgateCard>
-                        ))
-                    )}
-                </ResgatesContainer>
-            </MainContent>
-        </Container>
+      <Container>
+        <LoadingGif
+          text="Carregando resgates..."
+          size="120px"
+          mobileSize="100px"
+        />
+      </Container>
     );
+  }
+
+  return (
+    <Container>
+      <MainContent>
+        <Header>
+          <HeaderContent>
+            <div>
+              <HeaderTitle>
+                <FiPackage />
+                Resgates para Entrega
+              </HeaderTitle>
+              <HeaderSubtitle>
+                Gerencie os resgates de prêmios dos clientes
+                {user?.lojas?.nome && ` - ${user.lojas.nome}`}
+              </HeaderSubtitle>
+            </div>
+            <HeaderActions>
+              <ActionButton onClick={carregarResgates} $variant="primary">
+                <FiRefreshCw />
+                Atualizar
+              </ActionButton>
+            </HeaderActions>
+          </HeaderContent>
+        </Header>
+
+        <StatsContainer>
+          <StatCard $color="#F59E0B">
+            <StatValue>{stats.pendentes}</StatValue>
+            <StatLabel>Resgates Pendentes</StatLabel>
+          </StatCard>
+          <StatCard $color="#10B981">
+            <StatValue>{stats.entregues}</StatValue>
+            <StatLabel>Resgates Entregues</StatLabel>
+          </StatCard>
+          <StatCard $color="#EF4444">
+            <StatValue>{stats.cancelados}</StatValue>
+            <StatLabel>Resgates Cancelados</StatLabel>
+          </StatCard>
+          <StatCard $color="#6B7280">
+            <StatValue>{stats.total}</StatValue>
+            <StatLabel>Total de Resgates</StatLabel>
+          </StatCard>
+        </StatsContainer>
+
+        <FiltersContainer>
+          <FiltersRow>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <FiFilter />
+              <span style={{ fontWeight: '600', color: '#4A5568' }}>Filtrar por status:</span>
+            </div>
+            <FilterSelect
+              value={filtroStatus}
+              onChange={(e) => setFiltroStatus(e.target.value)}
+            >
+              <option value="todos">Todos os Status</option>
+              <option value="pendente">Pendentes</option>
+              <option value="entregue">Entregues</option>
+              <option value="cancelado">Cancelados</option>
+            </FilterSelect>
+          </FiltersRow>
+        </FiltersContainer>
+
+        <ResgatesContainer>
+          {resgatesFiltrados.length === 0 ? (
+            <EmptyContainer>
+              <FiPackage size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+              <h3>Nenhum resgate encontrado</h3>
+              <p>Não há resgates para o filtro selecionado.</p>
+            </EmptyContainer>
+          ) : (
+            resgatesFiltrados.map((resgate) => (
+              <ResgateCard
+                key={resgate.id}
+                $status={resgate.status}
+                $urgent={resgate.status === 'pendente' &&
+                  new Date() - new Date(resgate.data_resgate) > 24 * 60 * 60 * 1000}
+              >
+                <ResgateHeader>
+                  <ResgateInfo>
+                    <ResgateId>#{resgate.id.slice(-8).toUpperCase()}</ResgateId>
+                    <ResgateTitle>
+                      <FiGift />
+                      {resgate.premios_catalogo.nome}
+                    </ResgateTitle>
+                    <ResgateCliente>
+                      <FiUser />
+                      {resgate.clientes_fast.nome}
+                      {resgate.clientes_fast.telefone && ` - ${resgate.clientes_fast.telefone}`}
+                    </ResgateCliente>
+                  </ResgateInfo>
+                  <ResgateStatus>
+                    <StatusBadge $status={resgate.status}>
+                      {getStatusIcon(resgate.status)}
+                      {getStatusText(resgate.status)}
+                    </StatusBadge>
+                    <ResgateData>
+                      {formatarData(resgate.data_resgate)}
+                    </ResgateData>
+                  </ResgateStatus>
+                </ResgateHeader>
+
+                <ResgateBody>
+                  <ResgateDetalhes>
+                    {resgate.premios_catalogo.descricao && (
+                      <DetalheItem>
+                        <FiGift />
+                        {resgate.premios_catalogo.descricao}
+                      </DetalheItem>
+                    )}
+
+                    <PontosInfo>
+                      <FiStar />
+                      {resgate.pontos_utilizados?.toLocaleString()} pontos utilizados
+                    </PontosInfo>
+
+                    {resgate.observacoes_gerente && (
+                      <DetalheItem>
+                        <FiShield />
+                        {resgate.observacoes_gerente}
+                      </DetalheItem>
+                    )}
+                  </ResgateDetalhes>
+
+                  {resgate.status === 'pendente' && (
+                    <ResgateActions>
+                      <ProcessButton
+                        $action="entregar"
+                        onClick={() => processarResgate(resgate.id, 'entregue')}
+                        disabled={processando[resgate.id]}
+                      >
+                        {processando[resgate.id] ? (
+                          <>
+                            <FiLoader className="animate-spin" />
+                            Processando...
+                          </>
+                        ) : (
+                          <>
+                            <FiCheck />
+                            Entregar
+                          </>
+                        )}
+                      </ProcessButton>
+
+                      <ProcessButton
+                        $action="cancelar"
+                        onClick={() => processarResgate(resgate.id, 'cancelado')}
+                        disabled={processando[resgate.id]}
+                      >
+                        {processando[resgate.id] ? (
+                          <>
+                            <FiLoader className="animate-spin" />
+                            Processando...
+                          </>
+                        ) : (
+                          <>
+                            <FiX />
+                            Cancelar
+                          </>
+                        )}
+                      </ProcessButton>
+                    </ResgateActions>
+                  )}
+                </ResgateBody>
+              </ResgateCard>
+            ))
+          )}
+        </ResgatesContainer>
+      </MainContent>
+    </Container>
+  );
 }
 
 export default GerenteResgates;

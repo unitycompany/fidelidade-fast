@@ -14,6 +14,7 @@ import {
     FiInfo
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -388,9 +389,11 @@ function AdminConfiguracoes() {
     if (loading) {
         return (
             <Container>
-                <Section>
-                    <p>Carregando configurações...</p>
-                </Section>
+                <LoadingGif
+                    text="Carregando configurações..."
+                    size="120px"
+                    mobileSize="100px"
+                />
             </Container>
         );
     }

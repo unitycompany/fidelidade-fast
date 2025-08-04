@@ -15,6 +15,7 @@ import {
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -380,9 +381,11 @@ function AdminEstatisticas() {
     if (loading) {
         return (
             <Container>
-                <Section>
-                    <p>Carregando estatísticas...</p>
-                </Section>
+                <LoadingGif
+                    text="Carregando estatísticas..."
+                    size="120px"
+                    mobileSize="100px"
+                />
             </Container>
         );
     }

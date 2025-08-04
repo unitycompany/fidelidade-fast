@@ -4,6 +4,7 @@ import { FiGift, FiStar, FiShoppingCart, FiCheck, FiX, FiLoader, FiRefreshCw } f
 import { supabase, redeemPrize } from '../services/supabase';
 import { CATEGORIAS_PREMIOS } from '../utils/inicializarPremios';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -24,7 +25,7 @@ const fadeIn = keyframes`
 // Container principal otimizado
 const Container = styled.div`
   min-height: 100vh;
-  background: #f8fafc;
+  background: #fcfcff;
   padding: 1rem;
   font-family: 'Montserrat', sans-serif;
   
@@ -576,10 +577,11 @@ function PremiosNovo({ user, onUserUpdate }) {
     return (
       <Container>
         <MainContent>
-          <LoadingContainer>
-            <FiLoader className="animate-spin" size={32} />
-            <p style={{ marginTop: '1rem' }}>Carregando prêmios...</p>
-          </LoadingContainer>
+          <LoadingGif
+            text="Carregando prêmios..."
+            size="450px"
+            mobileSize="350px"
+          />
         </MainContent>
       </Container>
     );

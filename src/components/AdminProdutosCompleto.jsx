@@ -9,6 +9,7 @@ import {
 import { getCategoriasProdutos } from '../utils/pedidosFast';
 import ProdutosService from '../services/produtosService';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeIn = keyframes`
@@ -857,12 +858,11 @@ function AdminProdutosCompleto() {
   if (loading) {
     return (
       <Container>
-        <LoadingContainer>
-          <div className="loading-icon">
-            <FiDatabase />
-          </div>
-          <div>Carregando produtos elegíveis...</div>
-        </LoadingContainer>
+        <LoadingGif
+          text="Carregando produtos elegíveis..."
+          size="120px"
+          mobileSize="100px"
+        />
       </Container>
     );
   }

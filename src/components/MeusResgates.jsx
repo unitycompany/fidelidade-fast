@@ -3,6 +3,7 @@ import styled, { keyframes } from 'styled-components';
 import { FiGift, FiClock, FiCheckCircle, FiCopy, FiMapPin, FiInfo, FiCalendar, FiHash, FiUser } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -20,7 +21,7 @@ const pulse = keyframes`
 // Ajuste do Container para responsividade máxima
 const Container = styled.div`
   min-height: 100vh;
-  background: #f8fafc;
+  background: #fcfcff;
   padding: 2rem 0;
   font-family: 'Montserrat', sans-serif;
   display: flex;
@@ -485,9 +486,11 @@ function MeusResgates({ usuario, onClose, showAsSection = false }) {
   if (loading) {
     return (
       <Container>
-        <LoadingContainer>
-          <div>Carregando resgates...</div>
-        </LoadingContainer>
+        <LoadingGif
+          text="Carregando resgates..."
+          size="300px"
+          mobileSize="250px"
+        />
       </Container>
     );
   }

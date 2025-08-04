@@ -22,7 +22,6 @@ const ConfigSection = styled.div`
   background: #fff;
   padding: 2rem;
   margin: 0 auto;
-  border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
@@ -31,7 +30,6 @@ const ConfigSection = styled.div`
   @media (max-width: 900px) {
     padding: 1rem;
     max-width: calc(100vw - 1rem);
-    border-radius: 4px;
   }
   
   h2 {
@@ -54,7 +52,6 @@ const ConfigSection = styled.div`
 const Input = styled.input`
   padding: 0.75rem 1rem;
   border: 1px solid ${props => props.theme.colors.gray300};
-  border-radius: 4px;
   font-size: ${props => props.theme.fontSizes.base};
   transition: border-color 0.2s ease;
   
@@ -71,7 +68,6 @@ const Button = styled.button`
   color: white;
   border: none;
   font-size: 16px;
-  border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;

@@ -7,6 +7,7 @@ import {
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -36,7 +37,6 @@ const MainContent = styled.div`
 const Header = styled.div`
   background: white;
   padding: 2rem;
-  border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.1);
   margin-bottom: 2rem;
   animation: ${fadeInUp} 0.6s ease-out;
@@ -84,7 +84,6 @@ const ActionButton = styled.button`
   color: ${props => props.$variant === 'primary' || props.$variant === 'success' ? 'white' : '#4A5568'};
   border: ${props => props.$variant === 'primary' || props.$variant === 'success' ? 'none' : '2px solid #E2E8F0'};
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -108,7 +107,6 @@ const ActionButton = styled.button`
 const FiltersContainer = styled.div`
   background: white;
   padding: 1.5rem;
-  border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.05);
   margin-bottom: 2rem;
   animation: ${fadeInUp} 0.6s ease-out 0.1s both;
@@ -130,8 +128,7 @@ const SearchContainer = styled.div`
 const SearchInput = styled.input`
   width: 100%;
   padding: 0.75rem 1rem 0.75rem 2.5rem;
-  border: 2px solid #E2E8F0;
-  border-radius: 8px;
+  border: 1px solid #E2E8F0;
   font-size: 1rem;
   
   &:focus {
@@ -151,8 +148,7 @@ const SearchIcon = styled.div`
 
 const FilterSelect = styled.select`
   padding: 0.75rem 1rem;
-  border: 2px solid #E2E8F0;
-  border-radius: 8px;
+  border: 1px solid #E2E8F0;
   font-size: 1rem;
   background: white;
   cursor: pointer;
@@ -166,7 +162,6 @@ const FilterSelect = styled.select`
 // Tabela de usuários
 const TableContainer = styled.div`
   background: white;
-  border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.1);
   overflow: hidden;
   animation: ${fadeInUp} 0.6s ease-out 0.2s both;
@@ -222,7 +217,6 @@ const RoleBadge = styled.span`
     }};
   color: white;
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -233,7 +227,6 @@ const StatusBadge = styled.span`
   background: ${props => props.$active ? '#10B981' : '#EF4444'};
   color: white;
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 600;
 `;
@@ -255,7 +248,6 @@ const IconButton = styled.button`
   color: white;
   border: none;
   padding: 0.5rem;
-  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -291,7 +283,6 @@ const ModalOverlay = styled.div`
 
 const ModalContent = styled.div`
   background: white;
-  border-radius: 16px;
   padding: 2rem;
   max-width: 700px;
   width: 100%;
@@ -331,7 +322,6 @@ const ModalForm = styled.form`
 const FormSection = styled.div`
   padding: 1.5rem;
   border: 1px solid #E2E8F0;
-  border-radius: 8px;
   background: #F9FAFB;
   margin-bottom: 1.5rem;
 `;
@@ -370,8 +360,7 @@ const FormLabel = styled.label`
 
 const FormInput = styled.input`
   padding: 0.75rem 1rem;
-  border: 2px solid ${props => props.$error ? '#EF4444' : '#E2E8F0'};
-  border-radius: 8px;
+  border: 1px solid ${props => props.$error ? '#EF4444' : '#E2E8F0'};
   font-size: 1rem;
   
   &:focus {
@@ -388,8 +377,7 @@ const FormInput = styled.input`
 
 const FormSelect = styled.select`
   padding: 0.75rem 1rem;
-  border: 2px solid ${props => props.$error ? '#EF4444' : '#E2E8F0'};
-  border-radius: 8px;
+  border: 1px solid ${props => props.$error ? '#EF4444' : '#E2E8F0'};
   font-size: 1rem;
   background: white;
   
@@ -721,10 +709,11 @@ function AdminUsuarios({ user }) {
     if (loading) {
         return (
             <Container>
-                <LoadingContainer>
-                    <FiLoader className="animate-spin" size={32} />
-                    <p style={{ marginTop: '1rem' }}>Carregando usuários...</p>
-                </LoadingContainer>
+                <LoadingGif
+                    text="Carregando usuários..."
+                    size="120px"
+                    mobileSize="100px"
+                />
             </Container>
         );
     }
@@ -735,7 +724,6 @@ function AdminUsuarios({ user }) {
                 <Header>
                     <HeaderContent>
                         <HeaderTitle>
-                            <FiUsers />
                             Gerenciar Usuários
                         </HeaderTitle>
                         <HeaderActions>

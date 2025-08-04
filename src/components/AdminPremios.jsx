@@ -3,6 +3,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { FiPackage, FiPlus, FiEdit3, FiTrash2, FiSave, FiX } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeIn = keyframes`
@@ -46,7 +47,6 @@ const AddButton = styled.button`
   background: ${props => props.theme.colors.gradientPrimary};
   color: white;
   border: none;
-  border-radius: ${props => props.theme.radii.md};
   padding: 0.75rem 1.5rem;
   cursor: pointer;
   font-weight: 600;
@@ -79,7 +79,6 @@ const Grid = styled.div`
 
 const PremioCard = styled.div`
   background: white;
-  border-radius: ${props => props.theme.radii.lg};
   padding: 1.5rem;
   box-shadow: ${props => props.theme.shadows.md};
   transition: all 0.3s ease;
@@ -120,7 +119,6 @@ const Actions = styled.div`
 const ActionButton = styled.button`
   padding: 0.5rem;
   border: none;
-  border-radius: ${props => props.theme.radii.md};
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -164,7 +162,6 @@ const PontosDisplay = styled.div`
 const PremioImage = styled.div`
   width: 100%;
   height: 200px;
-  border-radius: 8px;
   overflow: hidden;
   margin-bottom: 1rem;
   background: #f8f9fa;
@@ -198,7 +195,6 @@ const PremioImage = styled.div`
 
 const StatusBadge = styled.span`
   padding: 0.25rem 0.75rem;
-  border-radius: ${props => props.theme.radii.full};
   font-size: 0.8rem;
   font-weight: 600;
   
@@ -228,7 +224,6 @@ const ModalOverlay = styled.div`
 
 const ModalContent = styled.div`
   background: white;
-  border-radius: ${props => props.theme.radii.lg};
   padding: 2rem;
   width: 90%;
   max-width: 500px;
@@ -252,7 +247,6 @@ const Input = styled.input`
   width: 100%;
   padding: 0.75rem;
   border: 1px solid ${props => props.theme.colors.gray300};
-  border-radius: ${props => props.theme.radii.md};
   font-size: 1rem;
   
   &:focus {
@@ -266,7 +260,6 @@ const TextArea = styled.textarea`
   width: 100%;
   padding: 0.75rem;
   border: 1px solid ${props => props.theme.colors.gray300};
-  border-radius: ${props => props.theme.radii.md};
   font-size: 1rem;
   resize: vertical;
   min-height: 100px;
@@ -282,7 +275,6 @@ const Select = styled.select`
   width: 100%;
   padding: 0.75rem;
   border: 1px solid ${props => props.theme.colors.gray300};
-  border-radius: ${props => props.theme.radii.md};
   font-size: 1rem;
   background: white;
   
@@ -303,7 +295,6 @@ const ButtonGroup = styled.div`
 const Button = styled.button`
   padding: 0.75rem 1.5rem;
   border: none;
-  border-radius: ${props => props.theme.radii.md};
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -443,7 +434,15 @@ function AdminPremios() {
   };
 
   if (loading) {
-    return <Container>Carregando prêmios...</Container>;
+    return (
+      <Container>
+        <LoadingGif
+          text="Carregando prêmios..."
+          size="120px"
+          mobileSize="100px"
+        />
+      </Container>
+    );
   }
 
   return (

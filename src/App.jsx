@@ -21,6 +21,7 @@ import { inicializarProdutosElegiveis } from './utils/inicializarProdutos'
 import { inicializarPremios } from './utils/inicializarPremios'
 import SidebarVertical from './components/SidebarVertical'
 import { supabase } from './services/supabase'
+import LoadingGif from './components/LoadingGif'
 
 // Contexto para autenticação e estado global
 const AuthContext = createContext()
@@ -37,6 +38,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState('upload')
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showLoadingScreen, setShowLoadingScreen] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [isAdminMode, setIsAdminMode] = useState(false)
   // Novo: mostrar campo 'meus resgates' se houver resgates
@@ -106,6 +108,8 @@ function App() {
       }
 
       setIsLoading(false)
+      // Manter a tela de loading até o GIF terminar de rodar
+      // setShowLoadingScreen será controlado pelo callback do LoadingGif
     }
 
     initializeApp()
@@ -247,8 +251,29 @@ function App() {
     }
   }
 
-  // Tela de loading enquanto verifica sessão
-  if (isLoading) {
+  // Callback para esconder a tela de loading quando o GIF terminar
+  const handleLoadingComplete = () => {
+    // Só esconder se os dados já estiverem carregados
+    if (!isLoading) {
+      setShowLoadingScreen(false)
+    }
+  }
+
+  // Verificar se pode esconder o loading quando os dados terminarem de carregar
+  useEffect(() => {
+    if (!isLoading && !showLoadingScreen) {
+      // Se os dados já carregaram e o GIF já terminou, tudo pronto
+      return
+    }
+
+    if (!isLoading) {
+      // Se os dados carregaram mas o GIF ainda está rodando, aguardar o GIF terminar
+      return
+    }
+  }, [isLoading, showLoadingScreen])
+
+  // Tela de loading enquanto verifica sessão ou enquanto o GIF está rodando
+  if (showLoadingScreen) {
     return (
       <ThemeProvider theme={themeFast}>
         <GlobalStyle />
@@ -257,11 +282,22 @@ function App() {
           justifyContent: 'center',
           alignItems: 'center',
           height: '100vh',
-          background: themeFast.colors.gradientPrimary,
-          color: 'white',
-          fontSize: '1.5rem'
+          width: '100vw',
+          background: '#fcfcff',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 9999,
+          transition: 'opacity 0.6s ease-in-out'
         }}>
-          Carregando...
+          <LoadingGif
+            text="Inicializando sistema..."
+            size="450px"
+            mobileSize="350px"
+            minHeight="100vh"
+            minDuration={3000}
+            onComplete={handleLoadingComplete}
+          />
         </div>
       </ThemeProvider>
     )

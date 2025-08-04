@@ -4,6 +4,7 @@ import { FiPackage, FiPlus, FiEdit3, FiTrash2, FiSave, FiX, FiSearch, FiFilter, 
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 import { CATEGORIAS_PREMIOS } from '../utils/inicializarPremios';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeIn = keyframes`
@@ -664,7 +665,15 @@ function AdminPremiosCompleto() {
   });
 
   if (loading) {
-    return <Container>Carregando prêmios...</Container>;
+    return (
+      <Container>
+        <LoadingGif
+          text="Carregando prêmios..."
+          size="120px"
+          mobileSize="100px"
+        />
+      </Container>
+    );
   }
 
   return (

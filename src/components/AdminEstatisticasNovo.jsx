@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import {
-    FiBarChart2,
-    FiUsers,
-    FiTrendingUp,
-    FiGift,
-    FiDollarSign,
-    FiCalendar,
-    FiActivity,
-    FiTarget,
-    FiRefreshCw,
-    FiDownload,
-    FiFilter
+  FiBarChart2,
+  FiUsers,
+  FiTrendingUp,
+  FiGift,
+  FiDollarSign,
+  FiCalendar,
+  FiActivity,
+  FiTarget,
+  FiRefreshCw,
+  FiDownload,
+  FiFilter
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -45,7 +47,6 @@ const Header = styled.div`
   background: linear-gradient(135deg, #A91918, #8B1510);
   color: white;
   padding: 1.5rem;
-  border-radius: 12px;
   margin-bottom: 1.5rem;
   text-align: center;
   animation: ${fadeInUp} 0.6s ease-out;
@@ -110,10 +111,9 @@ const StatsGrid = styled.div`
 
 const StatCard = styled.div`
   background: white;
-  border-radius: 12px;
   padding: 1.25rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border-left: 4px solid ${props => props.color || '#A91918'};
+  border-left: 2px solid ${props => props.color || '#A91918'};
   transition: all 0.3s ease;
   min-height: 120px;
   display: flex;
@@ -140,7 +140,6 @@ const StatHeader = styled.div`
 const StatIcon = styled.div`
   width: 40px;
   height: 40px;
-  border-radius: 8px;
   background: ${props => props.color}15;
   color: ${props => props.color};
   display: flex;
@@ -153,7 +152,6 @@ const StatIcon = styled.div`
   @media (min-width: 768px) {
     width: 50px;
     height: 50px;
-    border-radius: 12px;
     font-size: 1.5rem;
   }
 `;
@@ -211,7 +209,6 @@ const StatSubtitle = styled.p`
 const Button = styled.button`
   padding: 0.5rem 1rem;
   border: none;
-  border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -263,7 +260,6 @@ const Button = styled.button`
 
 const Section = styled.div`
   background: white;
-  border-radius: 12px;
   padding: 1rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   margin-bottom: 1.5rem;
@@ -309,7 +305,6 @@ const SectionHeader = styled.div`
 const TableContainer = styled.div`
   overflow-x: auto;
   margin-top: 1rem;
-  border-radius: 8px;
   border: 1px solid #e2e8f0;
   
   @media (max-width: 767px) {
@@ -365,296 +360,398 @@ const Tr = styled.tr`
 `;
 
 function AdminEstatisticasNovo() {
-    const [stats, setStats] = useState({
-        totalClientes: 0,
-        totalPontos: 0,
-        totalResgates: 0,
-        premiosAtivos: 0,
-        resgatesUltimos30Dias: 0,
-        pontosUltimos30Dias: 0,
-        clientesAtivos: 0,
-        valorMedioResgates: 0
-    });
+  const [stats, setStats] = useState({
+    totalClientes: 0,
+    totalPontos: 0,
+    totalResgates: 0,
+    premiosAtivos: 0,
+    resgatesUltimos30Dias: 0,
+    pontosUltimos30Dias: 0,
+    clientesAtivos: 0,
+    valorMedioResgates: 0
+  });
 
-    const [premiosPopulares, setPremiosPopulares] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const [premiosPopulares, setPremiosPopulares] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadStats();
-    }, []);
+  useEffect(() => {
+    loadStats();
+  }, []);
 
-    const loadStats = async () => {
-        try {
-            setLoading(true);
+  const exportToExcel = async () => {
+    try {
+      setLoading(true);
+      toast.loading('Gerando relatório Excel...');
 
-            // Total de clientes
-            const { count: totalClientes } = await supabase
-                .from('clientes_fast')
-                .select('*', { count: 'exact', head: true });
+      // Buscar dados detalhados para o relatório
+      const { data: clientesData } = await supabase
+        .from('clientes_fast')
+        .select('nome, email, telefone, saldo_pontos, created_at');
 
-            // Total de pontos disponíveis
-            const { data: pontosData } = await supabase
-                .from('clientes_fast')
-                .select('saldo_pontos');
+      const { data: resgatesData } = await supabase
+        .from('resgates')
+        .select(`
+                    codigo_resgate,
+                    pontos_utilizados,
+                    coletado,
+                    created_at,
+                    data_coleta,
+                    gerente_retirada,
+                    clientes_fast (nome, email),
+                    premios_catalogo (nome, categoria)
+                `);
 
-            const totalPontos = pontosData?.reduce((sum, cliente) =>
-                sum + (cliente.saldo_pontos || 0), 0) || 0;
+      const { data: premiosData } = await supabase
+        .from('premios_catalogo')
+        .select('nome, categoria, pontos_necessarios, ativo');
 
-            // Total de resgates
-            const { count: totalResgates } = await supabase
-                .from('resgates')
-                .select('*', { count: 'exact', head: true })
-                .eq('status', 'confirmado');
+      // Criar planilhas
+      const wb = XLSX.utils.book_new();
 
-            // Prêmios ativos
-            const { count: premiosAtivos } = await supabase
-                .from('premios_catalogo')
-                .select('*', { count: 'exact', head: true })
-                .eq('ativo', true);
+      // Planilha 1: Resumo Estatísticas
+      const statsData = [
+        ['Estatística', 'Valor'],
+        ['Total de Clientes', stats.totalClientes],
+        ['Total de Pontos Disponíveis', stats.totalPontos],
+        ['Total de Resgates', stats.totalResgates],
+        ['Prêmios Ativos', stats.premiosAtivos],
+        ['Resgates (30 dias)', stats.resgatesUltimos30Dias],
+        ['Pontos Ganhos (30 dias)', stats.pontosUltimos30Dias],
+        ['Clientes Ativos', stats.clientesAtivos],
+        ['Média Pontos por Resgate', stats.valorMedioResgates]
+      ];
+      const ws1 = XLSX.utils.aoa_to_sheet(statsData);
+      XLSX.utils.book_append_sheet(wb, ws1, 'Estatísticas');
 
-            // Resgates últimos 30 dias
-            const dataLimite = new Date();
-            dataLimite.setDate(dataLimite.getDate() - 30);
+      // Planilha 2: Clientes
+      const clientesFormatted = clientesData?.map(cliente => ({
+        'Nome': cliente.nome,
+        'Email': cliente.email,
+        'Telefone': cliente.telefone || 'Não informado',
+        'Saldo de Pontos': cliente.saldo_pontos || 0,
+        'Data de Cadastro': new Date(cliente.created_at).toLocaleDateString('pt-BR')
+      })) || [];
+      const ws2 = XLSX.utils.json_to_sheet(clientesFormatted);
+      XLSX.utils.book_append_sheet(wb, ws2, 'Clientes');
 
-            const { count: resgatesUltimos30Dias } = await supabase
-                .from('resgates')
-                .select('*', { count: 'exact', head: true })
-                .eq('status', 'confirmado')
-                .gte('created_at', dataLimite.toISOString());
+      // Planilha 3: Resgates
+      const resgatesFormatted = resgatesData?.map(resgate => ({
+        'Código': resgate.codigo_resgate,
+        'Cliente': resgate.clientes_fast?.nome,
+        'Email Cliente': resgate.clientes_fast?.email,
+        'Prêmio': resgate.premios_catalogo?.nome,
+        'Categoria': resgate.premios_catalogo?.categoria,
+        'Pontos Utilizados': resgate.pontos_utilizados,
+        'Status': resgate.coletado ? 'Retirado' : 'Aguardando',
+        'Data Resgate': new Date(resgate.created_at).toLocaleDateString('pt-BR'),
+        'Data Entrega': resgate.data_coleta ? new Date(resgate.data_coleta).toLocaleDateString('pt-BR') : 'Não entregue',
+        'Responsável Entrega': resgate.gerente_retirada || 'N/A'
+      })) || [];
+      const ws3 = XLSX.utils.json_to_sheet(resgatesFormatted);
+      XLSX.utils.book_append_sheet(wb, ws3, 'Resgates');
 
-            // Pontos ganhos últimos 30 dias
-            const { data: pontosRecentes } = await supabase
-                .from('historico_pontos')
-                .select('pontos')
-                .eq('tipo', 'ganho')
-                .gte('created_at', dataLimite.toISOString());
+      // Planilha 4: Prêmios
+      const premiosFormatted = premiosData?.map(premio => ({
+        'Nome': premio.nome,
+        'Categoria': premio.categoria,
+        'Pontos Necessários': premio.pontos_necessarios,
+        'Status': premio.ativo ? 'Ativo' : 'Inativo'
+      })) || [];
+      const ws4 = XLSX.utils.json_to_sheet(premiosFormatted);
+      XLSX.utils.book_append_sheet(wb, ws4, 'Prêmios');
 
-            const pontosUltimos30Dias = pontosRecentes?.reduce((sum, item) =>
-                sum + (item.pontos || 0), 0) || 0;
+      // Planilha 5: Prêmios Populares
+      const premiosPopularesFormatted = premiosPopulares.map(premio => ({
+        'Prêmio': premio.nome,
+        'Total de Resgates': premio.resgates
+      }));
+      const ws5 = XLSX.utils.json_to_sheet(premiosPopularesFormatted);
+      XLSX.utils.book_append_sheet(wb, ws5, 'Prêmios Populares');
 
-            // Clientes ativos (que enviaram pelo menos 1 nota)
-            const { count: clientesAtivos } = await supabase
-                .from('pedidos_fast')
-                .select('cliente_id', { count: 'exact', head: true });
+      // Gerar e baixar arquivo
+      const fileName = `Sistema_Fidelidade_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
 
-            // Valor médio dos resgates
-            const { data: resgatesValor } = await supabase
-                .from('resgates')
-                .select('pontos_utilizados')
-                .eq('status', 'confirmado');
+      toast.dismiss();
+      toast.success('Relatório Excel gerado com sucesso!');
 
-            const valorMedioResgates = resgatesValor?.length > 0
-                ? resgatesValor.reduce((sum, resgate) => sum + (resgate.pontos_utilizados || 0), 0) / resgatesValor.length
-                : 0;
+    } catch (error) {
+      console.error('Erro ao exportar Excel:', error);
+      toast.dismiss();
+      toast.error('Erro ao gerar relatório Excel');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            setStats({
-                totalClientes: totalClientes || 0,
-                totalPontos,
-                totalResgates: totalResgates || 0,
-                premiosAtivos: premiosAtivos || 0,
-                resgatesUltimos30Dias: resgatesUltimos30Dias || 0,
-                pontosUltimos30Dias,
-                clientesAtivos: clientesAtivos || 0,
-                valorMedioResgates: Math.round(valorMedioResgates)
-            });
+  const loadStats = async () => {
+    try {
+      setLoading(true);
 
-            // Prêmios mais populares
-            const { data: premiosData } = await supabase
-                .from('resgates')
-                .select(`
+      // Total de clientes
+      const { count: totalClientes } = await supabase
+        .from('clientes_fast')
+        .select('*', { count: 'exact', head: true });
+
+      // Total de pontos disponíveis
+      const { data: pontosData } = await supabase
+        .from('clientes_fast')
+        .select('saldo_pontos');
+
+      const totalPontos = pontosData?.reduce((sum, cliente) =>
+        sum + (cliente.saldo_pontos || 0), 0) || 0;
+
+      // Total de resgates
+      const { count: totalResgates } = await supabase
+        .from('resgates')
+        .select('*', { count: 'exact', head: true });
+
+      // Prêmios ativos
+      const { count: premiosAtivos } = await supabase
+        .from('premios_catalogo')
+        .select('*', { count: 'exact', head: true })
+        .eq('ativo', true);
+
+      // Resgates últimos 30 dias
+      const dataLimite = new Date();
+      dataLimite.setDate(dataLimite.getDate() - 30);
+
+      const { count: resgatesUltimos30Dias } = await supabase
+        .from('resgates')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', dataLimite.toISOString());
+
+      // Pontos ganhos últimos 30 dias
+      const { data: pontosRecentes } = await supabase
+        .from('historico_pontos')
+        .select('pontos')
+        .eq('tipo', 'ganho')
+        .gte('created_at', dataLimite.toISOString());
+
+      const pontosUltimos30Dias = pontosRecentes?.reduce((sum, item) =>
+        sum + (item.pontos || 0), 0) || 0;
+
+      // Clientes ativos (que enviaram pelo menos 1 nota) - contar clientes únicos
+      const { data: clientesAtivosData } = await supabase
+        .from('pedidos_fast')
+        .select('cliente_id');
+
+      const clientesUnicos = new Set(clientesAtivosData?.map(p => p.cliente_id) || []);
+      const clientesAtivos = clientesUnicos.size;
+
+      // Valor médio dos resgates
+      const { data: resgatesValor } = await supabase
+        .from('resgates')
+        .select('pontos_utilizados');
+
+      const valorMedioResgates = resgatesValor?.length > 0
+        ? resgatesValor.reduce((sum, resgate) => sum + (resgate.pontos_utilizados || 0), 0) / resgatesValor.length
+        : 0;
+
+      setStats({
+        totalClientes: totalClientes || 0,
+        totalPontos,
+        totalResgates: totalResgates || 0,
+        premiosAtivos: premiosAtivos || 0,
+        resgatesUltimos30Dias: resgatesUltimos30Dias || 0,
+        pontosUltimos30Dias,
+        clientesAtivos: clientesAtivos || 0,
+        valorMedioResgates: Math.round(valorMedioResgates)
+      });
+
+      // Prêmios mais populares
+      const { data: premiosData } = await supabase
+        .from('resgates')
+        .select(`
                     premio_id,
                     premios_catalogo (nome)
-                `)
-                .eq('status', 'confirmado');
+                `);
 
-            // Contar popularidade dos prêmios
-            const premiosCount = {};
-            premiosData?.forEach(resgate => {
-                const premioNome = resgate.premios_catalogo?.nome;
-                if (premioNome) {
-                    premiosCount[premioNome] = (premiosCount[premioNome] || 0) + 1;
-                }
-            });
-
-            const premiosPopularesArray = Object.entries(premiosCount)
-                .map(([nome, count]) => ({ nome, resgates: count }))
-                .sort((a, b) => b.resgates - a.resgates)
-                .slice(0, 5);
-
-            setPremiosPopulares(premiosPopularesArray);
-
-        } catch (error) {
-            console.error('Erro ao carregar estatísticas:', error);
-            toast.error('Erro ao carregar estatísticas');
-        } finally {
-            setLoading(false);
+      // Contar popularidade dos prêmios
+      const premiosCount = {};
+      premiosData?.forEach(resgate => {
+        const premioNome = resgate.premios_catalogo?.nome;
+        if (premioNome) {
+          premiosCount[premioNome] = (premiosCount[premioNome] || 0) + 1;
         }
-    };
+      });
 
-    if (loading) {
-        return (
-            <Container>
-                <Header>
-                    <h1>
-                        <FiBarChart2 />
-                        Carregando Estatísticas...
-                    </h1>
-                </Header>
-            </Container>
-        );
+      const premiosPopularesArray = Object.entries(premiosCount)
+        .map(([nome, count]) => ({ nome, resgates: count }))
+        .sort((a, b) => b.resgates - a.resgates)
+        .slice(0, 5);
+
+      setPremiosPopulares(premiosPopularesArray);
+
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+      toast.error('Erro ao carregar estatísticas');
+    } finally {
+      setLoading(false);
     }
+  };
 
+  if (loading) {
     return (
-        <Container>
-            <Header>
-                <h1>
-                    <FiBarChart2 />
-                    Estatísticas do Sistema
-                </h1>
-                <p>Relatórios e métricas do programa de fidelidade</p>
-            </Header>
-
-            {/* Grid de Estatísticas */}
-            <StatsGrid>
-                <StatCard color="#3182ce">
-                    <StatHeader>
-                        <StatIcon color="#3182ce">
-                            <FiUsers />
-                        </StatIcon>
-                        <StatContent>
-                            <StatTitle>Total de Clientes</StatTitle>
-                            <StatValue color="#3182ce">{stats.totalClientes}</StatValue>
-                            <StatSubtitle>Cadastrados no sistema</StatSubtitle>
-                        </StatContent>
-                    </StatHeader>
-                </StatCard>
-
-                <StatCard color="#38a169">
-                    <StatHeader>
-                        <StatIcon color="#38a169">
-                            <FiDollarSign />
-                        </StatIcon>
-                        <StatContent>
-                            <StatTitle>Total de Pontos</StatTitle>
-                            <StatValue color="#38a169">{stats.totalPontos.toLocaleString()}</StatValue>
-                            <StatSubtitle>Disponíveis para resgate</StatSubtitle>
-                        </StatContent>
-                    </StatHeader>
-                </StatCard>
-
-                <StatCard color="#d69e2e">
-                    <StatHeader>
-                        <StatIcon color="#d69e2e">
-                            <FiGift />
-                        </StatIcon>
-                        <StatContent>
-                            <StatTitle>Total de Resgates</StatTitle>
-                            <StatValue color="#d69e2e">{stats.totalResgates}</StatValue>
-                            <StatSubtitle>Prêmios resgatados</StatSubtitle>
-                        </StatContent>
-                    </StatHeader>
-                </StatCard>
-
-                <StatCard color="#805ad5">
-                    <StatHeader>
-                        <StatIcon color="#805ad5">
-                            <FiTarget />
-                        </StatIcon>
-                        <StatContent>
-                            <StatTitle>Prêmios Ativos</StatTitle>
-                            <StatValue color="#805ad5">{stats.premiosAtivos}</StatValue>
-                            <StatSubtitle>Disponíveis para resgate</StatSubtitle>
-                        </StatContent>
-                    </StatHeader>
-                </StatCard>
-
-                <StatCard color="#e53e3e">
-                    <StatHeader>
-                        <StatIcon color="#e53e3e">
-                            <FiTrendingUp />
-                        </StatIcon>
-                        <StatContent>
-                            <StatTitle>Resgates (30 dias)</StatTitle>
-                            <StatValue color="#e53e3e">{stats.resgatesUltimos30Dias}</StatValue>
-                            <StatSubtitle>Últimos 30 dias</StatSubtitle>
-                        </StatContent>
-                    </StatHeader>
-                </StatCard>
-
-                <StatCard color="#00b4d8">
-                    <StatHeader>
-                        <StatIcon color="#00b4d8">
-                            <FiActivity />
-                        </StatIcon>
-                        <StatContent>
-                            <StatTitle>Pontos (30 dias)</StatTitle>
-                            <StatValue color="#00b4d8">{stats.pontosUltimos30Dias.toLocaleString()}</StatValue>
-                            <StatSubtitle>Ganhos recentes</StatSubtitle>
-                        </StatContent>
-                    </StatHeader>
-                </StatCard>
-
-                <StatCard color="#f56565">
-                    <StatHeader>
-                        <StatIcon color="#f56565">
-                            <FiUsers />
-                        </StatIcon>
-                        <StatContent>
-                            <StatTitle>Clientes Ativos</StatTitle>
-                            <StatValue color="#f56565">{stats.clientesAtivos}</StatValue>
-                            <StatSubtitle>Com notas enviadas</StatSubtitle>
-                        </StatContent>
-                    </StatHeader>
-                </StatCard>
-
-                <StatCard color="#9f7aea">
-                    <StatHeader>
-                        <StatIcon color="#9f7aea">
-                            <FiCalendar />
-                        </StatIcon>
-                        <StatContent>
-                            <StatTitle>Média de Resgates</StatTitle>
-                            <StatValue color="#9f7aea">{stats.valorMedioResgates.toLocaleString()}</StatValue>
-                            <StatSubtitle>Pontos por resgate</StatSubtitle>
-                        </StatContent>
-                    </StatHeader>
-                </StatCard>
-            </StatsGrid>
-
-            {/* Prêmios Populares */}
-            <Section>
-                <SectionHeader>
-                    <h2>
-                        <FiGift />
-                        Prêmios Mais Populares
-                    </h2>
-                    <Button onClick={loadStats} disabled={loading}>
-                        <FiRefreshCw />
-                        Atualizar
-                    </Button>
-                </SectionHeader>
-
-                <TableContainer>
-                    <Table>
-                        <thead>
-                            <tr>
-                                <Th>Prêmio</Th>
-                                <Th>Total de Resgates</Th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {premiosPopulares.map((premio, index) => (
-                                <Tr key={index}>
-                                    <Td>{premio.nome}</Td>
-                                    <Td>{premio.resgates}</Td>
-                                </Tr>
-                            ))}
-                        </tbody>
-                    </Table>
-                </TableContainer>
-            </Section>
-        </Container>
+      <Container>
+        <LoadingGif
+          text="Carregando Estatísticas..."
+          size="120px"
+          mobileSize="100px"
+        />
+      </Container>
     );
+  }
+
+  return (
+    <Container>
+
+      {/* Grid de Estatísticas */}
+      <StatsGrid>
+        <StatCard color="#3182ce">
+          <StatHeader>
+            <StatIcon color="#3182ce">
+              <FiUsers />
+            </StatIcon>
+            <StatContent>
+              <StatTitle>Total de Clientes</StatTitle>
+              <StatValue color="#3182ce">{stats.totalClientes}</StatValue>
+              <StatSubtitle>Cadastrados no sistema</StatSubtitle>
+            </StatContent>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard color="#38a169">
+          <StatHeader>
+            <StatIcon color="#38a169">
+              <FiDollarSign />
+            </StatIcon>
+            <StatContent>
+              <StatTitle>Total de Pontos</StatTitle>
+              <StatValue color="#38a169">{stats.totalPontos.toLocaleString()}</StatValue>
+              <StatSubtitle>Disponíveis para resgate</StatSubtitle>
+            </StatContent>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard color="#d69e2e">
+          <StatHeader>
+            <StatIcon color="#d69e2e">
+              <FiGift />
+            </StatIcon>
+            <StatContent>
+              <StatTitle>Total de Resgates</StatTitle>
+              <StatValue color="#d69e2e">{stats.totalResgates}</StatValue>
+              <StatSubtitle>Prêmios resgatados</StatSubtitle>
+            </StatContent>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard color="#805ad5">
+          <StatHeader>
+            <StatIcon color="#805ad5">
+              <FiTarget />
+            </StatIcon>
+            <StatContent>
+              <StatTitle>Prêmios Ativos</StatTitle>
+              <StatValue color="#805ad5">{stats.premiosAtivos}</StatValue>
+              <StatSubtitle>Disponíveis para resgate</StatSubtitle>
+            </StatContent>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard color="#e53e3e">
+          <StatHeader>
+            <StatIcon color="#e53e3e">
+              <FiTrendingUp />
+            </StatIcon>
+            <StatContent>
+              <StatTitle>Resgates (30 dias)</StatTitle>
+              <StatValue color="#e53e3e">{stats.resgatesUltimos30Dias}</StatValue>
+              <StatSubtitle>Últimos 30 dias</StatSubtitle>
+            </StatContent>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard color="#00b4d8">
+          <StatHeader>
+            <StatIcon color="#00b4d8">
+              <FiActivity />
+            </StatIcon>
+            <StatContent>
+              <StatTitle>Pontos (30 dias)</StatTitle>
+              <StatValue color="#00b4d8">{stats.pontosUltimos30Dias.toLocaleString()}</StatValue>
+              <StatSubtitle>Ganhos recentes</StatSubtitle>
+            </StatContent>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard color="#f56565">
+          <StatHeader>
+            <StatIcon color="#f56565">
+              <FiUsers />
+            </StatIcon>
+            <StatContent>
+              <StatTitle>Clientes Ativos</StatTitle>
+              <StatValue color="#f56565">{stats.clientesAtivos}</StatValue>
+              <StatSubtitle>Com notas enviadas</StatSubtitle>
+            </StatContent>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard color="#9f7aea">
+          <StatHeader>
+            <StatIcon color="#9f7aea">
+              <FiCalendar />
+            </StatIcon>
+            <StatContent>
+              <StatTitle>Média de Resgates</StatTitle>
+              <StatValue color="#9f7aea">{stats.valorMedioResgates.toLocaleString()}</StatValue>
+              <StatSubtitle>Pontos por resgate</StatSubtitle>
+            </StatContent>
+          </StatHeader>
+        </StatCard>
+      </StatsGrid>
+
+      {/* Prêmios Populares */}
+      <Section>
+        <SectionHeader>
+          <h2>
+            Prêmios Mais Populares
+          </h2>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Button onClick={exportToExcel} disabled={loading}>
+              <FiDownload />
+              Exportar Excel
+            </Button>
+            <Button onClick={loadStats} disabled={loading}>
+              <FiRefreshCw />
+              Atualizar
+            </Button>
+          </div>
+        </SectionHeader>
+
+        <TableContainer>
+          <Table>
+            <thead>
+              <tr>
+                <Th>Prêmio</Th>
+                <Th>Total de Resgates</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {premiosPopulares.map((premio, index) => (
+                <Tr key={index}>
+                  <Td>{premio.nome}</Td>
+                  <Td>{premio.resgates}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </TableContainer>
+      </Section>
+    </Container>
+  );
 }
 
 export default AdminEstatisticasNovo;

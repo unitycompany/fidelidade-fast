@@ -3,6 +3,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { FiSettings, FiPlus, FiEdit3, FiTrash2, FiSave, FiX, FiPackage, FiDollarSign, FiTrendingUp, FiRotateCcw } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeInUp = keyframes`
@@ -504,7 +505,15 @@ function AdminConfiguracoesProdutos() {
     );
 
     if (loading) {
-        return <Container>Carregando configurações...</Container>;
+        return (
+            <Container>
+                <LoadingGif
+                    text="Carregando configurações..."
+                    size="120px"
+                    mobileSize="100px"
+                />
+            </Container>
+        );
     }
 
     return (

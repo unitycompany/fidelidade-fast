@@ -3,6 +3,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { FiPackage, FiPlus, FiEdit3, FiTrash2, FiSave, FiX } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeIn = keyframes`
@@ -262,242 +263,250 @@ const EmptyState = styled.div`
 `;
 
 function AdminPremios() {
-    const [premios, setPremios] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
-    const [editingPremio, setEditingPremio] = useState(null);
-    const [formData, setFormData] = useState({
-        nome: '',
-        descricao: '',
-        pontos_necessarios: 0,
-        categoria: '',
-        ativo: true
-    });
+  const [premios, setPremios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingPremio, setEditingPremio] = useState(null);
+  const [formData, setFormData] = useState({
+    nome: '',
+    descricao: '',
+    pontos_necessarios: 0,
+    categoria: '',
+    ativo: true
+  });
 
-    useEffect(() => {
-        loadPremios();
-    }, []);
+  useEffect(() => {
+    loadPremios();
+  }, []);
 
-    const loadPremios = async () => {
-        try {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from('premios_catalogo')
-                .select('*')
-                .order('pontos_necessarios');
+  const loadPremios = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('premios_catalogo')
+        .select('*')
+        .order('pontos_necessarios');
 
-            if (error) throw error;
-            setPremios(data || []);
-        } catch (error) {
-            console.error('Erro ao carregar prêmios:', error);
-            toast.error('Erro ao carregar prêmios');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        try {
-            if (editingPremio) {
-                const { error } = await supabase
-                    .from('premios_catalogo')
-                    .update(formData)
-                    .eq('id', editingPremio.id);
-
-                if (error) throw error;
-                toast.success('Prêmio atualizado!');
-            } else {
-                const { error } = await supabase
-                    .from('premios_catalogo')
-                    .insert([formData]);
-
-                if (error) throw error;
-                toast.success('Prêmio criado!');
-            }
-
-            handleCloseModal();
-            loadPremios();
-        } catch (error) {
-            console.error('Erro ao salvar prêmio:', error);
-            toast.error('Erro ao salvar prêmio');
-        }
-    };
-
-    const handleDelete = async (id) => {
-        if (!confirm('Tem certeza que deseja excluir este prêmio?')) return;
-
-        try {
-            const { error } = await supabase
-                .from('premios_catalogo')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-
-            toast.success('Prêmio excluído!');
-            loadPremios();
-        } catch (error) {
-            console.error('Erro ao excluir prêmio:', error);
-            toast.error('Erro ao excluir prêmio');
-        }
-    };
-
-    const handleEdit = (premio) => {
-        setEditingPremio(premio);
-        setFormData({
-            nome: premio.nome,
-            descricao: premio.descricao || '',
-            pontos_necessarios: premio.pontos_necessarios,
-            categoria: premio.categoria,
-            ativo: premio.ativo
-        });
-        setShowModal(true);
-    };
-
-    const handleCloseModal = () => {
-        setShowModal(false);
-        setEditingPremio(null);
-        setFormData({
-            nome: '',
-            descricao: '',
-            pontos_necessarios: 0,
-            categoria: '',
-            ativo: true
-        });
-    };
-
-    if (loading) {
-        return <Container>Carregando prêmios...</Container>;
+      if (error) throw error;
+      setPremios(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar prêmios:', error);
+      toast.error('Erro ao carregar prêmios');
+    } finally {
+      setLoading(false);
     }
+  };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      if (editingPremio) {
+        const { error } = await supabase
+          .from('premios_catalogo')
+          .update(formData)
+          .eq('id', editingPremio.id);
+
+        if (error) throw error;
+        toast.success('Prêmio atualizado!');
+      } else {
+        const { error } = await supabase
+          .from('premios_catalogo')
+          .insert([formData]);
+
+        if (error) throw error;
+        toast.success('Prêmio criado!');
+      }
+
+      handleCloseModal();
+      loadPremios();
+    } catch (error) {
+      console.error('Erro ao salvar prêmio:', error);
+      toast.error('Erro ao salvar prêmio');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Tem certeza que deseja excluir este prêmio?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('premios_catalogo')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Prêmio excluído!');
+      loadPremios();
+    } catch (error) {
+      console.error('Erro ao excluir prêmio:', error);
+      toast.error('Erro ao excluir prêmio');
+    }
+  };
+
+  const handleEdit = (premio) => {
+    setEditingPremio(premio);
+    setFormData({
+      nome: premio.nome,
+      descricao: premio.descricao || '',
+      pontos_necessarios: premio.pontos_necessarios,
+      categoria: premio.categoria,
+      ativo: premio.ativo
+    });
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingPremio(null);
+    setFormData({
+      nome: '',
+      descricao: '',
+      pontos_necessarios: 0,
+      categoria: '',
+      ativo: true
+    });
+  };
+
+  if (loading) {
     return (
-        <Container>
-            <Header>
-                <h2>
-                    <FiPackage />
-                    Gerenciar Prêmios
-                </h2>
-                <AddButton onClick={() => setShowModal(true)}>
-                    <FiPlus />
-                    Novo Prêmio
-                </AddButton>
-            </Header>
-
-            {premios.length === 0 ? (
-                <EmptyState>
-                    <h3>Nenhum prêmio encontrado</h3>
-                    <p>Clique em "Novo Prêmio" para adicionar o primeiro prêmio ao catálogo.</p>
-                </EmptyState>
-            ) : (
-                <Grid>
-                    {premios.map(premio => (
-                        <PremioCard key={premio.id}>
-                            <PremioHeader>
-                                <h3>{premio.nome}</h3>
-                                <Actions>
-                                    <ActionButton variant="edit" onClick={() => handleEdit(premio)}>
-                                        <FiEdit3 />
-                                    </ActionButton>
-                                    <ActionButton variant="delete" onClick={() => handleDelete(premio.id)}>
-                                        <FiTrash2 />
-                                    </ActionButton>
-                                </Actions>
-                            </PremioHeader>
-
-                            <PremioInfo>
-                                <p><strong>Pontos:</strong> {premio.pontos_necessarios.toLocaleString()}</p>
-                                <p><strong>Categoria:</strong> {premio.categoria}</p>
-                                {premio.descricao && (
-                                    <p><strong>Descrição:</strong> {premio.descricao}</p>
-                                )}
-                                <StatusBadge ativo={premio.ativo}>
-                                    {premio.ativo ? 'Ativo' : 'Inativo'}
-                                </StatusBadge>
-                            </PremioInfo>
-                        </PremioCard>
-                    ))}
-                </Grid>
-            )}
-
-            {showModal && (
-                <ModalOverlay onClick={handleCloseModal}>
-                    <ModalContent onClick={(e) => e.stopPropagation()}>
-                        <h3>{editingPremio ? 'Editar' : 'Novo'} Prêmio</h3>
-
-                        <form onSubmit={handleSubmit}>
-                            <FormGroup>
-                                <Label>Nome do Prêmio</Label>
-                                <Input
-                                    type="text"
-                                    value={formData.nome}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
-                                    required
-                                />
-                            </FormGroup>
-
-                            <FormGroup>
-                                <Label>Descrição</Label>
-                                <TextArea
-                                    value={formData.descricao}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
-                                    placeholder="Descrição opcional do prêmio..."
-                                />
-                            </FormGroup>
-
-                            <FormGroup>
-                                <Label>Pontos Necessários</Label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={formData.pontos_necessarios}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, pontos_necessarios: parseInt(e.target.value) || 0 }))}
-                                    required
-                                />
-                            </FormGroup>
-
-                            <FormGroup>
-                                <Label>Categoria</Label>
-                                <Select
-                                    value={formData.categoria}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, categoria: e.target.value }))}
-                                    required
-                                >
-                                    <option value="">Selecione uma categoria</option>
-                                    <option value="ferramentas">Ferramentas</option>
-                                    <option value="vale-compras">Vale-compras</option>
-                                    <option value="brindes">Brindes</option>
-                                    <option value="outros">Outros</option>
-                                </Select>
-                            </FormGroup>
-
-                            <FormGroup>
-                                <Label>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.ativo}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, ativo: e.target.checked }))}
-                                    />
-                                    {' '}Prêmio ativo
-                                </Label>
-                            </FormGroup>
-
-                            <ButtonGroup>
-                                <Button type="button" variant="secondary" onClick={handleCloseModal}>
-                                    Cancelar
-                                </Button>
-                                <Button type="submit" variant="primary">
-                                    <FiSave />
-                                    {editingPremio ? 'Atualizar' : 'Criar'}
-                                </Button>
-                            </ButtonGroup>
-                        </form>
-                    </ModalContent>
-                </ModalOverlay>
-            )}
-        </Container>
+      <Container>
+        <LoadingGif
+          text="Carregando prêmios..."
+          size="120px"
+          mobileSize="100px"
+        />
+      </Container>
     );
+  }
+
+  return (
+    <Container>
+      <Header>
+        <h2>
+          <FiPackage />
+          Gerenciar Prêmios
+        </h2>
+        <AddButton onClick={() => setShowModal(true)}>
+          <FiPlus />
+          Novo Prêmio
+        </AddButton>
+      </Header>
+
+      {premios.length === 0 ? (
+        <EmptyState>
+          <h3>Nenhum prêmio encontrado</h3>
+          <p>Clique em "Novo Prêmio" para adicionar o primeiro prêmio ao catálogo.</p>
+        </EmptyState>
+      ) : (
+        <Grid>
+          {premios.map(premio => (
+            <PremioCard key={premio.id}>
+              <PremioHeader>
+                <h3>{premio.nome}</h3>
+                <Actions>
+                  <ActionButton variant="edit" onClick={() => handleEdit(premio)}>
+                    <FiEdit3 />
+                  </ActionButton>
+                  <ActionButton variant="delete" onClick={() => handleDelete(premio.id)}>
+                    <FiTrash2 />
+                  </ActionButton>
+                </Actions>
+              </PremioHeader>
+
+              <PremioInfo>
+                <p><strong>Pontos:</strong> {premio.pontos_necessarios.toLocaleString()}</p>
+                <p><strong>Categoria:</strong> {premio.categoria}</p>
+                {premio.descricao && (
+                  <p><strong>Descrição:</strong> {premio.descricao}</p>
+                )}
+                <StatusBadge ativo={premio.ativo}>
+                  {premio.ativo ? 'Ativo' : 'Inativo'}
+                </StatusBadge>
+              </PremioInfo>
+            </PremioCard>
+          ))}
+        </Grid>
+      )}
+
+      {showModal && (
+        <ModalOverlay onClick={handleCloseModal}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <h3>{editingPremio ? 'Editar' : 'Novo'} Prêmio</h3>
+
+            <form onSubmit={handleSubmit}>
+              <FormGroup>
+                <Label>Nome do Prêmio</Label>
+                <Input
+                  type="text"
+                  value={formData.nome}
+                  onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
+                  required
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Descrição</Label>
+                <TextArea
+                  value={formData.descricao}
+                  onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
+                  placeholder="Descrição opcional do prêmio..."
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Pontos Necessários</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={formData.pontos_necessarios}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pontos_necessarios: parseInt(e.target.value) || 0 }))}
+                  required
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Categoria</Label>
+                <Select
+                  value={formData.categoria}
+                  onChange={(e) => setFormData(prev => ({ ...prev, categoria: e.target.value }))}
+                  required
+                >
+                  <option value="">Selecione uma categoria</option>
+                  <option value="ferramentas">Ferramentas</option>
+                  <option value="vale-compras">Vale-compras</option>
+                  <option value="brindes">Brindes</option>
+                  <option value="outros">Outros</option>
+                </Select>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>
+                  <input
+                    type="checkbox"
+                    checked={formData.ativo}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ativo: e.target.checked }))}
+                  />
+                  {' '}Prêmio ativo
+                </Label>
+              </FormGroup>
+
+              <ButtonGroup>
+                <Button type="button" variant="secondary" onClick={handleCloseModal}>
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary">
+                  <FiSave />
+                  {editingPremio ? 'Atualizar' : 'Criar'}
+                </Button>
+              </ButtonGroup>
+            </form>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+    </Container>
+  );
 }
 
 export default AdminPremios;

@@ -3,6 +3,7 @@ import styled, { keyframes } from 'styled-components';
 import toast from 'react-hot-toast';
 import { FiUser, FiLock, FiMail, FiPhone, FiLogIn, FiUserPlus, FiLoader } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeIn = keyframes`
@@ -480,8 +481,21 @@ const AuthNovoClean = ({ onLogin }) => {
                         </FormGroup>
 
                         <Button type="submit" disabled={loading}>
-                            {loading ? <LoadingSpinner /> : <FiLogIn />}
-                            {loading ? 'Entrando...' : 'Entrar'}
+                            {loading ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <img
+                                        src={require('../assets/gif-carregando.gif')}
+                                        alt="Carregando..."
+                                        style={{ width: '20px', height: '20px' }}
+                                    />
+                                    Entrando...
+                                </div>
+                            ) : (
+                                <>
+                                    <FiLogIn />
+                                    Entrar
+                                </>
+                            )}
                         </Button>
 
                         <HelpText>
@@ -592,8 +606,21 @@ const AuthNovoClean = ({ onLogin }) => {
                         </FormGroup>
 
                         <Button type="submit" disabled={loading}>
-                            {loading ? <LoadingSpinner /> : <FiUserPlus />}
-                            {loading ? 'Cadastrando...' : 'Cadastrar'}
+                            {loading ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <img
+                                        src={require('../assets/gif-carregando.gif')}
+                                        alt="Carregando..."
+                                        style={{ width: '20px', height: '20px' }}
+                                    />
+                                    Cadastrando...
+                                </div>
+                            ) : (
+                                <>
+                                    <FiUserPlus />
+                                    Cadastrar
+                                </>
+                            )}
                         </Button>
 
                         <HelpText>

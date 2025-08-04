@@ -4,6 +4,7 @@ import { FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiPackage, FiSearch, FiRefreshC
 import { getCategoriasProdutos } from '../utils/pedidosFast';
 import ProdutosService from '../services/produtosService';
 import toast from 'react-hot-toast';
+import LoadingGif from './LoadingGif';
 
 // Animações
 const fadeIn = keyframes`
@@ -436,17 +437,20 @@ const BulkActionsBar = styled.div`
     gap: 1rem;
   }
 `;
-border - radius: 12px;
-padding: 1.5rem;
-box - shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-transition: all 0.3s ease;
-border: 2px solid ${ props => props.isEditing ? '#A91918' : 'transparent' };
-opacity: ${ props => props.inactive ? 0.6 : 1 };
+
+const ProductCard = styled.div`
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border: 2px solid ${props => props.isEditing ? '#A91918' : 'transparent'};
+  opacity: ${props => props.inactive ? 0.6 : 1};
   
   &:hover {
-  transform: translateY(-2px);
-  box - shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-}
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  }
 `;
 
 const ProductHeader = styled.div`
@@ -485,7 +489,7 @@ flex: 1;
 `;
 
 const CategoryBadge = styled.span`
-background: ${ props => props.color || '#6c757d' };
+background: ${props => props.color || '#6c757d'};
 color: white;
 padding: 0.25rem 0.75rem;
 border - radius: 20px;
@@ -520,8 +524,7 @@ flex - direction: column;
 `;
 
 const CardActionButton = styled.button`
-background: ${
-  props => {
+background: ${props => {
     switch (props.variant) {
       case 'edit': return '#17a2b8';
       case 'delete': return '#dc3545';
@@ -529,7 +532,7 @@ background: ${
       default: return '#6c757d';
     }
   }
-};
+  };
 color: white;
 border: none;
 padding: 0.5rem;
@@ -566,7 +569,7 @@ display: flex;
 align - items: center;
 justify - content: center;
 z - index: 1000;
-animation: ${ fadeIn } 0.3s ease - out;
+animation: ${fadeIn} 0.3s ease - out;
 `;
 
 const ModalContent = styled.div`
@@ -577,7 +580,7 @@ width: 90 %;
 max - width: 500px;
 max - height: 90vh;
 overflow - y: auto;
-animation: ${ slideIn } 0.3s ease - out;
+animation: ${slideIn} 0.3s ease - out;
 `;
 
 const ModalHeader = styled.div`
@@ -630,409 +633,410 @@ justify - content: flex - end;
 `;
 
 function AdminProdutosNovo() {
-    const [produtos, setProdutos] = useState([]);
-    const [filteredProdutos, setFilteredProdutos] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState(null);
-    const [showInactive, setShowInactive] = useState(false);
-    const [formData, setFormData] = useState({
-        codigo: '',
-        nome: '',
-        pontos_por_real: '',
-        categoria: 'placa_st',
-        descricao: '',
-        ativa: true
-    });
+  const [produtos, setProdutos] = useState([]);
+  const [filteredProdutos, setFilteredProdutos] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(null);
+  const [showInactive, setShowInactive] = useState(false);
+  const [formData, setFormData] = useState({
+    codigo: '',
+    nome: '',
+    pontos_por_real: '',
+    categoria: 'placa_st',
+    descricao: '',
+    ativa: true
+  });
 
-    // Carregar produtos da base de dados
-    const carregarProdutos = async () => {
-        setLoading(true);
-        try {
-            const result = showInactive
-                ? await ProdutosService.obterTodosProdutos()
-                : await ProdutosService.obterProdutosAtivos();
+  // Carregar produtos da base de dados
+  const carregarProdutos = async () => {
+    setLoading(true);
+    try {
+      const result = showInactive
+        ? await ProdutosService.obterTodosProdutos()
+        : await ProdutosService.obterProdutosAtivos();
 
-            if (result.success) {
-                const produtosFormatados = result.data.map(produto => ({
-                    codigo: produto.codigo,
-                    nome: produto.nome,
-                    pontosPorReal: produto.pontos_por_real,
-                    categoria: produto.categoria,
-                    descricao: produto.descricao,
-                    ativa: produto.ativa
-                }));
-                setProdutos(produtosFormatados);
-                setFilteredProdutos(produtosFormatados);
-            } else {
-                toast.error(result.message || 'Erro ao carregar produtos');
-                // Se não conseguir carregar, inicializar produtos
-                await inicializarProdutos();
-            }
-        } catch (error) {
-            console.error('Erro ao carregar produtos:', error);
-            toast.error('Erro ao carregar produtos da base de dados');
-        } finally {
-            setLoading(false);
-        }
-    };
+      if (result.success) {
+        const produtosFormatados = result.data.map(produto => ({
+          codigo: produto.codigo,
+          nome: produto.nome,
+          pontosPorReal: produto.pontos_por_real,
+          categoria: produto.categoria,
+          descricao: produto.descricao,
+          ativa: produto.ativa
+        }));
+        setProdutos(produtosFormatados);
+        setFilteredProdutos(produtosFormatados);
+      } else {
+        toast.error(result.message || 'Erro ao carregar produtos');
+        // Se não conseguir carregar, inicializar produtos
+        await inicializarProdutos();
+      }
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+      toast.error('Erro ao carregar produtos da base de dados');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Carregar estatísticas
-    const carregarEstatisticas = async () => {
-        try {
-            const result = await ProdutosService.obterEstatisticas();
-            if (result.success) {
-                setStats(result.data);
-            }
-        } catch (error) {
-            console.error('Erro ao carregar estatísticas:', error);
-        }
-    };
+  // Carregar estatísticas
+  const carregarEstatisticas = async () => {
+    try {
+      const result = await ProdutosService.obterEstatisticas();
+      if (result.success) {
+        setStats(result.data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+    }
+  };
 
-    // Inicializar produtos se necessário
-    const inicializarProdutos = async () => {
-        try {
-            const result = await ProdutosService.inicializarProdutos();
-            if (result.success) {
-                toast.success(result.message);
-                carregarProdutos();
-            }
-        } catch (error) {
-            console.error('Erro ao inicializar produtos:', error);
-        }
-    };
-
-    useEffect(() => {
+  // Inicializar produtos se necessário
+  const inicializarProdutos = async () => {
+    try {
+      const result = await ProdutosService.inicializarProdutos();
+      if (result.success) {
+        toast.success(result.message);
         carregarProdutos();
-        carregarEstatisticas();
-    }, [showInactive]);
+      }
+    } catch (error) {
+      console.error('Erro ao inicializar produtos:', error);
+    }
+  };
 
-    useEffect(() => {
-        // Filtrar produtos baseado na busca
-        const filtered = produtos.filter(produto =>
-            produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            produto.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            produto.categoria.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setFilteredProdutos(filtered);
-    }, [searchTerm, produtos]);
+  useEffect(() => {
+    carregarProdutos();
+    carregarEstatisticas();
+  }, [showInactive]);
 
-    const handleAddProduct = () => {
-        setEditingProduct(null);
-        setFormData({
-            codigo: '',
-            nome: '',
-            pontos_por_real: '',
-            categoria: 'placa_st',
-            descricao: '',
-            ativa: true
-        });
-        setIsModalOpen(true);
-    };
+  useEffect(() => {
+    // Filtrar produtos baseado na busca
+    const filtered = produtos.filter(produto =>
+      produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      produto.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      produto.categoria.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredProdutos(filtered);
+  }, [searchTerm, produtos]);
 
-    const handleEditProduct = (produto) => {
-        setEditingProduct(produto.codigo);
-        setFormData({
-            codigo: produto.codigo,
-            nome: produto.nome,
-            pontos_por_real: produto.pontosPorReal.toString(),
-            categoria: produto.categoria,
-            descricao: produto.descricao || '',
-            ativa: produto.ativa
-        });
-        setIsModalOpen(true);
-    };
+  const handleAddProduct = () => {
+    setEditingProduct(null);
+    setFormData({
+      codigo: '',
+      nome: '',
+      pontos_por_real: '',
+      categoria: 'placa_st',
+      descricao: '',
+      ativa: true
+    });
+    setIsModalOpen(true);
+  };
 
-    const handleToggleProduct = async (codigo, ativaAtual) => {
-        try {
-            const result = ativaAtual
-                ? await ProdutosService.desativarProduto(codigo)
-                : await ProdutosService.reativarProduto(codigo);
+  const handleEditProduct = (produto) => {
+    setEditingProduct(produto.codigo);
+    setFormData({
+      codigo: produto.codigo,
+      nome: produto.nome,
+      pontos_por_real: produto.pontosPorReal.toString(),
+      categoria: produto.categoria,
+      descricao: produto.descricao || '',
+      ativa: produto.ativa
+    });
+    setIsModalOpen(true);
+  };
 
-            if (result.success) {
-                toast.success(result.message);
-                carregarProdutos();
-            } else {
-                toast.error(result.message);
-            }
-        } catch (error) {
-            console.error('Erro ao alterar status do produto:', error);
-            toast.error('Erro ao alterar status do produto');
-        }
-    };
+  const handleToggleProduct = async (codigo, ativaAtual) => {
+    try {
+      const result = ativaAtual
+        ? await ProdutosService.desativarProduto(codigo)
+        : await ProdutosService.reativarProduto(codigo);
 
-    const handleSaveProduct = async () => {
-        if (!formData.codigo || !formData.nome || !formData.pontos_por_real) {
-            toast.error('Preencha todos os campos obrigatórios!');
-            return;
-        }
+      if (result.success) {
+        toast.success(result.message);
+        carregarProdutos();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status do produto:', error);
+      toast.error('Erro ao alterar status do produto');
+    }
+  };
 
-        const produtoData = {
-            codigo: formData.codigo,
-            nome: formData.nome,
-            pontos_por_real: parseFloat(formData.pontos_por_real),
-            categoria: formData.categoria,
-            descricao: formData.descricao,
-            ativa: formData.ativa
-        };
-
-        try {
-            let result;
-            if (editingProduct) {
-                // Editando produto existente
-                result = await ProdutosService.atualizarProduto(editingProduct, produtoData);
-            } else {
-                // Adicionando novo produto
-                result = await ProdutosService.adicionarProduto(produtoData);
-            }
-
-            if (result.success) {
-                toast.success(result.message);
-                setIsModalOpen(false);
-                carregarProdutos();
-                carregarEstatisticas();
-            } else {
-                toast.error(result.message);
-            }
-        } catch (error) {
-            console.error('Erro ao salvar produto:', error);
-            toast.error('Erro ao salvar produto');
-        }
-    };
-
-    const getCategoryDisplayName = (categoria) => {
-        const categorias = getCategoriasProdutos();
-        return categorias[categoria]?.nome || categoria;
-    };
-
-    const getCategoryColor = (categoria) => {
-        const categorias = getCategoriasProdutos();
-        return categorias[categoria]?.cor || '#6c757d';
-    };
-
-    if (loading) {
-        return (
-            <Container>
-                <LoadingContainer>
-                    <FiDatabase style={{ marginRight: '0.5rem' }} />
-                    Carregando produtos...
-                </LoadingContainer>
-            </Container>
-        );
+  const handleSaveProduct = async () => {
+    if (!formData.codigo || !formData.nome || !formData.pontos_por_real) {
+      toast.error('Preencha todos os campos obrigatórios!');
+      return;
     }
 
+    const produtoData = {
+      codigo: formData.codigo,
+      nome: formData.nome,
+      pontos_por_real: parseFloat(formData.pontos_por_real),
+      categoria: formData.categoria,
+      descricao: formData.descricao,
+      ativa: formData.ativa
+    };
+
+    try {
+      let result;
+      if (editingProduct) {
+        // Editando produto existente
+        result = await ProdutosService.atualizarProduto(editingProduct, produtoData);
+      } else {
+        // Adicionando novo produto
+        result = await ProdutosService.adicionarProduto(produtoData);
+      }
+
+      if (result.success) {
+        toast.success(result.message);
+        setIsModalOpen(false);
+        carregarProdutos();
+        carregarEstatisticas();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar produto:', error);
+      toast.error('Erro ao salvar produto');
+    }
+  };
+
+  const getCategoryDisplayName = (categoria) => {
+    const categorias = getCategoriasProdutos();
+    return categorias[categoria]?.nome || categoria;
+  };
+
+  const getCategoryColor = (categoria) => {
+    const categorias = getCategoriasProdutos();
+    return categorias[categoria]?.cor || '#6c757d';
+  };
+
+  if (loading) {
     return (
-        <Container>
-            <Header>
-                <h1>
-                    <FiPackage />
-                    Administração de Produtos Elegíveis
-                </h1>
-                <p>Gerencie os produtos e regras de pontuação do Clube Fast de Recompensas</p>
-            </Header>
-
-            {stats && (
-                <StatsContainer>
-                    <StatCard color="#28a745">
-                        <div className="number">{stats.ativos}</div>
-                        <div className="label">Produtos Ativos</div>
-                    </StatCard>
-                    <StatCard color="#dc3545">
-                        <div className="number">{stats.inativos}</div>
-                        <div className="label">Produtos Inativos</div>
-                    </StatCard>
-                    <StatCard color="#17a2b8">
-                        <div className="number">{Object.keys(stats.categorias || {}).length}</div>
-                        <div className="label">Categorias</div>
-                    </StatCard>
-                    <StatCard color="#ffc107">
-                        <div className="number">{stats.pontuacaoMedia?.toFixed(1) || '0'}</div>
-                        <div className="label">Pontuação Média</div>
-                    </StatCard>
-                </StatsContainer>
-            )}
-
-            <Controls>
-                <SearchContainer>
-                    <FiSearch className="search-icon" />
-                    <input
-                        type="text"
-                        placeholder="Buscar produtos por nome, código ou categoria..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </SearchContainer>
-
-                <ButtonGroup>
-                    <ToggleContainer>
-                        <span>Mostrar inativos:</span>
-                        <ToggleButton
-                            active={showInactive}
-                            onClick={() => setShowInactive(!showInactive)}
-                        >
-                            {showInactive ? <FiToggleRight /> : <FiToggleLeft />}
-                        </ToggleButton>
-                    </ToggleContainer>
-
-                    <ActionButton variant="info" onClick={carregarProdutos}>
-                        <FiRefreshCw />
-                        Atualizar
-                    </ActionButton>
-
-                    <ActionButton variant="primary" onClick={inicializarProdutos}>
-                        <FiDatabase />
-                        Inicializar
-                    </ActionButton>
-
-                    <ActionButton variant="success" onClick={handleAddProduct}>
-                        <FiPlus />
-                        Adicionar Produto
-                    </ActionButton>
-                </ButtonGroup>
-            </Controls>
-
-            <ProductsGrid>
-                {filteredProdutos.map((produto) => (
-                    <ProductCard
-                        key={produto.codigo}
-                        inactive={!produto.ativa}
-                    >
-                        <ProductHeader>
-                            <ProductInfo>
-                                <h3>{produto.nome}</h3>
-                                <div className="codigo">{produto.codigo}</div>
-                                {produto.descricao && (
-                                    <div className="descricao">{produto.descricao}</div>
-                                )}
-                                <CategoryBadge color={getCategoryColor(produto.categoria)}>
-                                    {getCategoryDisplayName(produto.categoria)}
-                                </CategoryBadge>
-                            </ProductInfo>
-
-                            <ActionsGroup>
-                                <CardActionButton
-                                    variant="edit"
-                                    onClick={() => handleEditProduct(produto)}
-                                    title="Editar produto"
-                                >
-                                    <FiEdit2 />
-                                </CardActionButton>
-                                <CardActionButton
-                                    variant="toggle"
-                                    active={produto.ativa}
-                                    onClick={() => handleToggleProduct(produto.codigo, produto.ativa)}
-                                    title={produto.ativa ? "Desativar produto" : "Ativar produto"}
-                                >
-                                    {produto.ativa ? <FiToggleRight /> : <FiToggleLeft />}
-                                </CardActionButton>
-                            </ActionsGroup>
-                        </ProductHeader>
-
-                        <PointsDisplay>
-                            <div className="points">
-                                {produto.pontosPorReal} {produto.pontosPorReal === 1 ? 'ponto' : 'pontos'}
-                            </div>
-                            <div className="description">por R$ 1,00 gasto</div>
-                        </PointsDisplay>
-                    </ProductCard>
-                ))}
-            </ProductsGrid>
-
-            {isModalOpen && (
-                <Modal onClick={(e) => e.target === e.currentTarget && setIsModalOpen(false)}>
-                    <ModalContent>
-                        <ModalHeader>
-                            <h2>{editingProduct ? 'Editar Produto' : 'Adicionar Produto'}</h2>
-                            <CardActionButton onClick={() => setIsModalOpen(false)}>
-                                <FiX />
-                            </CardActionButton>
-                        </ModalHeader>
-
-                        <FormGroup>
-                            <label>Código do Produto *</label>
-                            <input
-                                type="text"
-                                value={formData.codigo}
-                                onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                                placeholder="Ex: DW00057"
-                                disabled={!!editingProduct}
-                            />
-                        </FormGroup>
-
-                        <FormGroup>
-                            <label>Nome do Produto *</label>
-                            <input
-                                type="text"
-                                value={formData.nome}
-                                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                                placeholder="Ex: Placa ST 13mm x 1,20 x 2,40"
-                            />
-                        </FormGroup>
-
-                        <FormGroup>
-                            <label>Pontos por R$ 1,00 *</label>
-                            <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                value={formData.pontos_por_real}
-                                onChange={(e) => setFormData({ ...formData, pontos_por_real: e.target.value })}
-                                placeholder="Ex: 1.0"
-                            />
-                        </FormGroup>
-
-                        <FormGroup>
-                            <label>Categoria *</label>
-                            <select
-                                value={formData.categoria}
-                                onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                            >
-                                {Object.entries(getCategoriasProdutos()).map(([key, categoria]) => (
-                                    <option key={key} value={key}>
-                                        {categoria.nome} ({categoria.pontos} pts)
-                                    </option>
-                                ))}
-                            </select>
-                        </FormGroup>
-
-                        <FormGroup>
-                            <label>Descrição</label>
-                            <textarea
-                                value={formData.descricao}
-                                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                                placeholder="Descrição detalhada do produto..."
-                            />
-                        </FormGroup>
-
-                        <FormGroup>
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    checked={formData.ativa}
-                                    onChange={(e) => setFormData({ ...formData, ativa: e.target.checked })}
-                                    style={{ marginRight: '0.5rem' }}
-                                />
-                                Produto ativo
-                            </label>
-                        </FormGroup>
-
-                        <ModalActions>
-                            <ActionButton onClick={() => setIsModalOpen(false)}>
-                                <FiX />
-                                Cancelar
-                            </ActionButton>
-                            <ActionButton variant="success" onClick={handleSaveProduct}>
-                                <FiSave />
-                                Salvar
-                            </ActionButton>
-                        </ModalActions>
-                    </ModalContent>
-                </Modal>
-            )}
-        </Container>
+      <Container>
+        <LoadingGif
+          text="Carregando produtos..."
+          size="300px"
+          mobileSize="250px"
+        />
+      </Container>
     );
+  }
+
+  return (
+    <Container>
+      <Header>
+        <h1>
+          <FiPackage />
+          Administração de Produtos Elegíveis
+        </h1>
+        <p>Gerencie os produtos e regras de pontuação do Clube Fast de Recompensas</p>
+      </Header>
+
+      {stats && (
+        <StatsContainer>
+          <StatCard color="#28a745">
+            <div className="number">{stats.ativos}</div>
+            <div className="label">Produtos Ativos</div>
+          </StatCard>
+          <StatCard color="#dc3545">
+            <div className="number">{stats.inativos}</div>
+            <div className="label">Produtos Inativos</div>
+          </StatCard>
+          <StatCard color="#17a2b8">
+            <div className="number">{Object.keys(stats.categorias || {}).length}</div>
+            <div className="label">Categorias</div>
+          </StatCard>
+          <StatCard color="#ffc107">
+            <div className="number">{stats.pontuacaoMedia?.toFixed(1) || '0'}</div>
+            <div className="label">Pontuação Média</div>
+          </StatCard>
+        </StatsContainer>
+      )}
+
+      <Controls>
+        <SearchContainer>
+          <FiSearch className="search-icon" />
+          <input
+            type="text"
+            placeholder="Buscar produtos por nome, código ou categoria..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </SearchContainer>
+
+        <ButtonGroup>
+          <ToggleContainer>
+            <span>Mostrar inativos:</span>
+            <ToggleButton
+              active={showInactive}
+              onClick={() => setShowInactive(!showInactive)}
+            >
+              {showInactive ? <FiToggleRight /> : <FiToggleLeft />}
+            </ToggleButton>
+          </ToggleContainer>
+
+          <ActionButton variant="info" onClick={carregarProdutos}>
+            <FiRefreshCw />
+            Atualizar
+          </ActionButton>
+
+          <ActionButton variant="primary" onClick={inicializarProdutos}>
+            <FiDatabase />
+            Inicializar
+          </ActionButton>
+
+          <ActionButton variant="success" onClick={handleAddProduct}>
+            <FiPlus />
+            Adicionar Produto
+          </ActionButton>
+        </ButtonGroup>
+      </Controls>
+
+      <ProductsGrid>
+        {filteredProdutos.map((produto) => (
+          <ProductCard
+            key={produto.codigo}
+            inactive={!produto.ativa}
+          >
+            <ProductHeader>
+              <ProductInfo>
+                <h3>{produto.nome}</h3>
+                <div className="codigo">{produto.codigo}</div>
+                {produto.descricao && (
+                  <div className="descricao">{produto.descricao}</div>
+                )}
+                <CategoryBadge color={getCategoryColor(produto.categoria)}>
+                  {getCategoryDisplayName(produto.categoria)}
+                </CategoryBadge>
+              </ProductInfo>
+
+              <ActionsGroup>
+                <CardActionButton
+                  variant="edit"
+                  onClick={() => handleEditProduct(produto)}
+                  title="Editar produto"
+                >
+                  <FiEdit2 />
+                </CardActionButton>
+                <CardActionButton
+                  variant="toggle"
+                  active={produto.ativa}
+                  onClick={() => handleToggleProduct(produto.codigo, produto.ativa)}
+                  title={produto.ativa ? "Desativar produto" : "Ativar produto"}
+                >
+                  {produto.ativa ? <FiToggleRight /> : <FiToggleLeft />}
+                </CardActionButton>
+              </ActionsGroup>
+            </ProductHeader>
+
+            <PointsDisplay>
+              <div className="points">
+                {produto.pontosPorReal} {produto.pontosPorReal === 1 ? 'ponto' : 'pontos'}
+              </div>
+              <div className="description">por R$ 1,00 gasto</div>
+            </PointsDisplay>
+          </ProductCard>
+        ))}
+      </ProductsGrid>
+
+      {isModalOpen && (
+        <Modal onClick={(e) => e.target === e.currentTarget && setIsModalOpen(false)}>
+          <ModalContent>
+            <ModalHeader>
+              <h2>{editingProduct ? 'Editar Produto' : 'Adicionar Produto'}</h2>
+              <CardActionButton onClick={() => setIsModalOpen(false)}>
+                <FiX />
+              </CardActionButton>
+            </ModalHeader>
+
+            <FormGroup>
+              <label>Código do Produto *</label>
+              <input
+                type="text"
+                value={formData.codigo}
+                onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                placeholder="Ex: DW00057"
+                disabled={!!editingProduct}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <label>Nome do Produto *</label>
+              <input
+                type="text"
+                value={formData.nome}
+                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                placeholder="Ex: Placa ST 13mm x 1,20 x 2,40"
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <label>Pontos por R$ 1,00 *</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={formData.pontos_por_real}
+                onChange={(e) => setFormData({ ...formData, pontos_por_real: e.target.value })}
+                placeholder="Ex: 1.0"
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <label>Categoria *</label>
+              <select
+                value={formData.categoria}
+                onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+              >
+                {Object.entries(getCategoriasProdutos()).map(([key, categoria]) => (
+                  <option key={key} value={key}>
+                    {categoria.nome} ({categoria.pontos} pts)
+                  </option>
+                ))}
+              </select>
+            </FormGroup>
+
+            <FormGroup>
+              <label>Descrição</label>
+              <textarea
+                value={formData.descricao}
+                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                placeholder="Descrição detalhada do produto..."
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={formData.ativa}
+                  onChange={(e) => setFormData({ ...formData, ativa: e.target.checked })}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Produto ativo
+              </label>
+            </FormGroup>
+
+            <ModalActions>
+              <ActionButton onClick={() => setIsModalOpen(false)}>
+                <FiX />
+                Cancelar
+              </ActionButton>
+              <ActionButton variant="success" onClick={handleSaveProduct}>
+                <FiSave />
+                Salvar
+              </ActionButton>
+            </ModalActions>
+          </ModalContent>
+        </Modal>
+      )}
+    </Container>
+  );
 }
 
 export default AdminProdutosNovo;
