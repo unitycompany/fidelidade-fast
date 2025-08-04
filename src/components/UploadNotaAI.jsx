@@ -102,7 +102,7 @@ export default function UploadNotaAI() {
 
             setResult(processed);
             toast.success('Pedido processado e pontos adicionados!');
-            
+
             // Enviar notificação de pontos creditados
             notifyPointsEarned(processed.totalPoints);
         } catch (err) {
