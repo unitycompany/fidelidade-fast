@@ -5,6 +5,7 @@ import { analyzeOrderWithGemini } from '../services/geminiService';
 import { processOrderResult, validateOrder, validarPontosCalculados } from '../utils/pedidosFast'; // removed getProdutosElegiveis import
 import { saveOrder, saveOrderItems, addPointsToCustomer, checkOrderExists } from '../services/supabase';
 import { getPointsPerReal } from '../utils/config';
+import { sefazValidationService } from '../services/sefazValidation';
 import LoadingGif from './LoadingGif';
 
 // Animações
@@ -500,9 +501,10 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
   const processingSteps = [
     { id: 1, text: 'Analisando documento', icon: FiEye },
     { id: 2, text: 'Extraindo informações', icon: FiFile },
-    { id: 3, text: 'Calculando pontos', icon: FiTarget },
-    { id: 4, text: 'Salvando no sistema', icon: FiDatabase },
-    { id: 5, text: 'Creditando pontos', icon: FiGift }
+    { id: 3, text: 'Validando via SEFAZ', icon: FiTarget },
+    { id: 4, text: 'Calculando pontos', icon: FiTarget },
+    { id: 5, text: 'Salvando no sistema', icon: FiDatabase },
+    { id: 6, text: 'Creditando pontos', icon: FiGift }
   ];
 
   const updateProcessingStep = (stepId, completed = false) => {
@@ -671,45 +673,167 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         }
       }
 
-      // Etapa 3: Calculando pontos
+      // Etapa 3: Validando via SEFAZ (Anti-Fraude)
       updateProcessingStep(3);
       await new Promise(resolve => setTimeout(resolve, 1000)); // Pausa para mostrar transição
 
       // Aguardando o processamento de dados pela IA
       const processedOrder = await processOrderResult(aiResult.data); // Garantir que a promise seja resolvida
 
+      // � VALIDAÇÃO ANTI-FRAUDE VIA SEFAZ
+      console.log('🔒 Iniciando validação anti-fraude...');
+
+      let validationResult;
+      let finalOrderData = processedOrder;
+
+      try {
+        // Tentar validar via SEFAZ usando texto OCR original
+        const ocrText = aiResult.rawText || JSON.stringify(aiResult.data);
+        validationResult = await sefazValidationService.validateNotaFiscal(ocrText, processedOrder);
+
+        if (validationResult.success && !validationResult.useOCR) {
+          // ✅ DADOS OFICIAIS SEFAZ - 100% CONFIÁVEIS
+          console.log('✅ Validação SEFAZ bem-sucedida - usando dados oficiais');
+
+          finalOrderData = {
+            ...processedOrder,
+            totalValue: validationResult.data.valorTotal || processedOrder.totalValue,
+            orderDate: validationResult.data.dataEmissao || processedOrder.orderDate,
+            customer: validationResult.data.razaoSocial || processedOrder.customer,
+            cnpjEmitente: validationResult.data.cnpjEmitente,
+            chaveNFe: validationResult.data.chaveNFe,
+            validationType: validationResult.data.validationType || 'sefaz_official',
+            extractionMethod: validationResult.data.extractionMethod,
+            antifraudValidated: true,
+            sefazData: validationResult.data
+          };
+
+        } else if (validationResult.success && validationResult.useOCR) {
+          // ⚠️ DADOS OCR COM VALIDAÇÕES EXTRAS
+          console.log('⚠️ Usando dados OCR com validações anti-fraude extras');
+
+          // Aplicar validações extras para dados OCR
+          const ocrValidation = sefazValidationService.validateOCRData(processedOrder, ocrText);
+
+          // Se dados OCR são suspeitos, aplicar medidas restritivas
+          if (!ocrValidation.hasReasonableValues || ocrValidation.suspiciousPatterns.length > 2) {
+            console.warn('🚨 Padrões suspeitos detectados:', ocrValidation.suspiciousPatterns);
+
+            // Limitar pontos em casos suspeitos
+            const originalPoints = Math.floor((processedOrder.totalValue || 0) * getPointsPerReal());
+            const limitedPoints = Math.min(originalPoints, 50); // Máximo 50 pontos para casos suspeitos
+
+            finalOrderData = {
+              ...processedOrder,
+              totalPoints: limitedPoints,
+              validationType: 'ocr_limited',
+              antifraudValidated: true,
+              suspiciousPatterns: ocrValidation.suspiciousPatterns,
+              pointsLimited: originalPoints > limitedPoints,
+              originalPoints: originalPoints
+            };
+
+            console.log('🔒 Pontos limitados por segurança:', {
+              original: originalPoints,
+              limited: limitedPoints,
+              patterns: ocrValidation.suspiciousPatterns
+            });
+
+          } else {
+            // Dados OCR parecem válidos
+            finalOrderData = {
+              ...processedOrder,
+              chaveNFe: validationResult.data?.chaveNFe,
+              validationType: 'ocr_validated',
+              antifraudValidated: true,
+              ocrValidation
+            };
+          }
+
+        } else {
+          // ❌ FALHA NA VALIDAÇÃO - REJEITAR
+          console.error('❌ Falha na validação anti-fraude:', validationResult.error);
+
+          setResult({
+            orderNumber: `FRAUD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+            customer: 'Sistema Fast',
+            totalValue: 0,
+            items: [],
+            totalPoints: 0,
+            allProducts: [],
+            error: true,
+            errorMessage: `Validação anti-fraude falhou: ${validationResult.error}. Por segurança, não foi possível processar esta nota.`
+          });
+          setShowResult(true);
+          setTimeout(() => {
+            setShowAnimatedRows(true);
+          }, 300);
+          return;
+        }
+
+        updateProcessingStep(3, true); // Marca validação SEFAZ como concluída
+
+      } catch (validationError) {
+        console.error('⚠️ Erro na validação SEFAZ:', validationError);
+
+        // Em caso de erro na validação, usar dados OCR com limitações
+        finalOrderData = {
+          ...processedOrder,
+          validationType: 'ocr_fallback',
+          antifraudValidated: false,
+          validationError: validationError.message
+        };
+
+        updateProcessingStep(3, true); // Marca como concluída mesmo com erro
+      }
+
+      // Etapa 4: Calculando pontos
+      updateProcessingStep(4);
+      await new Promise(resolve => setTimeout(resolve, 800)); // Pausa para mostrar transição
+
       // 🔍 LOG DETALHADO: Verificar dados processados
       console.log('📊 DADOS PROCESSADOS COMPLETOS:', {
-        orderNumber: processedOrder.orderNumber,
-        orderDate: processedOrder.orderDate,
-        totalValue: processedOrder.totalValue,
-        totalPoints: processedOrder.totalPoints,
-        items: processedOrder.items,
-        allProducts: processedOrder.allProducts,
+        orderNumber: finalOrderData.orderNumber,
+        orderDate: finalOrderData.orderDate,
+        totalValue: finalOrderData.totalValue,
+        totalPoints: finalOrderData.totalPoints,
+        items: finalOrderData.items,
+        allProducts: finalOrderData.allProducts,
+        validationType: finalOrderData.validationType,
+        antifraudValidated: finalOrderData.antifraudValidated
       });
 
       // 🔍 LOG CRÍTICO: Verificar se totalPoints foi perdido durante processamento
       console.log('🔍 VERIFICAÇÃO TOTALPOINTS APÓS PROCESSAMENTO:', {
-        'processedOrder.totalPoints': processedOrder.totalPoints,
-        'tipo': typeof processedOrder.totalPoints,
-        'é número': typeof processedOrder.totalPoints === 'number',
-        'é maior que 0': processedOrder.totalPoints > 0,
-        'itens com pontos': processedOrder.items?.filter(item => item.points > 0) || [],
-        'soma manual dos pontos': processedOrder.items?.reduce((acc, item) => acc + (item.points || 0), 0) || 0
+        'finalOrderData.totalPoints': finalOrderData.totalPoints,
+        'tipo': typeof finalOrderData.totalPoints,
+        'é número': typeof finalOrderData.totalPoints === 'number',
+        'é maior que 0': finalOrderData.totalPoints > 0,
+        'itens com pontos': finalOrderData.items?.filter(item => item.points > 0) || [],
+        'soma manual dos pontos': finalOrderData.items?.reduce((acc, item) => acc + (item.points || 0), 0) || 0
       });
 
-      // 🔧 CORREÇÃO FORÇADA: Garantir que totalPoints seja SEMPRE a soma dos itens com pontos
-      // const somaPontosCalculada = processedOrder.items?.reduce((acc, item) => acc + (Number(item.points) || 0), 0) || 0;
-      // processedOrder.totalPoints = somaPontosCalculada;
-      // Agora pontuar por valor total
-      const multiplier = getPointsPerReal();
-      const calculatedPoints = Math.floor((processedOrder.totalValue || 0) * multiplier);
-      processedOrder.totalPoints = calculatedPoints;
-      console.log('🔧 Pontos calculados por valor total:', { totalValue: processedOrder.totalValue, multiplier, calculatedPoints });
-      updateProcessingStep(3, true); // Marca cálculo de pontos como concluído
+      // 🔧 CÁLCULO DE PONTOS BASEADO NA VALIDAÇÃO
+      if (finalOrderData.validationType === 'sefaz_official') {
+        // Dados oficiais SEFAZ - calcular normalmente
+        const multiplier = getPointsPerReal();
+        const calculatedPoints = Math.floor((finalOrderData.totalValue || 0) * multiplier);
+        finalOrderData.totalPoints = calculatedPoints;
+        console.log('🔧 Pontos calculados com dados SEFAZ:', { totalValue: finalOrderData.totalValue, multiplier, calculatedPoints });
+
+      } else if (!finalOrderData.pointsLimited) {
+        // Dados OCR validados - calcular normalmente
+        const multiplier = getPointsPerReal();
+        const calculatedPoints = Math.floor((finalOrderData.totalValue || 0) * multiplier);
+        finalOrderData.totalPoints = calculatedPoints;
+        console.log('🔧 Pontos calculados por valor total (OCR):', { totalValue: finalOrderData.totalValue, multiplier, calculatedPoints });
+      }
+      // Se pointsLimited=true, os pontos já foram limitados na validação
+
+      updateProcessingStep(4, true); // Marca cálculo de pontos como concluído
 
       // Validar pedido
-      const validation = await validateOrder(processedOrder);
+      const validation = await validateOrder(finalOrderData);
 
       // ✅ APENAS LOG DE WARNINGS - NÃO BLOQUEAR PROCESSAMENTO
       if (validation.warnings && validation.warnings.length > 0) {
@@ -721,9 +845,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       }
 
       // VALIDAÇÃO DE PONTOS: Verificar se os cálculos estão corretos
-      if (processedOrder.items && processedOrder.items.length > 0) {
+      if (finalOrderData.items && finalOrderData.items.length > 0) {
         try {
-          const validacaoPontos = await validarPontosCalculados(processedOrder.items);
+          const validacaoPontos = await validarPontosCalculados(finalOrderData.items);
 
           if (!validacaoPontos.todosCorretos) {
             console.warn('⚠️ Alguns pontos podem estar incorretos, mas prosseguindo com totalPoints atual...');
@@ -736,8 +860,8 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         }
       }
 
-      // Etapa 4: Salvando no sistema
-      updateProcessingStep(4);
+      // Etapa 5: Salvando no sistema
+      updateProcessingStep(5);
       await new Promise(resolve => setTimeout(resolve, 800)); // Pausa para mostrar transição
 
       // Salvar no banco
@@ -762,28 +886,30 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       // Log de verificação antes de salvar
       console.log('🔍 Dados que serão salvos no banco:', {
         cliente_id: customerId,
-        numero_pedido: processedOrder.orderNumber,
-        data_emissao: processedOrder.orderDate,
-        valor_total: processedOrder.totalValue,
-        hash_documento: processedOrder.documentHash,
-        pontos_gerados: processedOrder.totalPoints,
-        status: 'processado'
+        numero_pedido: finalOrderData.orderNumber,
+        data_emissao: finalOrderData.orderDate,
+        valor_total: finalOrderData.totalValue,
+        hash_documento: finalOrderData.documentHash,
+        pontos_gerados: finalOrderData.totalPoints,
+        status: 'processado',
+        validationType: finalOrderData.validationType,
+        antifraudValidated: finalOrderData.antifraudValidated
       })
 
       // Salvar pedido principal
       const savedOrder = await saveOrder({
         cliente_id: customerId,
-        numero_pedido: processedOrder.orderNumber,
-        data_emissao: processedOrder.orderDate,
-        valor_total: processedOrder.totalValue,
-        hash_documento: processedOrder.documentHash,
-        pontos_gerados: processedOrder.totalPoints,
+        numero_pedido: finalOrderData.orderNumber,
+        data_emissao: finalOrderData.orderDate,
+        valor_total: finalOrderData.totalValue,
+        hash_documento: finalOrderData.documentHash,
+        pontos_gerados: finalOrderData.totalPoints,
         status: 'processado' // Sempre usar 'processado' - o que importa são os pontos
       });
 
       // Salvar itens do pedido (apenas se houver itens)
-      if (processedOrder.items && processedOrder.items.length > 0) {
-        for (const item of processedOrder.items) {
+      if (finalOrderData.items && finalOrderData.items.length > 0) {
+        for (const item of finalOrderData.items) {
           await saveOrderItems({
             pedido_id: savedOrder.id,
             produto_catalogo_id: item.product_id,
@@ -798,39 +924,49 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
           });
         }
       }
-      updateProcessingStep(4, true); // Marca salvamento como concluído
+      updateProcessingStep(5, true); // Marca salvamento como concluído
 
       // 🔍 LOG FINAL: Dados que serão exibidos na interface
       console.log('🎯 DADOS PARA A INTERFACE:', {
-        orderNumber: processedOrder.orderNumber,
-        totalValue: processedOrder.totalValue,
-        totalPoints: processedOrder.totalPoints,
-        items: processedOrder.items,
-        allProducts: processedOrder.allProducts,
-        orderId: savedOrder.id
+        orderNumber: finalOrderData.orderNumber,
+        totalValue: finalOrderData.totalValue,
+        totalPoints: finalOrderData.totalPoints,
+        items: finalOrderData.items,
+        allProducts: finalOrderData.allProducts,
+        orderId: savedOrder.id,
+        validationType: finalOrderData.validationType,
+        antifraudValidated: finalOrderData.antifraudValidated
       });
 
       // ✅ RESULTADO FINAL PARA A INTERFACE - COM GARANTIA DE totalPoints
-      const totalPointsGarantido = processedOrder.totalPoints || processedOrder.items?.reduce((acc, item) => acc + (Number(item.points) || 0), 0) || 0;
+      const totalPointsGarantido = finalOrderData.totalPoints || finalOrderData.items?.reduce((acc, item) => acc + (Number(item.points) || 0), 0) || 0;
 
       const resultadoFinal = {
-        orderNumber: processedOrder.orderNumber,
-        orderDate: processedOrder.orderDate,
-        customer: processedOrder.customer,
-        totalValue: processedOrder.totalValue,
-        items: processedOrder.items,
+        orderNumber: finalOrderData.orderNumber,
+        orderDate: finalOrderData.orderDate,
+        customer: finalOrderData.customer,
+        totalValue: finalOrderData.totalValue,
+        items: finalOrderData.items,
         totalPoints: totalPointsGarantido,
-        documentHash: processedOrder.documentHash,
-        allProducts: processedOrder.allProducts,
+        documentHash: finalOrderData.documentHash,
+        allProducts: finalOrderData.allProducts,
         orderId: savedOrder.id,
+        validationType: finalOrderData.validationType,
+        antifraudValidated: finalOrderData.antifraudValidated,
+        chaveNFe: finalOrderData.chaveNFe,
+        suspiciousPatterns: finalOrderData.suspiciousPatterns,
+        pointsLimited: finalOrderData.pointsLimited,
+        originalPoints: finalOrderData.originalPoints,
         usingFallback: usingFallback, // Informar se usou IA simulada
         processingMethod: processingMethod // Informar qual método foi usado
       };
 
       console.log('🔒 RESULTADO FINAL GARANTIDO:', {
-        'totalPoints original': processedOrder.totalPoints,
+        'totalPoints original': finalOrderData.totalPoints,
         'totalPoints garantido': totalPointsGarantido,
-        'totalPoints no resultado': resultadoFinal.totalPoints
+        'totalPoints no resultado': resultadoFinal.totalPoints,
+        'validationType': finalOrderData.validationType,
+        'antifraudValidated': finalOrderData.antifraudValidated
       });
 
       // 🔍 LOG CRÍTICO: Verificar totalPoints ANTES de creditar
@@ -839,30 +975,34 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         'tipo de resultadoFinal.totalPoints': typeof resultadoFinal.totalPoints,
         'resultadoFinal.totalPoints > 0': resultadoFinal.totalPoints > 0,
         'resultadoFinal.totalPoints === 0': resultadoFinal.totalPoints === 0,
-        'processedOrder.items.length': processedOrder.items?.length || 0,
-        'processedOrder.items': processedOrder.items,
-        'soma pontos dos items': processedOrder.items?.reduce((acc, item) => acc + (item.points || 0), 0) || 0
+        'finalOrderData.items.length': finalOrderData.items?.length || 0,
+        'finalOrderData.items': finalOrderData.items,
+        'soma pontos dos items': finalOrderData.items?.reduce((acc, item) => acc + (item.points || 0), 0) || 0,
+        'validationType': resultadoFinal.validationType,
+        'antifraudValidated': resultadoFinal.antifraudValidated
       });
 
       // Adicionar pontos ao cliente (apenas se houver pontos)
       if (resultadoFinal.totalPoints > 0) {
-        // Etapa 5: Creditando pontos
-        updateProcessingStep(5);
+        // Etapa 6: Creditando pontos
+        updateProcessingStep(6);
         await new Promise(resolve => setTimeout(resolve, 700)); // Pausa para mostrar transição
 
         try {
           console.log('💰 Iniciando crédito de pontos para o cliente:', {
             customerId,
             pontos: resultadoFinal.totalPoints,
-            orderNumber: processedOrder.orderNumber
+            orderNumber: finalOrderData.orderNumber,
+            validationType: resultadoFinal.validationType
           });
 
-          const updatedCustomer = await addPointsToCustomer(customerId, resultadoFinal.totalPoints, `Pedido ${processedOrder.orderNumber}`);
+          const updatedCustomer = await addPointsToCustomer(customerId, resultadoFinal.totalPoints, `Pedido ${finalOrderData.orderNumber}`);
 
           console.log('✅ Pontos creditados com sucesso:', {
             saldoAnterior: user.saldo_pontos,
             pontosAdicionados: resultadoFinal.totalPoints,
-            novoSaldo: updatedCustomer.saldo_pontos
+            novoSaldo: updatedCustomer.saldo_pontos,
+            validationType: resultadoFinal.validationType
           });
 
           // Atualizar contexto global do usuário para refletir novos pontos
@@ -892,7 +1032,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
 
           // Incluir saldo atualizado no resultado para interface
           resultadoFinal.saldoAtualizado = updatedCustomer.saldo_pontos;
-          updateProcessingStep(5, true); // Marca crédito como concluído
+          updateProcessingStep(6, true); // Marca crédito como concluído
 
         } catch (error) {
           console.error('❌ Erro ao creditar pontos:', error);
@@ -1110,7 +1250,62 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
                     </div>
                   )}
 
-                  {/* Exibir código de retirada se existir */}
+                  {/* Informações de Validação Anti-Fraude */}
+                  {showAnimatedRows && result.antifraudValidated && (
+                    <div style={{
+                      marginTop: 16,
+                      padding: '8px 12px',
+                      background: result.validationType === 'sefaz_official' ? '#e8f5e8' :
+                        result.validationType === 'ocr_limited' ? '#fff3cd' : '#f8f9fa',
+                      border: `1px solid ${result.validationType?.includes('sefaz') ? '#28a745' :
+                        result.validationType === 'ocr_limited' ? '#ffc107' : '#dee2e6'}`,
+                      fontSize: 12,
+                      color: '#555',
+                      textAlign: 'center'
+                    }} className="fade-in-security">
+                      {result.validationType?.includes('sefaz') && (
+                        <div>
+                          ✅ Validado oficialmente via SEFAZ
+                          {result.extractionMethod === 'barcode_extraction' && (
+                            <div style={{ fontSize: 11, marginTop: 2, color: '#0066cc' }}>
+                              📊 Chave extraída de código de barras
+                            </div>
+                          )}
+                          {result.extractionMethod === 'generated_key' && (
+                            <div style={{ fontSize: 11, marginTop: 2, color: '#0066cc' }}>
+                              🎯 Chave gerada e validada
+                            </div>
+                          )}
+                          {!result.extractionMethod && (
+                            <div style={{ fontSize: 11, marginTop: 2, color: '#0066cc' }}>
+                              🔑 Chave encontrada no texto
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {result.validationType === 'cnpj_validated' && (
+                        <div>🏛️ Validado via CNPJ da Receita Federal</div>
+                      )}
+                      {result.validationType === 'ocr_validated' && (
+                        <div>🔍 Validado com verificações anti-fraude</div>
+                      )}
+                      {result.validationType === 'ocr_limited' && (
+                        <>
+                          <div>⚠️ Pontos limitados por segurança</div>
+                          {result.originalPoints && (
+                            <div style={{ fontSize: 11, marginTop: 4 }}>
+                              Pontos originais: {result.originalPoints} → Creditados: {result.totalPoints}
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {result.chaveNFe && (
+                        <div style={{ marginTop: 4, fontSize: 11, fontFamily: 'monospace' }}>
+                          NFe: {result.chaveNFe.substring(0, 8)}...{result.chaveNFe.substring(result.chaveNFe.length - 8)}
+                        </div>
+                      )}
+                    </div>
+                  )}                  {/* Exibir código de retirada se existir */}
                   {result.codigo_resgate && showAnimatedRows && (
                     <div className="fade-in-codigo">
                       <CodigoAviso><FiInfo style={{ fontSize: 18, color: '#A91918' }} /> Apresente este código para retirar seu produto em uma loja credenciada:</CodigoAviso>
@@ -1152,19 +1347,24 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
               animation-delay: 1.8s;
               animation-fill-mode: both;
             }
-            .fade-in-codigo {
+            .fade-in-security {
               animation: fadeInRow 0.6s ease-out;
               animation-delay: 2s;
               animation-fill-mode: both;
             }
-            .fade-in-status {
+            .fade-in-codigo {
               animation: fadeInRow 0.6s ease-out;
               animation-delay: 2.2s;
               animation-fill-mode: both;
             }
-            .fade-in-button {
+            .fade-in-status {
               animation: fadeInRow 0.6s ease-out;
               animation-delay: 2.4s;
+              animation-fill-mode: both;
+            }
+            .fade-in-button {
+              animation: fadeInRow 0.6s ease-out;
+              animation-delay: 2.6s;
               animation-fill-mode: both;
             }
           `}</style>

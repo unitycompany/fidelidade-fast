@@ -25,7 +25,13 @@ ETAPA 1 - EXTRAÇÃO COMPLETA:
 3. Para cada produto, extraia: código, descrição, quantidade, valor unitário, valor total
 4. NÃO ignore produtos - liste TUDO que encontrar
 
-ETAPA 2 - CLASSIFICAÇÃO:
+ETAPA 2 - CÓDIGO DE BARRAS E CHAVE NFE:
+1. Procure por códigos de barras (sequências longas de números)
+2. Procure por "Chave de Acesso NFe" ou similar
+3. Se encontrar código de barras, extraia TODOS os números
+4. Códigos de barras NFe têm 44 dígitos numéricos
+
+ETAPA 3 - CLASSIFICAÇÃO:
 Produtos Fast Sistemas elegíveis para pontos:
 - Placa ST (DW00057, DW00058) → 0,5 pontos/R$
 - Guia Drywall (DW00074) → 1 ponto/R$
@@ -36,7 +42,7 @@ Produtos Fast Sistemas elegíveis para pontos:
 - Malha Glasroc (MT00001, MT00002) → 2 pontos/R$
 - Basecoat (BC00001, BC00002) → 2 pontos/R$
 
-ETAPA 3 - TOLERÂNCIA A ERROS OCR:
+ETAPA 4 - TOLERÂNCIA A ERROS OCR:
 - "PLAGA ST" = "PLACA ST"
 - "DW0O057" = "DW00057" (O maiúsculo = zero)
 - "1OO,OO" = "100,00" (O maiúsculo = zero)
@@ -48,6 +54,7 @@ REGRAS DE EXTRAÇÃO:
 3. Se valor não claro, use qualquer valor numérico da linha
 4. Se código ausente, use descrição
 5. NUNCA ignore um produto por falta de dados
+6. SEMPRE extraia códigos de barras e chaves NFe quando visíveis
 
 IMPORTANTE - EXTRAÇÃO MÁXIMA:
 - Prefira incluir produtos com dados incompletos a perdê-los
@@ -364,6 +371,7 @@ RETORNE APENAS JSON, SEM TEXTO ADICIONAL!
             return {
                 sucesso: true,
                 dados: dadosExtraidos,
+                rawText: text, // Incluir resposta completa para validação anti-fraude
                 confianca: dadosExtraidos.validacoes?.confianca || 0,
                 metodo: 'gemini_visao'
             };
