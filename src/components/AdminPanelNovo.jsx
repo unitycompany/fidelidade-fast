@@ -82,7 +82,7 @@ const Button = styled.button`
   }
 `;
 
-function AdminPanelNovo({ section = 'config' }) {
+function AdminPanelNovo({ section = 'config', user }) {
   const [pointsPerRealState, setPointsPerRealState] = useState(1);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ function AdminPanelNovo({ section = 'config' }) {
           <Button onClick={handleSaveConfig}>Salvar Configuração</Button>
         </ConfigSection>
       )}
-      {section === 'resgates' && <AdminResgates />}
+      {section === 'resgates' && <AdminResgates user={user} />}
       {section === 'catalogo' && <AdminPremios />}
       {section === 'estatisticas' && <AdminEstatisticasNovo />}
     </Container>

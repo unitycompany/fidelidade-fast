@@ -245,8 +245,8 @@ const MobileLogo = styled.img`
 `;
 
 const MobilePoints = styled.div`
-  color: ${props => props.theme.colors.primary};
-  font-weight: bold;
+  color: #1d1d1b;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 0.3rem;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { FiGift, FiClock, FiCheckCircle, FiCopy, FiMapPin, FiInfo, FiCalendar, FiHash } from 'react-icons/fi';
+import { FiGift, FiClock, FiCheckCircle, FiCopy, FiMapPin, FiInfo, FiCalendar, FiHash, FiUser } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
@@ -156,7 +156,7 @@ const ResgateCard = styled.div`
   border: 1px solid #e3e6ea;
   animation: ${fadeInUp} 0.3s ease-out;
   
-  /* Destaque para itens coletados */
+  /* Destaque para itens retirados */
   ${({ isColetado }) => isColetado && `
     background: #eafaf1;
     border-color: #3CB371;
@@ -307,7 +307,7 @@ const StatusBadge = styled.span`
   font-size: 0.8rem;
   color: #fff;
   background: ${({ status }) =>
-    status === 'Coletado' ? '#3CB371' :
+    status === 'Retirado' ? '#3CB371' :
       status === 'Disponível' ? '#FFC107' :
         '#6c757d'};
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
@@ -319,7 +319,7 @@ const StatusBadge = styled.span`
   }
 `;
 
-// Linha destacada para coletado
+// Linha destacada para retirado
 const ColetadoRow = styled.tr`
   background: #eafaf1 !important;
 `;
@@ -397,6 +397,8 @@ function MeusResgates({ usuario, onClose, showAsSection = false }) {
                     created_at,
                     coletado,
                     data_coleta,
+                    gerente_retirada,
+                    usuario_retirada_id,
                     pontos_utilizados,
                     status,
                     premio_id,
@@ -443,12 +445,14 @@ function MeusResgates({ usuario, onClose, showAsSection = false }) {
           data_resgate: resgate.created_at,
           coletado: resgate.coletado || false,
           data_coleta: resgate.data_coleta,
+          gerente_retirada: resgate.gerente_retirada,
+          usuario_retirada_id: resgate.usuario_retirada_id,
           pontos_utilizados: resgate.pontos_utilizados,
           status: resgate.status,
           premio_nome: premio.nome || 'Prêmio',
           premio_descricao: premio.descricao || '',
           premio_categoria: premio.categoria || 'Geral',
-          status_coleta: resgate.coletado ? 'Coletado' : 'Aguardando Coleta'
+          status_retirada: resgate.coletado ? 'Retirado' : 'Aguardando Retirada'
         };
       });
 
@@ -504,101 +508,110 @@ function MeusResgates({ usuario, onClose, showAsSection = false }) {
           <p>Você ainda não realizou nenhum resgate de prêmios.</p>
         </EmptyState>
       ) : ( */}
-        <ResgatesContainer>
-          <ResgatesGrid>
-            {/* Tabela para Desktop */}
-            <ResgatesTable>
-              <thead>
-                <tr>
-                  <ResgatesTh>Prêmio</ResgatesTh>
-                  <ResgatesTh>Pontos Utilizados</ResgatesTh>
-                  <ResgatesTh>Data do Resgate</ResgatesTh>
-                  <ResgatesTh>Status</ResgatesTh>
-                  <ResgatesTh>Código</ResgatesTh>
-                  <ResgatesTh>Data da Coleta</ResgatesTh>
-                </tr>
-              </thead>
-              <tbody>
-                {resgates.map(resgate => {
-                  const isColetado = resgate.status_coleta === 'Coletado';
-                  const RowTag = isColetado ? ColetadoRow : 'tr';
-                  return (
-                    <RowTag key={resgate.id}>
-                      <ResgatesTd>{resgate.premio_nome}</ResgatesTd>
-                      <ResgatesTd>{resgate.pontos_utilizados}</ResgatesTd>
-                      <ResgatesTd>{formatarData(resgate.data_resgate)}</ResgatesTd>
-                      <ResgatesTd>
-                        <StatusBadge status={resgate.status_coleta}>
-                          {resgate.status_coleta}
-                        </StatusBadge>
-                      </ResgatesTd>
-                      <ResgatesTd>{resgate.codigo_resgate || '-'}</ResgatesTd>
-                      <ResgatesTd>{resgate.data_coleta ? formatarData(resgate.data_coleta) : '-'}</ResgatesTd>
-                    </RowTag>
-                  );
-                })}
-              </tbody>
-            </ResgatesTable>
+      <ResgatesContainer>
+        <ResgatesGrid>
+          {/* Tabela para Desktop */}
+          <ResgatesTable>
+            <thead>
+              <tr>
+                <ResgatesTh>Prêmio</ResgatesTh>
+                <ResgatesTh>Pontos Utilizados</ResgatesTh>
+                <ResgatesTh>Data do Resgate</ResgatesTh>
+                <ResgatesTh>Status</ResgatesTh>
+                <ResgatesTh>Código</ResgatesTh>
+                <ResgatesTh>Data da Retirada</ResgatesTh>
+              </tr>
+            </thead>
+            <tbody>
+              {resgates.map(resgate => {
+                const isRetirado = resgate.status_retirada === 'Retirado';
+                const RowTag = isRetirado ? ColetadoRow : 'tr';
+                return (
+                  <RowTag key={resgate.id}>
+                    <ResgatesTd>{resgate.premio_nome}</ResgatesTd>
+                    <ResgatesTd>{resgate.pontos_utilizados}</ResgatesTd>
+                    <ResgatesTd>{formatarData(resgate.data_resgate)}</ResgatesTd>
+                    <ResgatesTd>
+                      <StatusBadge status={resgate.status_retirada}>
+                        {resgate.status_retirada}
+                      </StatusBadge>
+                    </ResgatesTd>
+                    <ResgatesTd>{resgate.codigo_resgate || '-'}</ResgatesTd>
+                    <ResgatesTd>{resgate.data_coleta ? formatarData(resgate.data_coleta) : '-'}</ResgatesTd>
+                  </RowTag>
+                );
+              })}
+            </tbody>
+          </ResgatesTable>
 
-            {/* Cards para Mobile */}
-            {resgates.map(resgate => {
-              const isColetado = resgate.status_coleta === 'Coletado';
-              return (
-                <ResgateCard key={`card-${resgate.id}`} isColetado={isColetado}>
-                  <CardHeader>
-                    <CardTitle>{resgate.premio_nome}</CardTitle>
-                    <StatusBadge status={resgate.status_coleta}>
-                      {resgate.status_coleta}
-                    </StatusBadge>
-                  </CardHeader>
+          {/* Cards para Mobile */}
+          {resgates.map(resgate => {
+            const isRetirado = resgate.status_retirada === 'Retirado';
+            return (
+              <ResgateCard key={`card-${resgate.id}`} isColetado={isRetirado}>
+                <CardHeader>
+                  <CardTitle>{resgate.premio_nome}</CardTitle>
+                  <StatusBadge status={resgate.status_retirada}>
+                    {resgate.status_retirada}
+                  </StatusBadge>
+                </CardHeader>
 
-                  <CardInfo>
-                    <CardField>
-                      <CardLabel>
-                        <FiGift />
-                        Pontos Utilizados
-                      </CardLabel>
-                      <CardValue>{resgate.pontos_utilizados} pontos</CardValue>
-                    </CardField>
-                    <CardField>
-                      <CardLabel>
-                        <FiCalendar />
-                        Data do Resgate
-                      </CardLabel>
-                      <CardValue>{formatarData(resgate.data_resgate)}</CardValue>
-                    </CardField>
-                    {resgate.data_coleta && (
-                      <>
+                <CardInfo>
+                  <CardField>
+                    <CardLabel>
+                      <FiGift />
+                      Pontos Utilizados
+                    </CardLabel>
+                    <CardValue>{resgate.pontos_utilizados} pontos</CardValue>
+                  </CardField>
+                  <CardField>
+                    <CardLabel>
+                      <FiCalendar />
+                      Data do Resgate
+                    </CardLabel>
+                    <CardValue>{formatarData(resgate.data_resgate)}</CardValue>
+                  </CardField>
+                  {resgate.data_coleta && (
+                    <>
+                      <CardField>
+                        <CardLabel>
+                          <FiCheckCircle />
+                          Data da Retirada
+                        </CardLabel>
+                        <CardValue>{formatarData(resgate.data_coleta)}</CardValue>
+                      </CardField>
+                      {resgate.gerente_retirada && (
                         <CardField>
                           <CardLabel>
-                            <FiCheckCircle />
-                            Data da Coleta
+                            <FiUser />
+                            Retirado por
                           </CardLabel>
-                          <CardValue>{formatarData(resgate.data_coleta)}</CardValue>
+                          <CardValue>{resgate.gerente_retirada}</CardValue>
                         </CardField>
-                      </>
-                    )}
-                  </CardInfo>
-
-                  {resgate.codigo_resgate && (
-                    <CardFooter>
-                      <CardField style={{ width: '100%' }}>
-                        <CardLabel>
-                          <FiHash />
-                          Código do Resgate
-                        </CardLabel>
-                        <CardCode>
-                          <FiCopy />
-                          {resgate.codigo_resgate}
-                        </CardCode>
-                      </CardField>
-                    </CardFooter>
+                      )}
+                    </>
                   )}
-                </ResgateCard>
-              );
-            })}
-          </ResgatesGrid>
-        </ResgatesContainer>
+                </CardInfo>
+
+                {resgate.codigo_resgate && (
+                  <CardFooter>
+                    <CardField style={{ width: '100%' }}>
+                      <CardLabel>
+                        <FiHash />
+                        Código do Resgate
+                      </CardLabel>
+                      <CardCode>
+                        <FiCopy />
+                        {resgate.codigo_resgate}
+                      </CardCode>
+                    </CardField>
+                  </CardFooter>
+                )}
+              </ResgateCard>
+            );
+          })}
+        </ResgatesGrid>
+      </ResgatesContainer>
     </>
   );
 

@@ -29,7 +29,6 @@ const Container = styled.div`
 
 const Header = styled.div`
   background: white;
-  border-radius: 5px;
   padding: 2rem;
   margin-bottom: 2rem;
   box-shadow: ${props => props.theme.shadows.md};
@@ -51,7 +50,6 @@ const Header = styled.div`
 
 const Filters = styled.div`
   background: white;
-  border-radius: 5px;
   padding: 1.5rem;
   margin-bottom: 2rem;
   box-shadow: ${props => props.theme.shadows.md};
@@ -66,8 +64,7 @@ const SearchInput = styled.input`
   flex: 1;
   min-width: 300px;
   padding: 0.75rem 1rem 0.75rem 2.5rem;
-  border: 2px solid ${props => props.theme.colors.gray200};
-  border-radius: 5px;
+  border: 1px solid ${props => props.theme.colors.gray200};
   font-size: 1rem;
   transition: border-color 0.3s ease;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23666' viewBox='0 0 24 24'%3E%3Cpath d='M23.809 21.646l-6.205-6.205c1.167-1.605 1.857-3.579 1.857-5.711 0-5.365-4.365-9.73-9.731-9.73-5.365 0-9.73 4.365-9.73 9.73 0 5.366 4.365 9.73 9.73 9.73 2.034 0 3.923-.627 5.487-1.698l6.238 6.238 2.354-2.354zm-20.955-11.916c0-3.792 3.085-6.877 6.877-6.877s6.877 3.085 6.877 6.877-3.085 6.877-6.877 6.877-6.877-3.085-6.877-6.877z'/%3E%3C/svg%3E");
@@ -82,8 +79,7 @@ const SearchInput = styled.input`
 
 const FilterSelect = styled.select`
   padding: 0.75rem 1rem;
-  border: 2px solid ${props => props.theme.colors.gray200};
-  border-radius: 5px;
+  border: 1px solid ${props => props.theme.colors.gray200};
   font-size: 1rem;
   background: white;
   min-width: 150px;
@@ -103,10 +99,9 @@ const Stats = styled.div`
 
 const StatCard = styled.div`
   background: white;
-  border-radius: 5px;
   padding: 1.5rem;
   box-shadow: ${props => props.theme.shadows.md};
-  border-left: 4px solid ${props => props.color || props.theme.colors.primary};
+  border-left: 2px solid ${props => props.color || props.theme.colors.primary};
   animation: ${fadeInUp} 0.6s ease-out ${props => props.delay || '0s'} both;
   
   .value {
@@ -126,7 +121,6 @@ const StatCard = styled.div`
 
 const ResgatesTable = styled.div`
   background: white;
-  border-radius: 5px;
   box-shadow: ${props => props.theme.shadows.md};
   overflow: hidden;
   animation: ${fadeInUp} 0.6s ease-out 0.3s both;
@@ -176,7 +170,6 @@ const TableRow = styled.div`
 
 const StatusBadge = styled.span`
   padding: 0.25rem 0.75rem;
-  border-radius: 5px;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -196,7 +189,6 @@ const StatusBadge = styled.span`
 const ActionButton = styled.button`
   padding: 0.5rem 1rem;
   border: none;
-  border-radius: 5px;
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 600;
@@ -248,7 +240,6 @@ const Modal = styled.div`
 
 const ModalContent = styled.div`
   background: white;
-  border-radius: 5px;
   padding: 2rem;
   max-width: 500px;
   width: 100%;
@@ -264,8 +255,7 @@ const ModalContent = styled.div`
 
 const CodigoDestaque = styled.div`
   background: ${props => props.theme.colors.gray50};
-  border: 2px dashed ${props => props.theme.colors.primary};
-  border-radius: 5px;
+  border: 1px dashed ${props => props.theme.colors.primary};
   padding: 1rem;
   margin: 1rem 0;
   text-align: center;
@@ -279,7 +269,7 @@ const CodigoDestaque = styled.div`
   }
 `;
 
-function AdminResgates() {
+function AdminResgates({ user }) {
     const [resgates, setResgates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filtroStatus, setFiltroStatus] = useState('todos');
@@ -327,6 +317,8 @@ function AdminResgates() {
                 data_resgate: resgate.created_at,
                 coletado: resgate.coletado || false,
                 data_coleta: resgate.data_coleta,
+                gerente_retirada: resgate.gerente_retirada,
+                usuario_retirada_id: resgate.usuario_retirada_id,
                 pontos_utilizados: resgate.pontos_utilizados,
                 status: resgate.status,
                 // Dados do cliente
@@ -339,7 +331,7 @@ function AdminResgates() {
                 premio_descricao: resgate.premios_catalogo.descricao,
                 premio_pontos: resgate.premios_catalogo.pontos_necessarios,
                 // Status formatado
-                status_coleta: resgate.coletado ? 'Coletado' : 'Aguardando Coleta'
+                status_retirada: resgate.coletado ? 'Retirado' : 'Aguardando Retirada'
             })) || [];
 
             setResgates(resgatesFormatados);
@@ -347,14 +339,14 @@ function AdminResgates() {
             // Calcular estatísticas
             const total = resgatesFormatados?.length || 0;
             const pendentes = resgatesFormatados?.filter(r => !r.coletado).length || 0;
-            const coletados = resgatesFormatados?.filter(r => r.coletado).length || 0;
+            const retirados = resgatesFormatados?.filter(r => r.coletado).length || 0;
             const hoje = resgatesFormatados?.filter(r => {
                 const dataResgate = new Date(r.data_resgate);
                 const hoje = new Date();
                 return dataResgate.toDateString() === hoje.toDateString();
             }).length || 0;
 
-            setStats({ total, pendentes, coletados, hoje });
+            setStats({ total, pendentes, coletados: retirados, hoje });
 
         } catch (error) {
             console.error('Erro ao carregar resgates:', error);
@@ -372,12 +364,19 @@ function AdminResgates() {
         try {
             setProcessando(true);
 
-            // Atualizar resgate como coletado usando o código
+            // Preparar informações do gerente e loja
+            const gerenteNome = user?.nome || 'Gerente';
+            const lojaNome = user?.lojas?.nome || 'Loja';
+            const gerenteInfo = `${gerenteNome} | ${lojaNome}`;
+
+            // Atualizar resgate como retirado usando o código
             const { data, error } = await supabase
                 .from('resgates')
                 .update({
                     coletado: true,
-                    data_coleta: new Date().toISOString()
+                    data_coleta: new Date().toISOString(),
+                    gerente_retirada: gerenteInfo,
+                    usuario_retirada_id: user?.id
                 })
                 .eq('codigo_resgate', codigo)
                 .select()
@@ -409,7 +408,7 @@ function AdminResgates() {
 
         const matchStatus = filtroStatus === 'todos' ||
             (filtroStatus === 'pendentes' && !resgate.coletado) ||
-            (filtroStatus === 'coletados' && resgate.coletado);
+            (filtroStatus === 'retirados' && resgate.coletado);
 
         return matchBusca && matchStatus;
     });
@@ -426,13 +425,6 @@ function AdminResgates() {
 
     return (
         <Container>
-            <Header>
-                <h1>
-                    <FiGift />
-                    Administração de Resgates
-                </h1>
-                <p>Gerencie todos os resgates de prêmios realizados pelos clientes</p>
-            </Header>
 
             <Stats>
                 <StatCard color="#007bff" delay="0.1s">
@@ -466,7 +458,7 @@ function AdminResgates() {
                 >
                     <option value="todos">Todos os Status</option>
                     <option value="pendentes">Aguardando</option>
-                    <option value="coletados">Entregues</option>
+                    <option value="retirados">Entregues</option>
                 </FilterSelect>
             </Filters>
 
@@ -512,8 +504,22 @@ function AdminResgates() {
 
                         <div>
                             <StatusBadge status={resgate.coletado ? 'resgatado' : 'pendente'}>
-                                {resgate.status_coleta}
+                                {resgate.status_retirada}
                             </StatusBadge>
+                            {resgate.coletado && resgate.data_coleta && (
+                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                                    <div style={{ fontWeight: '500' }}>
+                                        Data da Entrega: {new Date(resgate.data_coleta).toLocaleDateString('pt-BR')}
+                                    </div>
+                                </div>
+                            )}
+                            {resgate.coletado && resgate.gerente_retirada && (
+                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                                    <div style={{ fontWeight: '500' }}>
+                                        Retirado por: {resgate.gerente_retirada}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -571,12 +577,18 @@ function AdminResgates() {
                         <div style={{ marginBottom: '1rem' }}>
                             <strong>Data do Resgate:</strong> {new Date(modalDetalhes.data_resgate).toLocaleString('pt-BR')}<br />
                             <strong>Pontos Utilizados:</strong> {modalDetalhes.pontos_utilizados}<br />
-                            <strong>Status:</strong> {modalDetalhes.status_coleta}
+                            <strong>Status:</strong> {modalDetalhes.status_retirada}
                         </div>
 
                         {modalDetalhes.coletado && modalDetalhes.data_coleta && (
                             <div style={{ marginBottom: '1rem' }}>
                                 <strong>Data da Entrega:</strong> {new Date(modalDetalhes.data_coleta).toLocaleString('pt-BR')}
+                                {modalDetalhes.gerente_retirada && (
+                                    <>
+                                        <br />
+                                        <strong>Retirado por:</strong> {modalDetalhes.gerente_retirada}
+                                    </>
+                                )}
                             </div>
                         )}
 

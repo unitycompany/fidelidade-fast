@@ -212,7 +212,7 @@ function App() {
       case 'admin-config':
         return temPermissao('admin') ? <AdminPanelNovo section="config" /> : <div>Acesso negado</div>
       case 'admin-resgates':
-        return temPermissao('gerente') ? <AdminPanelNovo section="resgates" /> : <div>Acesso negado</div>
+        return temPermissao('gerente') ? <AdminPanelNovo section="resgates" user={user} /> : <div>Acesso negado</div>
       case 'admin-catalogo':
         return temPermissao('admin') ? <AdminPanelNovo section="catalogo" /> : <div>Acesso negado</div>
       case 'admin-estatisticas':
@@ -222,7 +222,7 @@ function App() {
 
       // Página específica para Gerentes
       case 'gerente-resgates':
-        return temPermissao('gerente') ? <GerenteResgates user={user} /> : <div>Acesso negado</div>
+        return temPermissao('gerente') ? <AdminPanelNovo section="resgates" user={user} /> : <div>Acesso negado</div>
 
       // Páginas de debug/desenvolvimento (apenas admin)
       case 'debug':

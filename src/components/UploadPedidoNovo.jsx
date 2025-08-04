@@ -235,7 +235,7 @@ const StatusBadge = styled.span`
   font-size: 13px;
   color: #fff;
   background: ${({ status }) =>
-    status === 'Coletado' ? '#3CB371' : '#FFC107'};
+    status === 'Retirado' ? '#3CB371' : '#FFC107'};
   margin-left: 6px;
   vertical-align: middle;
 `;

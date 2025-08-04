@@ -119,8 +119,8 @@ const PremioInfo = styled.div`
 
 const StatusBadge = styled.div`
   background: ${props => props.$coletado ?
-        'linear-gradient(135deg, #28a745, #20c997)' :
-        'linear-gradient(135deg, #ffc107, #fd7e14)'};
+    'linear-gradient(135deg, #28a745, #20c997)' :
+    'linear-gradient(135deg, #ffc107, #fd7e14)'};
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 20px;
@@ -220,193 +220,203 @@ const LoadingContainer = styled.div`
 `;
 
 function MeusResgatesLimpo({ usuario, onClose, showAsSection = false }) {
-    const [resgates, setResgates] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const [resgates, setResgates] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (usuario?.id) {
-            carregarResgates();
-        }
-    }, [usuario?.id]);
+  useEffect(() => {
+    if (usuario?.id) {
+      carregarResgates();
+    }
+  }, [usuario?.id]);
 
-    const carregarResgates = async () => {
-        try {
-            setLoading(true);
+  const carregarResgates = async () => {
+    try {
+      setLoading(true);
 
-            // Buscar resgates diretamente da tabela resgates
-            const { data: resgatesData, error: resgatesError } = await supabase
-                .from('resgates')
-                .select(`
+      // Buscar resgates diretamente da tabela resgates
+      const { data: resgatesData, error: resgatesError } = await supabase
+        .from('resgates')
+        .select(`
                     id,
                     codigo_resgate,
                     created_at,
                     coletado,
                     data_coleta,
+                    gerente_retirada,
+                    usuario_retirada_id,
                     pontos_utilizados,
                     status,
                     premio_id
                 `)
-                .eq('cliente_id', usuario.id)
-                .eq('status', 'confirmado')
-                .order('created_at', { ascending: false })
-                .limit(10);
+        .eq('cliente_id', usuario.id)
+        .eq('status', 'confirmado')
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-            if (resgatesError) throw resgatesError;
+      if (resgatesError) throw resgatesError;
 
-            if (!resgatesData || resgatesData.length === 0) {
-                setResgates([]);
-                return;
-            }
+      if (!resgatesData || resgatesData.length === 0) {
+        setResgates([]);
+        return;
+      }
 
-            // Buscar dados dos prêmios separadamente
-            const premioIds = resgatesData.map(r => r.premio_id);
-            const { data: premiosData, error: premiosError } = await supabase
-                .from('premios_catalogo')
-                .select('id, nome, descricao, categoria')
-                .in('id', premioIds);
+      // Buscar dados dos prêmios separadamente
+      const premioIds = resgatesData.map(r => r.premio_id);
+      const { data: premiosData, error: premiosError } = await supabase
+        .from('premios_catalogo')
+        .select('id, nome, descricao, categoria')
+        .in('id', premioIds);
 
-            if (premiosError) {
-                console.error('Erro ao buscar prêmios:', premiosError);
-                // Continuar mesmo sem dados dos prêmios
-            }
+      if (premiosError) {
+        console.error('Erro ao buscar prêmios:', premiosError);
+        // Continuar mesmo sem dados dos prêmios
+      }
 
-            // Combinar dados
-            const resgatesCombinados = resgatesData.map(resgate => {
-                const premio = premiosData?.find(p => p.id === resgate.premio_id) || {};
+      // Combinar dados
+      const resgatesCombinados = resgatesData.map(resgate => {
+        const premio = premiosData?.find(p => p.id === resgate.premio_id) || {};
 
-                return {
-                    id: resgate.id,
-                    codigo_resgate: resgate.codigo_resgate,
-                    data_resgate: resgate.created_at,
-                    coletado: resgate.coletado || false,
-                    data_coleta: resgate.data_coleta,
-                    pontos_utilizados: resgate.pontos_utilizados,
-                    status: resgate.status,
-                    premio_nome: premio.nome || 'Prêmio',
-                    premio_descricao: premio.descricao || '',
-                    premio_categoria: premio.categoria || 'Geral',
-                    status_coleta: resgate.coletado ? 'Coletado' : 'Aguardando Coleta'
-                };
-            });
+        return {
+          id: resgate.id,
+          codigo_resgate: resgate.codigo_resgate,
+          data_resgate: resgate.created_at,
+          coletado: resgate.coletado || false,
+          data_coleta: resgate.data_coleta,
+          gerente_retirada: resgate.gerente_retirada,
+          usuario_retirada_id: resgate.usuario_retirada_id,
+          pontos_utilizados: resgate.pontos_utilizados,
+          status: resgate.status,
+          premio_nome: premio.nome || 'Prêmio',
+          premio_descricao: premio.descricao || '',
+          premio_categoria: premio.categoria || 'Geral',
+          status_retirada: resgate.coletado ? 'Retirado' : 'Aguardando Retirada'
+        };
+      });
 
-            setResgates(resgatesCombinados);
+      setResgates(resgatesCombinados);
 
-        } catch (error) {
-            console.error('Erro ao carregar resgates:', error);
-            setResgates([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const copiarCodigo = (codigo) => {
-        navigator.clipboard.writeText(codigo);
-        toast.success(`Código ${codigo} copiado!`);
-    };
-
-    const formatarData = (dataString) => {
-        return new Date(dataString).toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
-    if (loading) {
-        return (
-            <Container>
-                <LoadingContainer>
-                    <div>Carregando resgates...</div>
-                </LoadingContainer>
-            </Container>
-        );
+    } catch (error) {
+      console.error('Erro ao carregar resgates:', error);
+      setResgates([]);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const ContainerComponent = showAsSection ? React.Fragment : Container;
-    const content = (
-        <>
-            {!showAsSection && (
-                <Header>
-                    <Title>Meus Resgates</Title>
-                    <Subtitle>Acompanhe o status dos seus resgates realizados</Subtitle>
-                </Header>
-            )}
+  const copiarCodigo = (codigo) => {
+    navigator.clipboard.writeText(codigo);
+    toast.success(`Código ${codigo} copiado!`);
+  };
 
-            {resgates.length === 0 ? (
-                <EmptyState>
-                    <FiGift />
-                    <h3>Nenhum resgate encontrado</h3>
-                    <p>Você ainda não realizou nenhum resgate de prêmios.</p>
-                </EmptyState>
-            ) : (
-                <ResgatesList>
-                    {resgates.map(resgate => (
-                        <ResgateCard key={resgate.id} $coletado={resgate.coletado}>
-                            <ResgateHeader>
-                                <PremioInfo>
-                                    <h3>{resgate.premio_nome}</h3>
-                                    <p>{resgate.premio_descricao}</p>
-                                </PremioInfo>
+  const formatarData = (dataString) => {
+    return new Date(dataString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
-                                <StatusBadge $coletado={resgate.coletado}>
-                                    {resgate.coletado ? <FiCheckCircle /> : <FiClock />}
-                                    {resgate.status_coleta}
-                                </StatusBadge>
-                            </ResgateHeader>
-
-                            {resgate.codigo_resgate && (
-                                <CodigoSection>
-                                    <div style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                                        Código de Resgate:
-                                    </div>
-                                    <CodigoTexto>{resgate.codigo_resgate}</CodigoTexto>
-                                    <CopiarButton onClick={() => copiarCodigo(resgate.codigo_resgate)}>
-                                        <FiCopy />
-                                        Copiar Código
-                                    </CopiarButton>
-                                </CodigoSection>
-                            )}
-
-                            <InfoDetalhes>
-                                <InfoItem>
-                                    <div className="label">Data do Resgate</div>
-                                    <div className="value">{formatarData(resgate.data_resgate)}</div>
-                                </InfoItem>
-                                <InfoItem>
-                                    <div className="label">Pontos Utilizados</div>
-                                    <div className="value">{resgate.pontos_utilizados}</div>
-                                </InfoItem>
-                                <InfoItem>
-                                    <div className="label">Categoria</div>
-                                    <div className="value">{resgate.premio_categoria}</div>
-                                </InfoItem>
-                                {resgate.data_coleta && (
-                                    <InfoItem>
-                                        <div className="label">Data da Coleta</div>
-                                        <div className="value">{formatarData(resgate.data_coleta)}</div>
-                                    </InfoItem>
-                                )}
-                            </InfoDetalhes>
-                        </ResgateCard>
-                    ))}
-                </ResgatesList>
-            )}
-        </>
+  if (loading) {
+    return (
+      <Container>
+        <LoadingContainer>
+          <div>Carregando resgates...</div>
+        </LoadingContainer>
+      </Container>
     );
+  }
 
-    return showAsSection ? (
-        <MainContent>
-            {content}
-        </MainContent>
-    ) : (
-        <Container>
-            <MainContent>
-                {content}
-            </MainContent>
-        </Container>
-    );
+  const ContainerComponent = showAsSection ? React.Fragment : Container;
+  const content = (
+    <>
+      {!showAsSection && (
+        <Header>
+          <Title>Meus Resgates</Title>
+          <Subtitle>Acompanhe o status dos seus resgates realizados</Subtitle>
+        </Header>
+      )}
+
+      {resgates.length === 0 ? (
+        <EmptyState>
+          <FiGift />
+          <h3>Nenhum resgate encontrado</h3>
+          <p>Você ainda não realizou nenhum resgate de prêmios.</p>
+        </EmptyState>
+      ) : (
+        <ResgatesList>
+          {resgates.map(resgate => (
+            <ResgateCard key={resgate.id} $coletado={resgate.coletado}>
+              <ResgateHeader>
+                <PremioInfo>
+                  <h3>{resgate.premio_nome}</h3>
+                  <p>{resgate.premio_descricao}</p>
+                </PremioInfo>
+
+                <StatusBadge $coletado={resgate.coletado}>
+                  {resgate.coletado ? <FiCheckCircle /> : <FiClock />}
+                  {resgate.status_retirada}
+                </StatusBadge>
+              </ResgateHeader>
+
+              {resgate.codigo_resgate && (
+                <CodigoSection>
+                  <div style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                    Código de Resgate:
+                  </div>
+                  <CodigoTexto>{resgate.codigo_resgate}</CodigoTexto>
+                  <CopiarButton onClick={() => copiarCodigo(resgate.codigo_resgate)}>
+                    <FiCopy />
+                    Copiar Código
+                  </CopiarButton>
+                </CodigoSection>
+              )}
+
+              <InfoDetalhes>
+                <InfoItem>
+                  <div className="label">Data do Resgate</div>
+                  <div className="value">{formatarData(resgate.data_resgate)}</div>
+                </InfoItem>
+                <InfoItem>
+                  <div className="label">Pontos Utilizados</div>
+                  <div className="value">{resgate.pontos_utilizados}</div>
+                </InfoItem>
+                <InfoItem>
+                  <div className="label">Categoria</div>
+                  <div className="value">{resgate.premio_categoria}</div>
+                </InfoItem>
+                {resgate.data_coleta && (
+                  <InfoItem>
+                    <div className="label">Data da Retirada</div>
+                    <div className="value">{formatarData(resgate.data_coleta)}</div>
+                  </InfoItem>
+                )}
+                {resgate.gerente_retirada && (
+                  <InfoItem>
+                    <div className="label">Retirado por</div>
+                    <div className="value">{resgate.gerente_retirada}</div>
+                  </InfoItem>
+                )}
+              </InfoDetalhes>
+            </ResgateCard>
+          ))}
+        </ResgatesList>
+      )}
+    </>
+  );
+
+  return showAsSection ? (
+    <MainContent>
+      {content}
+    </MainContent>
+  ) : (
+    <Container>
+      <MainContent>
+        {content}
+      </MainContent>
+    </Container>
+  );
 }
 
 export default MeusResgatesLimpo;
