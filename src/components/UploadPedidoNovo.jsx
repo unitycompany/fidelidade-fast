@@ -45,6 +45,55 @@ const slideInUp = keyframes`
   }
 `;
 
+const fadeInRow = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const pointsAnimation = keyframes`
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const shine = keyframes`
+  0% {
+    background-position: -100% center;
+  }
+  100% {
+    background-position: 100% center;
+  }
+`;
+
+const bounceIn = keyframes`
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+`;
+
 // Container otimizado para responsividade
 const Container = styled.div`
   min-height: 100vh;
@@ -172,10 +221,10 @@ const MinimalButton = styled.button`
 const SecondaryButton = styled.button`
   background: transparent;
   color: #A91918;
-  border: 2px solid #A91918;
+  border: 1px solid #A91918;
   padding: 0.8rem 1.5rem;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 400;
   margin-top: 1.5rem;
   width: 100%;
   max-width: 320px;
@@ -194,24 +243,26 @@ const SecondaryButton = styled.button`
 const MinimalResult = styled.div`
   width: 100%;
   max-width: 480px;
-  background: #f9f9f9;
+  background: #fff;
   border: 1px solid #e3e6ea;
-  padding: 1.5rem 1rem;
+  padding: 2rem 1.5rem;
   margin-top: 1.5rem;
   text-align: center;
+  animation: ${bounceIn} 0.6s ease-out;
 
   @media (max-width: 600px) {
     max-width: 98vw;
-    padding: 1rem 0.5rem;
+    padding: 1.5rem 1rem;
   }
   h2 {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     color: #222;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+    animation: ${fadeInRow} 0.5s ease-out;
   }
   .success {
     color: #28a745;
@@ -223,6 +274,42 @@ const MinimalResult = styled.div`
     margin: 1rem 0 0.5rem 0;
     font-size: 1.05rem;
     color: #444;
+  }
+`;
+
+const AnimatedTableRow = styled.tr`
+  animation: ${fadeInRow} 0.6s ease-out;
+  animation-delay: ${props => props.delay || 0}s;
+  animation-fill-mode: both;
+`;
+
+const PointsHighlight = styled.div`
+  background: #A91918;
+  color: white;
+  padding: 1rem 1.5rem;
+  margin: 1.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 300;
+  text-align: center;
+  animation: ${pointsAnimation} 0.8s ease-out;
+  animation-delay: 1.6s;
+  animation-fill-mode: both;
+  position: relative;
+  overflow: hidden;
+  
+  .points-number {
+    background: linear-gradient(
+      90deg,
+      #fff 0%,
+      #dfdfdf 50%,
+      #fff 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: ${shine} 2s ease-in-out infinite;
+    font-weight: 500;
   }
 `;
 
@@ -408,6 +495,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
   const [completedSteps, setCompletedSteps] = useState([]);
   const [stepTextKey, setStepTextKey] = useState(0);
   const [showResult, setShowResult] = useState(false);
+  const [showAnimatedRows, setShowAnimatedRows] = useState(false);
 
   const processingSteps = [
     { id: 1, text: 'Analisando documento', icon: FiEye },
@@ -434,6 +522,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
     setCompletedSteps([]);
     setStepTextKey(0);
     setShowResult(false);
+    setShowAnimatedRows(false);
   };
 
   const handleFileInput = (e) => {
@@ -517,6 +606,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
             errorMessage: 'Limite diário do Google Gemini excedido.'
           });
           setShowResult(true);
+          setTimeout(() => {
+            setShowAnimatedRows(true);
+          }, 300);
           return;
 
           // Verificar se é erro de JSON malformado
@@ -552,6 +644,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
               errorMessage: 'Erro no processamento da imagem. O documento pode estar muito borrado ou com formato não suportado. Tente uma imagem mais nítida.'
             });
             setShowResult(true);
+            setTimeout(() => {
+              setShowAnimatedRows(true);
+            }, 300);
             return;
           }
         } else {
@@ -569,6 +664,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
             errorMessage: 'Erro no processamento da imagem. O documento pode estar muito borrado ou com formato não suportado. Tente uma imagem mais nítida.'
           });
           setShowResult(true);
+          setTimeout(() => {
+            setShowAnimatedRows(true);
+          }, 300);
           return;
         }
       }
@@ -805,6 +903,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
             errorMessage: 'Erro ao creditar pontos no banco de dados. Tente novamente.'
           });
           setShowResult(true);
+          setTimeout(() => {
+            setShowAnimatedRows(true);
+          }, 300);
           return;
         }
       } else {
@@ -852,6 +953,10 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       });
       setResult(resultadoSeguro);
       setShowResult(true);
+      // Iniciar animação das linhas após um pequeno delay
+      setTimeout(() => {
+        setShowAnimatedRows(true);
+      }, 300);
       console.log('✅ RESULTADO APLICADO COM SUCESSO');
 
     } catch (err) {
@@ -873,6 +978,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
           errorMessage: 'Limite diário da API excedido.'
         });
         setShowResult(true);
+        setTimeout(() => {
+          setShowAnimatedRows(true);
+        }, 300);
         return;
       }
 
@@ -889,6 +997,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         errorMessage: 'Erro no processamento da imagem. O documento pode estar muito borrado ou com formato não suportado. Tente uma imagem mais nítida.'
       });
       setShowResult(true);
+      setTimeout(() => {
+        setShowAnimatedRows(true);
+      }, 300);
     } finally {
       setIsProcessing(false);
     }
@@ -935,7 +1046,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
               {error && <div style={{ color: '#A91918', marginTop: 10, fontSize: 15, textAlign: 'center', width: '100%', maxWidth: 420 }}>{error}</div>}
             </>
           )}
-          
+
           {isProcessing && (
             <ProcessingContainer>
               <CurrentStep>
@@ -950,59 +1061,113 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
               </CurrentStep>
             </ProcessingContainer>
           )}
-          
+
           {showResult && result && (
             <>
               <MinimalResult>
-                <h2 className={result.error ? 'error' : 'success'} style={{ justifyContent: 'flex-start', fontSize: 18, marginBottom: 18 }}>
-                  {result.error ? <FiX /> : <FiCheck />} {result.error ? 'Erro' : 'Nota processada'}
+                <h2 className={result.error ? 'error' : 'success'} style={{ justifyContent: 'center', fontSize: 20, marginBottom: 24 }}>
+                  {result.error ? <FiX /> : <FiCheck />} {result.error ? 'Erro no processamento' : 'Nota processada com sucesso!'}
                 </h2>
                 <div className="summary" style={{ margin: 0 }}>
                   <ExcelTable>
                     <tbody>
-                      <tr>
-                        <ExcelTh>Pedido</ExcelTh>
-                        <ExcelTd>{result.orderNumber}</ExcelTd>
-                      </tr>
-                      <tr>
-                        <ExcelTh>Data de Expedição</ExcelTh>
-                        <ExcelTd>{result.orderDate ? new Date(result.orderDate).toLocaleDateString('pt-BR') : '-'}</ExcelTd>
-                      </tr>
-                      <tr>
-                        <ExcelTh>Pontos Recebidos</ExcelTh>
-                        <ExcelTd>{result.totalPoints}</ExcelTd>
-                      </tr>
-                      <tr>
-                        <ExcelTh>Valor Total da Nota</ExcelTh>
-                        <ExcelTd>R$ {Number(result.totalValue).toFixed(2)}</ExcelTd>
-                      </tr>
+                      {showAnimatedRows && (
+                        <>
+                          <AnimatedTableRow delay={0.1}>
+                            <ExcelTh>Pedido</ExcelTh>
+                            <ExcelTd>{result.orderNumber}</ExcelTd>
+                          </AnimatedTableRow>
+                          <AnimatedTableRow delay={0.3}>
+                            <ExcelTh>Data de Expedição</ExcelTh>
+                            <ExcelTd>{result.orderDate ? new Date(result.orderDate).toLocaleDateString('pt-BR') : '-'}</ExcelTd>
+                          </AnimatedTableRow>
+                          <AnimatedTableRow delay={0.5}>
+                            <ExcelTh>Valor Total da Nota</ExcelTh>
+                            <ExcelTd>R$ {Number(result.totalValue).toFixed(2)}</ExcelTd>
+                          </AnimatedTableRow>
+                        </>
+                      )}
                     </tbody>
                   </ExcelTable>
-                  <div style={{ color: '#555', fontSize: 14, marginTop: 12, textAlign: 'left' }}>
-                    {result.totalPoints} pontos recebidos para {Number(result.totalValue).toFixed(2)} reais
-                  </div>
+
+                  {showAnimatedRows && result.totalPoints > 0 && (
+                    <PointsHighlight>
+                      <span className="points-number">+{result.totalPoints}</span> pontos creditados
+                    </PointsHighlight>
+                  )}
+
+                  {showAnimatedRows && (
+                    <div style={{
+                      color: '#666',
+                      fontSize: 14,
+                      marginTop: 16,
+                      textAlign: 'center'
+                    }} className="fade-in-text">
+                      {result.totalPoints > 0 ?
+                        `${result.totalPoints} pontos foram creditados na sua conta` :
+                        'Nenhum ponto foi creditado para esta nota'
+                      }
+                    </div>
+                  )}
+
                   {/* Exibir código de retirada se existir */}
-                  {result.codigo_resgate && (
-                    <>
+                  {result.codigo_resgate && showAnimatedRows && (
+                    <div className="fade-in-codigo">
                       <CodigoAviso><FiInfo style={{ fontSize: 18, color: '#A91918' }} /> Apresente este código para retirar seu produto em uma loja credenciada:</CodigoAviso>
                       <CodigoBox>{result.codigo_resgate}</CodigoBox>
-                    </>
+                    </div>
                   )}
+
                   {/* Exemplo de status visual, se necessário */}
-                  {result.status && (
-                    <div style={{ marginTop: 8 }}>
+                  {result.status && showAnimatedRows && (
+                    <div className="fade-in-status" style={{ marginTop: 8 }}>
                       <StatusBadge status={result.status}>{result.status}</StatusBadge>
                     </div>
                   )}
                 </div>
               </MinimalResult>
-              <SecondaryButton onClick={resetForm}>
+              <SecondaryButton onClick={resetForm} className="fade-in-button">
                 Processar outra nota
               </SecondaryButton>
             </>
           )}
-          
-          <style>{`@keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }`}</style>
+
+          <style>{`
+            @keyframes spin { 
+              0%{transform:rotate(0deg);} 
+              100%{transform:rotate(360deg);} 
+            }
+            @keyframes fadeInRow {
+              from {
+                opacity: 0;
+                transform: translateY(20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+            .fade-in-text {
+              animation: fadeInRow 0.6s ease-out;
+              animation-delay: 1.8s;
+              animation-fill-mode: both;
+            }
+            .fade-in-codigo {
+              animation: fadeInRow 0.6s ease-out;
+              animation-delay: 2s;
+              animation-fill-mode: both;
+            }
+            .fade-in-status {
+              animation: fadeInRow 0.6s ease-out;
+              animation-delay: 2.2s;
+              animation-fill-mode: both;
+            }
+            .fade-in-button {
+              animation: fadeInRow 0.6s ease-out;
+              animation-delay: 2.4s;
+              animation-fill-mode: both;
+            }
+          `}</style>
         </MinimalContainer>
       </MainContent>
     </Container>
