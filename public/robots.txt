@@ -1,0 +1,41 @@
+# robots.txt para Fast Fidelidade
+
+User-agent: *
+Allow: /
+Allow: /src/assets/
+Allow: /premios
+Allow: /pontos
+Allow: /cadastro
+Allow: /login
+
+# Bloquear arquivos sensíveis
+Disallow: /admin/
+Disallow: /api/
+Disallow: /.env
+Disallow: /config/
+Disallow: /private/
+Disallow: /test/
+Disallow: /*.json$
+Disallow: /*.log$
+
+# Permitir bots de IA
+User-agent: GPTBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+# Sitemap
+Sitemap: https://clube.fastsistemasconstrutivos.com.br/sitemap.xml
+
+# Crawl-delay para não sobrecarregar o servidor
+Crawl-delay: 1

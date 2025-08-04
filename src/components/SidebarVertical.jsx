@@ -196,8 +196,7 @@ const adminItems = [
   { key: 'admin-resgates', label: 'Resgates Admin', icon: FiSettings },
   { key: 'admin-catalogo', label: 'Catálogo de Prêmios', icon: FiGift },
   { key: 'admin-estatisticas', label: 'Estatísticas', icon: FiBarChart2 },
-  { key: 'admin-usuarios', label: 'Usuários', icon: FiUsers },
-  { key: 'teste-imagem', label: '🧪 Teste Upload', icon: FiUpload }
+  { key: 'admin-usuarios', label: 'Usuários', icon: FiUsers }
 ];
 
 // Função para obter os itens corretos baseado no role do usuário

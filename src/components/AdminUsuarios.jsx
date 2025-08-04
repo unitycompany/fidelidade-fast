@@ -1182,7 +1182,7 @@ function AdminUsuarios({ user }) {
                                                         color: '#10B981',
                                                         background: '#F0FDF4',
                                                         padding: '0.25rem 0.5rem',
-                                                        
+
                                                         fontSize: '0.75rem',
                                                         fontWeight: 'bold'
                                                     }}>
@@ -1195,7 +1195,7 @@ function AdminUsuarios({ user }) {
                                                     fontSize: '0.875rem',
                                                     background: '#F7FAFC',
                                                     padding: '0.25rem 0.5rem',
-                                                    
+
                                                 }}>
                                                     Nenhum arquivo
                                                 </span>
@@ -1512,7 +1512,7 @@ function AdminUsuarios({ user }) {
                                         {historicoUsuario.length > 0 ? (
                                             <div style={{
                                                 border: '1px solid #E2E8F0',
-                                                
+
                                                 overflow: 'hidden',
                                                 background: 'white'
                                             }}>
@@ -1574,7 +1574,7 @@ function AdminUsuarios({ user }) {
                                                             }}>
                                                                 <span style={{
                                                                     padding: '0.25rem 0.5rem',
-                                                                    
+
                                                                     fontSize: '0.65rem',
                                                                     fontWeight: 'bold',
                                                                     color: 'white',
@@ -1660,7 +1660,7 @@ function AdminUsuarios({ user }) {
                                                 textAlign: 'center',
                                                 padding: '3rem',
                                                 background: '#F7FAFC',
-                                                
+
                                                 border: '1px solid #E2E8F0'
                                             }}>
                                                 <FiCheck size={48} style={{ color: '#A0AEC0', marginBottom: '1rem' }} />
@@ -1898,7 +1898,7 @@ function AdminUsuarios({ user }) {
                                                         key={imagem.id}
                                                         style={{
                                                             border: '1px solid #E2E8F0',
-                                                            
+
                                                             padding: '1rem',
                                                             background: 'white',
                                                             cursor: 'pointer',
@@ -1924,7 +1924,7 @@ function AdminUsuarios({ user }) {
                                                         }}>
                                                             <div style={{
                                                                 padding: '0.25rem 0.75rem',
-                                                                
+
                                                                 fontSize: '0.65rem',
                                                                 fontWeight: 'bold',
                                                                 color: 'white',
@@ -1953,7 +1953,7 @@ function AdminUsuarios({ user }) {
                                                                 backgroundImage: `url(${imagem.url_supabase})`,
                                                                 backgroundSize: 'cover',
                                                                 backgroundPosition: 'center',
-                                                                
+
                                                                 marginBottom: '0.75rem',
                                                                 border: '1px solid #E2E8F0',
                                                                 position: 'relative'
@@ -1965,7 +1965,7 @@ function AdminUsuarios({ user }) {
                                                                     left: 0,
                                                                     right: 0,
                                                                     background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                                                                    
+
                                                                     padding: '1rem 0.5rem 0.5rem',
                                                                     color: 'white',
                                                                     fontSize: '0.75rem'
@@ -1983,7 +1983,7 @@ function AdminUsuarios({ user }) {
                                                                 width: '100%',
                                                                 height: '140px',
                                                                 background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
-                                                                
+
                                                                 marginBottom: '0.75rem',
                                                                 border: '1px solid #E2E8F0',
                                                                 display: 'flex',
@@ -2081,7 +2081,7 @@ function AdminUsuarios({ user }) {
                                                                 marginTop: '0.75rem',
                                                                 padding: '0.5rem',
                                                                 background: '#F7FAFC',
-                                                                
+
                                                                 fontSize: '0.75rem'
                                                             }}>
                                                                 <div>
@@ -2108,7 +2108,7 @@ function AdminUsuarios({ user }) {
                                                                 padding: '0.5rem',
                                                                 background: 'linear-gradient(135deg, #cc1515 0%, #9b0c0c 100%)',
                                                                 color: 'white',
-                                                                
+
                                                                 fontSize: '0.75rem',
                                                                 fontWeight: 'bold',
                                                                 textTransform: 'uppercase',
@@ -2125,7 +2125,7 @@ function AdminUsuarios({ user }) {
                                                 textAlign: 'center',
                                                 padding: '3rem',
                                                 background: '#F7FAFC',
-                                                
+
                                                 border: '1px solid #E2E8F0'
                                             }}>
                                                 <FiAlertCircle size={48} style={{ color: '#A0AEC0', marginBottom: '1rem' }} />
@@ -2163,7 +2163,7 @@ function AdminUsuarios({ user }) {
                                     background: '#F7FAFC',
                                     padding: '1.5rem',
                                     marginBottom: '1.5rem',
-                                    
+
                                     border: '1px solid #E2E8F0'
                                 }}>
                                     <div style={{
@@ -2223,7 +2223,7 @@ function AdminUsuarios({ user }) {
                                             <div style={{
                                                 display: 'inline-block',
                                                 padding: '0.375rem 0.75rem',
-                                                
+
                                                 fontSize: '0.875rem',
                                                 fontWeight: 'bold',
                                                 color: 'white',
@@ -2262,7 +2262,7 @@ function AdminUsuarios({ user }) {
                                         <div style={{
                                             padding: '1rem',
                                             background: '#EBF8FF',
-                                            
+
                                             borderLeft: '4px solid #3B82F6',
                                             marginTop: '1rem'
                                         }}>
@@ -2281,7 +2281,7 @@ function AdminUsuarios({ user }) {
                                                 wordBreak: 'break-all',
                                                 padding: '0.5rem',
                                                 background: 'white',
-                                                
+
                                                 border: '1px solid #BFDBFE'
                                             }}>
                                                 {imagemSelecionada.chave_acesso}
@@ -2294,7 +2294,7 @@ function AdminUsuarios({ user }) {
                                         <div style={{
                                             padding: '1rem',
                                             background: '#F0FDF4',
-                                            
+
                                             borderLeft: '4px solid #10B981',
                                             marginTop: '1rem'
                                         }}>
@@ -2317,7 +2317,7 @@ function AdminUsuarios({ user }) {
                                         <div style={{
                                             padding: '1rem',
                                             background: '#FEF2F2',
-                                            
+
                                             borderLeft: '4px solid #EF4444',
                                             marginTop: '1rem'
                                         }}>
@@ -2347,7 +2347,7 @@ function AdminUsuarios({ user }) {
                                                 maxHeight: '70vh',
                                                 objectFit: 'contain',
                                                 border: '2px solid #E2E8F0',
-                                                
+
                                                 boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
                                             }}
                                         />
@@ -2355,7 +2355,7 @@ function AdminUsuarios({ user }) {
                                         <div style={{
                                             height: '70vh',
                                             border: '2px solid #E2E8F0',
-                                            
+
                                             boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
                                         }}>
                                             <iframe
@@ -2364,7 +2364,7 @@ function AdminUsuarios({ user }) {
                                                     width: '100%',
                                                     height: '100%',
                                                     border: 'none',
-                                                    
+
                                                 }}
                                                 title="Arquivo PDF"
                                             />
@@ -2373,7 +2373,7 @@ function AdminUsuarios({ user }) {
                                         <div style={{
                                             padding: '4rem',
                                             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                            
+
                                             textAlign: 'center',
                                             color: 'white',
                                             boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
@@ -2461,12 +2461,12 @@ function AdminUsuarios({ user }) {
                                     marginBottom: '1.5rem',
                                     padding: '1rem',
                                     background: '#F7FAFC',
-                                    
+
                                     border: '1px solid #E2E8F0'
                                 }}>
                                     <div style={{
                                         padding: '0.5rem 1rem',
-                                        
+
                                         fontSize: '0.875rem',
                                         fontWeight: 'bold',
                                         color: 'white',
