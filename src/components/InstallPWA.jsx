@@ -80,8 +80,8 @@ const InstallPWA = () => {
                 title="Instalar aplicativo Fast Fidelidade"
                 style={{
                     position: 'fixed',
-                    bottom: isMobile ? '20px' : '20px',
-                    right: isMobile ? '16px' : '20px',
+                    bottom: '20px',
+                    right: '20px',
                     backgroundColor: '#A91918',
                     color: 'white',
                     border: 'none',
@@ -98,8 +98,8 @@ const InstallPWA = () => {
                     boxShadow: '0 4px 12px rgba(169, 25, 24, 0.3)',
                     animation: 'pulseInstall 3s infinite',
                     transition: 'all 0.3s ease',
-                    minWidth: isMobile ? '120px' : 'auto',
-                    maxWidth: isMobile ? '140px' : 'none',
+                    minWidth: isMobile ? '100px' : 'auto',
+                    maxWidth: isMobile ? '120px' : 'none',
                     whiteSpace: 'nowrap'
                 }}
             >
@@ -128,37 +128,12 @@ const InstallPWA = () => {
           transform: translateY(0) scale(0.98);
         }
 
-        /* Posicionamento específico para mobile */
-        @media (max-width: 768px) {
-          .pwa-install-button {
-            position: fixed !important;
-            bottom: 20px !important;
-            right: 16px !important;
-            left: auto !important;
-            margin: 0 !important;
-            transform: none !important;
-          }
-          
-          .pwa-install-button:hover {
-            transform: translateY(-1px) scale(1.01) !important;
-          }
-        }
-
-        /* Ajustes para telas muito pequenas */
-        @media (max-width: 480px) {
-          .pwa-install-button {
-            bottom: 16px !important;
-            right: 12px !important;
-            padding: 8px 12px !important;
-            font-size: 12px !important;
-          }
-        }
-
-        /* Ajuste para quando há navigation bar no mobile */
-        @media (max-width: 768px) and (max-height: 700px) {
-          .pwa-install-button {
-            bottom: 80px !important;
-          }
+        /* Garantir posicionamento fixo em todas as telas */
+        .pwa-install-button {
+          position: fixed !important;
+          bottom: 20px !important;
+          right: 20px !important;
+          z-index: 1000 !important;
         }
       `}</style>
         </>

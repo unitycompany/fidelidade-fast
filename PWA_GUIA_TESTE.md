@@ -5,8 +5,10 @@
 ### 🎯 **Funcionalidades Ativas:**
 
 #### **1. Instalação PWA**
-- ✅ Botão "Instalar" no canto inferior direito
+- ✅ Botão "Instalar" fixo no canto inferior direito (20px da borda)
 - ✅ Funciona em Android, iOS e Desktop
+- ✅ Responsivo e bem posicionado em mobile
+- ✅ Instruções automáticas para iOS/Safari
 - ✅ Ícone personalizado na tela inicial
 - ✅ Splash screen com tema da Fast
 
@@ -37,9 +39,17 @@ npm run preview
 
 ### **2. Testar no Celular**
 - Acessar o site no Chrome/Safari
-- Botão "Instalar" aparece
-- Ou menu do navegador > "Adicionar à tela inicial"
+- Botão "Instalar" aparece fixo no canto inferior direito
+- **Android**: Funciona automaticamente com prompt nativo
+- **iOS**: Mostra instruções para "Adicionar à tela inicial"
 - App fica igual nativo na tela inicial
+
+### **📱 Correções Mobile Aplicadas:**
+- ✅ Botão fixo em `bottom: 20px` e `right: 20px`
+- ✅ Detecta mobile automaticamente
+- ✅ Instruções específicas para iOS/Safari
+- ✅ Funciona com prompt nativo do Android
+- ✅ Posicionamento consistente em todas as telas
 
 ### **3. Testar Notificações**
 
