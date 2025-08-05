@@ -34,6 +34,9 @@ export function registerSW() {
 let deferredPrompt;
 
 export function setupInstallPrompt() {
+    // Debug inicial
+    console.log('🔧 Configurando prompt de instalação...');
+
     window.addEventListener('beforeinstallprompt', (e) => {
         console.log('💾 Prompt de instalação disponível (desktop/Android)');
         // Previne o Chrome de mostrar o prompt automaticamente
@@ -58,17 +61,38 @@ export function setupInstallPrompt() {
         localStorage.setItem('pwa-installed', 'true');
     });
 
-    // Log inicial para debug
+    // Log detalhado para debug após carregamento
     setTimeout(() => {
-        console.log('🔍 Debug PWA:', {
+        const debugInfo = {
             isInstalled: isPWAInstalled(),
             hasPrompt: !!deferredPrompt,
             isStandalone: window.matchMedia('(display-mode: standalone)').matches,
-            userAgent: navigator.userAgent.substring(0, 50)
-        });
-    }, 2000);
+            userAgent: navigator.userAgent.substring(0, 50),
+            serviceWorkerSupported: 'serviceWorker' in navigator,
+            manifestLink: document.querySelector('link[rel="manifest"]')?.href,
+            isSecureContext: window.isSecureContext,
+            notificationPermission: Notification.permission
+        };
+
+        console.log('🔍 Debug PWA Completo:', debugInfo);
+
+        // Verificar se está atendendo aos critérios de PWA
+        if (!debugInfo.hasPrompt && !debugInfo.isInstalled) {
+            console.warn('⚠️ Prompt de instalação não disponível. Verifique:');
+            console.warn('1. Se está em HTTPS ou localhost');
+            console.warn('2. Se o manifest.json está acessível');
+            console.warn('3. Se o Service Worker está registrado');
+            console.warn('4. Se está usando Chrome/Edge no desktop');
+        }
+    }, 3000);
 }// Função para mostrar o prompt de instalação
 export async function showInstallPrompt() {
+    // Verificar se já está instalado
+    if (isPWAInstalled()) {
+        alert('O app já está instalado! 🎉');
+        return false;
+    }
+
     if (!deferredPrompt) {
         console.log('Prompt de instalação não disponível');
 
@@ -76,8 +100,21 @@ export async function showInstallPrompt() {
         const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const isAndroid = /Android/.test(navigator.userAgent);
+        const isDesktop = !isMobile;
 
-        if (isIOS) {
+        if (isDesktop) {
+            // Para desktop, dar instruções específicas do Chrome/Edge
+            alert(
+                '💻 Para instalar o Fast Fidelidade no computador:\n\n' +
+                '🔍 MÉTODO 1 - Barra de endereços:\n' +
+                '• Procure o ícone de instalação (⊕) na barra de endereços\n' +
+                '• Clique nele e depois em "Instalar"\n\n' +
+                '🔍 MÉTODO 2 - Menu do navegador:\n' +
+                '• Chrome: Menu ⋮ > "Instalar Fast Fidelidade..."\n' +
+                '• Edge: Menu ⋯ > "Apps" > "Instalar este site como um app"\n\n' +
+                '✅ Certifique-se de que está usando Chrome ou Edge!'
+            );
+        } else if (isIOS) {
             // Instruções para iOS/Safari
             alert(
                 '📱 Para instalar o Fast Fidelidade no iPhone/iPad:\n\n' +
@@ -95,7 +132,7 @@ export async function showInstallPrompt() {
                 '3. Confirme a instalação\n\n' +
                 'O app aparecerá na sua tela inicial! 🎉'
             );
-        } else if (isMobile) {
+        } else {
             // Outros dispositivos móveis
             alert(
                 '📱 Para instalar o Fast Fidelidade:\n\n' +
@@ -154,7 +191,9 @@ export function isPWAInstalled() {
     const wasInstalledViaPrompt = localStorage.getItem('pwa-installed') === 'true';
 
     return isStandalone || isIOSStandalone || wasInstalledViaPrompt;
-}// Mostrar notificação de atualização disponível
+}
+
+// Mostrar notificação de atualização disponível
 function showUpdateAvailable() {
     // Pode implementar um toast ou modal aqui
     if (confirm('Nova versão disponível! Deseja atualizar?')) {

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import toast from 'react-hot-toast';
-import { FiUser, FiLock, FiMail, FiPhone, FiLogIn, FiUserPlus, FiLoader } from 'react-icons/fi';
+import { FiUser, FiLock, FiMail, FiPhone, FiLogIn, FiUserPlus, FiLoader, FiFileText, FiCheck } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import LoadingGif from './LoadingGif';
+import Regulamento from './Regulamento';
 
 // Animações
 const fadeIn = keyframes`
@@ -40,7 +41,6 @@ const AuthCard = styled.div`
   width: 100%;
   max-width: 420px;
   background: white;
-  box-shadow: 0 20px 40px rgba(53, 53, 53, 0.1);
   overflow: hidden;
   animation: ${fadeIn} 0.6s ease-out;
   border: 1px solid rgba(169, 25, 24, 0.1);
@@ -177,8 +177,8 @@ const Input = styled.input`
 const Spinner = styled.div`
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-top: 1px solid white;
   border-radius: 50%;
   animation: ${spin} 1s linear infinite;
 `;
@@ -241,6 +241,51 @@ const HelpText = styled.div`
   }
 `;
 
+const RegulamentoContainer = styled.div`
+  margin: 5px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+`;
+
+const CheckboxContainer = styled.label`
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  
+  input[type="checkbox"] {
+    margin: 0;
+    margin-top: 2px;
+    transform: scale(1.1);
+    accent-color: #A91918;
+    cursor: pointer;
+  }
+  
+  span {
+    color: #495057;
+    line-height: 1.4;
+    font-size: 0.9rem;
+  }
+`;
+
+const RegulamentoLink = styled.button`
+  background: none;
+  border: none;
+  color: #A91918;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+  margin: 0;
+  
+  &:hover {
+    color: #8B1415;
+    text-decoration: none;
+  }
+`;
+
 const AuthNovoClean = ({ onLogin }) => {
     const [activeTab, setActiveTab] = useState('login');
     const [loading, setLoading] = useState(false);
@@ -261,6 +306,10 @@ const AuthNovoClean = ({ onLogin }) => {
         senha: '',
         confirmarSenha: ''
     });
+
+    // Estados para regulamento
+    const [regulamentoAccepted, setRegulamentoAccepted] = useState(false);
+    const [showRegulamento, setShowRegulamento] = useState(false);
 
     // Funções de formatação
     const formatCPFCNPJ = (value) => {
@@ -371,6 +420,10 @@ const AuthNovoClean = ({ onLogin }) => {
 
             if (registerData.senha !== registerData.confirmarSenha) {
                 newErrors.confirmarSenha = 'Senhas não coincidem';
+            }
+
+            if (!regulamentoAccepted) {
+                newErrors.regulamento = 'É necessário aceitar o regulamento para prosseguir';
             }
 
             if (Object.keys(newErrors).length > 0) {
@@ -615,7 +668,29 @@ const AuthNovoClean = ({ onLogin }) => {
                             {errors.confirmarSenha && <ErrorMessage>{errors.confirmarSenha}</ErrorMessage>}
                         </FormGroup>
 
-                        <Button type="submit" disabled={loading}>
+                        <RegulamentoContainer>
+                            <CheckboxContainer>
+                                <input
+                                    type="checkbox"
+                                    checked={regulamentoAccepted}
+                                    onChange={(e) => setRegulamentoAccepted(e.target.checked)}
+                                />
+                                <span>
+                                    Li e aceito os{' '}
+                                    <RegulamentoLink
+                                        type="button"
+                                        onClick={() => setShowRegulamento(true)}
+                                    >
+                                        Termos e Condições do Fast Fidelidade
+                                    </RegulamentoLink>
+                                </span>
+                            </CheckboxContainer>
+
+                            {errors.regulamento && <ErrorMessage>{errors.regulamento}</ErrorMessage>}
+
+                        </RegulamentoContainer>
+
+                        <Button type="submit" disabled={loading || !regulamentoAccepted}>
                             {loading ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <Spinner />
@@ -637,6 +712,15 @@ const AuthNovoClean = ({ onLogin }) => {
                     </Form>
                 )}
             </AuthCard>
+
+            <Regulamento
+                isOpen={showRegulamento}
+                onClose={() => setShowRegulamento(false)}
+                onAccept={() => {
+                    setRegulamentoAccepted(true);
+                    toast.success('Regulamento aceito com sucesso!');
+                }}
+            />
         </Container>
     );
 }
