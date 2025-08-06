@@ -10,6 +10,12 @@ import toast from 'react-hot-toast';
 import LoadingGif from './LoadingGif';
 import imagemNotaFiscalService from '../services/imagemNotaFiscalService';
 
+// Função para formatação de números no padrão brasileiro
+const formatarPontos = (valor) => {
+    if (!valor || valor === 0) return '0';
+    return Number(valor).toLocaleString('pt-BR');
+};
+
 // Animações
 const fadeInUp = keyframes`
   from { opacity: 0; transform: translateY(20px); }
@@ -181,7 +187,6 @@ const TableHeader = styled.thead`
     color: #4A5568;
     border-bottom: 1px solid #E2E8F0;
     font-size: 0.9rem;
-    text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 `;
@@ -203,6 +208,10 @@ const TableBody = styled.tbody`
     padding: 1rem;
     color: #2D3748;
     vertical-align: middle;
+
+    & strong {
+        font-weight: 500;
+    }
   }
 `;
 
@@ -218,8 +227,7 @@ const RoleBadge = styled.span`
   padding: 0.25rem 0.75rem;
   border-radius: 0;
   font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
+  font-weight: 500;
   letter-spacing: 0.5px;
 `;
 
@@ -229,7 +237,7 @@ const StatusBadge = styled.span`
   padding: 0.25rem 0.75rem;
   border-radius: 0;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 500;
 `;
 
 const ActionsCell = styled.div`
@@ -400,11 +408,10 @@ const ClientInfo = styled.div`
 `;
 
 const ClientName = styled.h3`
-  color: #cc1515;
+  color: #1d1d1b;
   font-size: 1.8rem;
-  font-weight: 900;
+  font-weight: 500;
   margin: 0;
-  text-transform: uppercase;
   letter-spacing: 1px;
 `;
 
@@ -1042,20 +1049,108 @@ function AdminUsuarios({ user }) {
         }
 
         try {
-            // Sempre excluir da tabela clientes_fast
+            // Verificar se existem dados relacionados para informar o usuário
+            const { data: historico, error: errorHistorico } = await supabase
+                .from('historico_pontos')
+                .select('id')
+                .eq('cliente_id', usuario.id)
+                .limit(1);
+
+            const { data: pedidos, error: errorPedidos } = await supabase
+                .from('pedidos_vendas')
+                .select('id')
+                .eq('cliente_id', usuario.id)
+                .limit(1);
+
+            const { data: imagens, error: errorImagens } = await supabase
+                .from('imagens_notas_fiscais')
+                .select('id')
+                .eq('cliente_id', usuario.id)
+                .limit(1);
+
+            // Avisar se existem dados relacionados (apenas informativo)
+            const temDadosRelacionados = (historico?.length > 0) || (pedidos?.length > 0) || (imagens?.length > 0);
+
+            if (temDadosRelacionados) {
+                const confirmarExclusao = confirm(
+                    `ATENÇÃO: Este usuário possui dados relacionados (histórico, pedidos e/ou imagens). ` +
+                    `A exclusão irá remover TODOS os dados relacionados automaticamente. ` +
+                    `Esta ação não pode ser desfeita. Deseja continuar?`
+                );
+
+                if (!confirmarExclusao) {
+                    return;
+                }
+            }
+
+            // Excluir o usuário - as foreign keys CASCADE cuidarão dos dados relacionados
             const { error } = await supabase
                 .from('clientes_fast')
                 .delete()
                 .eq('id', usuario.id);
 
-            if (error) throw error;
+            if (error) {
+                throw error;
+            }
 
-            toast.success('Usuário excluído com sucesso!');
+            toast.success('Usuário e todos os dados relacionados foram excluídos com sucesso!');
             carregarUsuarios();
 
         } catch (error) {
             console.error('Erro ao excluir usuário:', error);
-            toast.error('Erro ao excluir usuário');
+
+            // Tratamento de erro mais detalhado
+            let errorMessage = 'Erro desconhecido ao excluir usuário';
+
+            if (error?.code) {
+                // Erros específicos do PostgreSQL
+                switch (error.code) {
+                    case '23503':
+                        errorMessage = `❌ FOREIGN KEY CONSTRAINT: Este usuário possui dados relacionados que impedem a exclusão.\n\n` +
+                            `🔧 SOLUÇÃO: Execute este comando no SQL Editor do Supabase:\n\n` +
+                            `ALTER TABLE pedidos_vendas DROP CONSTRAINT IF EXISTS pedidos_vendas_cliente_id_fkey;\n` +
+                            `ALTER TABLE pedidos_vendas ADD CONSTRAINT pedidos_vendas_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes_fast(id) ON DELETE CASCADE;\n\n` +
+                            `ALTER TABLE historico_pontos DROP CONSTRAINT IF EXISTS historico_pontos_cliente_id_fkey;\n` +
+                            `ALTER TABLE historico_pontos ADD CONSTRAINT historico_pontos_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes_fast(id) ON DELETE CASCADE;\n\n` +
+                            `📋 Ou use o arquivo: sql/29_fix_foreign_keys_SIMPLES.sql`;
+                        break;
+                    case '23505':
+                        errorMessage = 'Este email já está em uso por outro usuário.';
+                        break;
+                    case '42501':
+                        errorMessage = 'Permissão negada. Verifique se você tem permissão para excluir usuários.';
+                        break;
+                    default:
+                        errorMessage = `Erro do banco de dados (${error.code}): ${error.message}`;
+                }
+            } else if (error?.message) {
+                errorMessage = error.message;
+            } else if (error?.error_description) {
+                errorMessage = error.error_description;
+            } else if (error?.details) {
+                errorMessage = error.details;
+            }
+
+            // Mensagens adicionais para problemas comuns (texto)
+            const errorText = errorMessage.toLowerCase();
+            if (errorText.includes('foreign key constraint') || errorText.includes('still referenced')) {
+                errorMessage = `❌ PROBLEMA: Usuário possui dados relacionados.\n\n` +
+                    `🔧 EXECUTE este comando no Supabase SQL Editor:\n\n` +
+                    `ALTER TABLE pedidos_vendas ADD CONSTRAINT pedidos_vendas_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes_fast(id) ON DELETE CASCADE;\n` +
+                    `ALTER TABLE historico_pontos ADD CONSTRAINT historico_pontos_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes_fast(id) ON DELETE CASCADE;`;
+            } else if (errorText.includes('permission denied')) {
+                errorMessage = 'Permissão negada. Verifique suas permissões de administrador.';
+            } else if (errorText.includes('row-level security')) {
+                errorMessage = 'Erro de segurança RLS. Verifique as políticas de segurança do banco de dados.';
+            }
+
+            toast.error(`Erro ao excluir usuário: ${errorMessage}`, {
+                duration: 8000, // Mais tempo para ler a mensagem
+                style: {
+                    maxWidth: '600px',
+                    fontSize: '14px'
+                }
+            });
         }
     };
 
@@ -1162,19 +1257,21 @@ function AdminUsuarios({ user }) {
                                         </RoleBadge>
                                     </td>
                                     <td>
-                                        <div style={{ fontWeight: 'bold', color: '#cc1515' }}>
-                                            {usuario.saldo_pontos || 0} pts
+                                        <div style={{ fontWeight: '500', color: '#1d1d1b' }}>
+                                            {formatarPontos(usuario.saldo_pontos)} pts
                                         </div>
                                         <div style={{ fontSize: '0.75rem', color: '#718096' }}>
-                                            Total ganho: {usuario.total_pontos_ganhos || 0}
+                                            TP: {formatarPontos(usuario.total_pontos_ganhos)}
                                         </div>
                                     </td>
                                     <td>
                                         <div style={{
                                             display: 'flex',
                                             alignItems: 'center',
+                                            lineHeight: '1.2',
+                                            fontSize: '0.75rem',
                                             gap: '0.5rem',
-                                            fontWeight: 'bold'
+                                            fontWeight: '500'
                                         }}>
                                             {usuario.total_imagens > 0 ? (
                                                 <>
@@ -1182,9 +1279,8 @@ function AdminUsuarios({ user }) {
                                                         color: '#10B981',
                                                         background: '#F0FDF4',
                                                         padding: '0.25rem 0.5rem',
-
                                                         fontSize: '0.75rem',
-                                                        fontWeight: 'bold'
+                                                        fontWeight: '500'
                                                     }}>
                                                         {usuario.total_imagens} arquivo{usuario.total_imagens !== 1 ? 's' : ''}
                                                     </span>
@@ -1488,15 +1584,15 @@ function AdminUsuarios({ user }) {
 
                                         <ClientStats>
                                             <StatCard $type="balance">
-                                                <div className="value">{usuarioDetalhes.saldo_pontos || 0}</div>
+                                                <div className="value">{formatarPontos(usuarioDetalhes.saldo_pontos)}</div>
                                                 <div className="label">Saldo Atual</div>
                                             </StatCard>
                                             <StatCard $type="points">
-                                                <div className="value">{usuarioDetalhes.total_pontos_ganhos || 0}</div>
+                                                <div className="value">{formatarPontos(usuarioDetalhes.total_pontos_ganhos)}</div>
                                                 <div className="label">Total Ganho</div>
                                             </StatCard>
                                             <StatCard $type="spent">
-                                                <div className="value">{usuarioDetalhes.total_pontos_gastos || 0}</div>
+                                                <div className="value">{formatarPontos(usuarioDetalhes.total_pontos_gastos)}</div>
                                                 <div className="label">Total Gasto</div>
                                             </StatCard>
                                         </ClientStats>
@@ -1828,7 +1924,7 @@ function AdminUsuarios({ user }) {
                                                                 <div>
                                                                     <div style={{ color: '#718096', fontWeight: '500' }}>Pontos do Prêmio:</div>
                                                                     <div style={{ color: '#3B82F6', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                                                                        {resgate.premios_catalogo?.pontos_necessarios || 0} pts
+                                                                        {formatarPontos(resgate.premios_catalogo?.pontos_necessarios)} pts
                                                                     </div>
                                                                 </div>
                                                                 <div>
@@ -2566,7 +2662,7 @@ function AdminUsuarios({ user }) {
                                         <div>
                                             <strong style={{ color: '#2D3748' }}>Pontos do Prêmio:</strong>
                                             <div style={{ fontSize: '1.125rem', color: '#3B82F6', fontWeight: 'bold', marginTop: '0.25rem' }}>
-                                                {premioSelecionado.premios_catalogo?.pontos_necessarios || 0} pontos
+                                                {formatarPontos(premioSelecionado.premios_catalogo?.pontos_necessarios)} pontos
                                             </div>
                                         </div>
                                         <div>
