@@ -17,7 +17,6 @@ import AdminPanelNovo from './components/AdminPanelNovo'
 import AdminUsuarios from './components/AdminUsuarios'
 import GerenteResgates from './components/GerenteResgates'
 import MeusResgates from './components/MeusResgates'
-import InstallPWA from './components/InstallPWA'
 import { inicializarProdutosElegiveis } from './utils/inicializarProdutos'
 import { inicializarPremios } from './utils/inicializarPremios'
 import SidebarVertical from './components/SidebarVertical'
@@ -53,44 +52,53 @@ function App() {
   // Verificar se há sessão salva ao carregar a página
   useEffect(() => {
     const initializeApp = async () => {
-      // Verificar URL especial para acesso admin (manter compatibilidade)
-      const urlParams = new URLSearchParams(window.location.search)
-      const adminAccess = urlParams.get('admin')
-
-      if (adminAccess === 'fastsistemas2024') {
-        setIsAdminMode(true)
-        // Criar usuário admin temporário
-        const adminUser = {
-          id: 'admin',
-          nome: 'Administrador Fast',
-          email: 'admin@fastsistemas.com.br',
-          role: 'admin',
-          saldo_pontos: 0
-        }
-        setUser(adminUser)
-        setCurrentPage('admin')
-        localStorage.setItem('clubeFastUser', JSON.stringify(adminUser))
-        // Limpar URL para segurança
-        window.history.replaceState({}, document.title, window.location.pathname)
-      } else {
-        // Carregar usuário salvo normal
-        const savedUser = localStorage.getItem('clubeFastUser')
-        if (savedUser) {
-          try {
-            const userData = JSON.parse(savedUser)
-            setUser(userData)
-            // Verificar role do usuário
-            const userRole = userData.role || 'cliente'
-            if (userRole === 'admin') {
-              setIsAdminMode(true)
-              setCurrentPage('admin')
-            } else if (userRole === 'gerente') {
-              setCurrentPage('gerente-resgates')
+      // Carregar usuário salvo
+      const savedUserData = localStorage.getItem('clubeFastUser')
+      if (savedUserData) {
+        try {
+          const storageData = JSON.parse(savedUserData)
+          
+          // Verificar se os dados são do formato antigo (migração)
+          let userData, isExpired;
+          
+          if (storageData.user && storageData.expiry) {
+            // Novo formato com expiração
+            userData = storageData.user
+            isExpired = Date.now() > storageData.expiry
+          } else {
+            // Formato antigo sem expiração - converter
+            userData = storageData
+            isExpired = false
+            
+            // Migrar para novo formato com expiração
+            const newStorageData = {
+              user: userData,
+              expiry: Date.now() + (24 * 60 * 60 * 1000) // 24 horas
             }
-          } catch (error) {
-            console.error('Erro ao carregar usuário salvo:', error)
-            localStorage.removeItem('clubeFastUser')
+            localStorage.setItem('clubeFastUser', JSON.stringify(newStorageData))
           }
+          
+          // Verificar se a sessão expirou
+          if (isExpired) {
+            console.log('Sessão expirada, realizando logout')
+            localStorage.removeItem('clubeFastUser')
+            return
+          }
+          
+          // Verificar autenticidade do token (poderia incluir aqui validação com backend)
+          setUser(userData)
+          
+          // Verificar role do usuário
+          const userRole = userData.role || 'cliente'
+          if (userRole === 'admin') {
+            setIsAdminMode(true)
+            setCurrentPage('admin')
+          } else if (userRole === 'gerente') {
+            setCurrentPage('gerente-resgates')
+          }
+        } catch (error) {
+          console.error('Erro ao carregar usuário salvo:', error)
+          localStorage.removeItem('clubeFastUser')
         }
       }
 
@@ -135,8 +143,23 @@ function App() {
 
   const handleLogin = (userData) => {
     console.log('🔐 Login realizado:', userData.nome)
-    setUser(userData)
-    localStorage.setItem('clubeFastUser', JSON.stringify(userData))
+    
+    // Remover dados sensíveis antes de armazenar
+    const userToStore = {
+      ...userData,
+      // Remove dados sensíveis
+      senha: undefined,
+      token: userData.token // Manter apenas o token de autenticação
+    }
+    
+    setUser(userToStore)
+    
+    // Armazenar com expiração (24 horas)
+    const storageData = {
+      user: userToStore,
+      expiry: Date.now() + (24 * 60 * 60 * 1000) // 24 horas
+    }
+    localStorage.setItem('clubeFastUser', JSON.stringify(storageData))
 
     // Determinar página inicial baseado no role
     const userRole = userData.role || 'cliente'
@@ -176,14 +199,23 @@ function App() {
   }, [])
 
   const handleLogout = () => {
+    // Limpar estado
     setUser(null)
     setIsAdminMode(false)
-    localStorage.removeItem('clubeFastUser')
     setCurrentPage('dashboard')
-
+    
+    // Limpar todos os dados de sessão
+    localStorage.removeItem('clubeFastUser')
+    sessionStorage.clear()
+    
     // Limpar funções globais
     window.updateUserContext = null
     window.triggerGlobalRefresh = null
+    
+    // Limpar cookies relacionados à sessão (caso existam)
+    document.cookie.split(';').forEach(cookie => {
+      document.cookie = cookie.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+    });
   }
 
   // Função para verificar permissões
@@ -350,7 +382,6 @@ function App() {
           }
         `}</style>
       </AuthContext.Provider>
-      <InstallPWA />
       <Toaster position="top-right" />
     </ThemeProvider>
   )

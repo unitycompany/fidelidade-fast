@@ -7,10 +7,23 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Arquivos de ambiente e configuração
+.env
+.env.local
+.env.development
+.env.production
+*.config.prod.js
+.env.*
+python-processor/quota_stats.json
+python-processor/config.py
+
+# Dependências
 node_modules
 dist
 dist-ssr
 *.local
+python-processor/__pycache__
+python-processor/venv
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +35,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.bak

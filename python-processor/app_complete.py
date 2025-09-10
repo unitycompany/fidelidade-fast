@@ -4,6 +4,44 @@
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import os
+from functools import wraps
+
+# Importar configurações seguras
+try:
+    # Primeiro tenta importar o arquivo de configuração real
+    from config import get_api_key, get_supabase_config, API_SECURITY
+    print("✅ Arquivo config.py carregado com sucesso")
+except ImportError:
+    print("⚠️ Arquivo config.py não encontrado. Criando configuração temporária com variáveis de ambiente")
+    # Se não encontrar, cria uma configuração básica com variáveis de ambiente
+    from dotenv import load_dotenv
+    load_dotenv()  # Carrega variáveis do arquivo .env
+    
+    # Configurações de API a partir de variáveis de ambiente
+    API_KEYS = {
+        "deepseek": os.getenv("VITE_DEEPSEEK_API_KEY", ""),
+        "gemini": os.getenv("VITE_GEMINI_API_KEY", ""),
+        "openai": os.getenv("VITE_OPENAI_API_KEY", ""),
+        "anthropic": os.getenv("VITE_ANTHROPIC_API_KEY", "")
+    }
+    
+    # Função para obter chaves de API
+    def get_api_key(service):
+        return API_KEYS.get(service, "")
+        
+    # Configurações do Supabase
+    def get_supabase_config():
+        return {
+            "url": os.getenv("VITE_SUPABASE_URL", ""),
+            "anon_key": os.getenv("VITE_SUPABASE_ANON_KEY", "")
+        }
+    
+    # Configuração de segurança para API
+    API_SECURITY = {
+        "api_key": os.getenv("FLASK_API_KEY", ""),
+        "allowed_origins": os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+    }
 import base64
 import io
 import numpy as np
@@ -38,7 +76,55 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app)
+
+# Configurações de segurança para o CORS
+cors_allowed_origins = API_SECURITY.get('allowed_origins', ['http://localhost:5173', 'http://localhost:3000'])
+CORS(app, origins=cors_allowed_origins, supports_credentials=True, methods=["GET", "POST"])
+
+# Middleware de segurança - API Key
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Verificação de API key para aumentar segurança
+        api_key = request.headers.get('X-Api-Key', '')
+        expected_key = API_SECURITY.get('api_key', '')
+        
+        # Permitir chave vazia em desenvolvimento
+        if expected_key and api_key != expected_key:
+            return jsonify({"error": "Acesso não autorizado"}), 401
+            
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Middleware de Rate Limiting
+request_counter = {}
+def rate_limit(max_requests=20, window_seconds=60):
+    @wraps
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # IP do cliente
+            client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+            
+            # Verificar limite de requisições
+            current_time = datetime.now().timestamp()
+            if client_ip not in request_counter:
+                request_counter[client_ip] = {'count': 0, 'window_start': current_time}
+            
+            # Reset contador se janela expirou
+            if current_time - request_counter[client_ip]['window_start'] > window_seconds:
+                request_counter[client_ip] = {'count': 0, 'window_start': current_time}
+                
+            # Incrementar contador
+            request_counter[client_ip]['count'] += 1
+            
+            # Verificar se excedeu limite
+            if request_counter[client_ip]['count'] > max_requests:
+                return jsonify({"error": "Taxa de requisições excedida"}), 429
+                
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 # Configurar Tesseract automaticamente
 if TESSERACT_AVAILABLE:

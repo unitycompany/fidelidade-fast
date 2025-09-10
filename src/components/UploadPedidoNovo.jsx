@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled, { keyframes, css } from 'styled-components';
-import { FiUpload, FiFile, FiCheck, FiX, FiStar, FiInfo, FiEye, FiTarget, FiDatabase, FiGift } from 'react-icons/fi';
+import { FiUpload, FiFile, FiCheck, FiX, FiStar, FiInfo, FiEye, FiTarget, FiDatabase, FiGift, FiFileText } from 'react-icons/fi';
 import { analyzeOrderWithGemini } from '../services/geminiService';
 import { processOrderResult, validateOrder, validarPontosCalculados } from '../utils/pedidosFast'; // removed getProdutosElegiveis import
 import { saveOrder, saveOrderItems, addPointsToCustomer, checkOrderExists } from '../services/supabase';
 import { getPointsPerReal } from '../utils/config';
 import { sefazValidationService } from '../services/sefazValidation';
+import sapService from '../services/sapService';
 import LoadingGif from './LoadingGif';
 import { notifyPointsEarned } from '../services/notificationManager.js';
+import NotaFiscalInput from './NotaFiscalInput';
 
 // Animações
 const fadeIn = keyframes`
@@ -44,6 +46,70 @@ const slideInUp = keyframes`
   to { 
     opacity: 1; 
     transform: translateY(0); 
+  }
+`;
+
+// Novos estilos para seleção de modo
+const InputModeSelector = styled.div`
+  display: flex;
+  width: 100%;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+`;
+
+const ModeButton = styled.button`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0.8rem;
+  background: ${props => props.active ? '#A91918' : '#f7fafc'};
+  color: ${props => props.active ? 'white' : '#666'};
+  border: none;
+  font-weight: ${props => props.active ? '600' : '400'};
+  cursor: pointer;
+  
+  &:hover {
+    background: ${props => props.active ? '#8B0000' : '#edf2f7'};
+  }
+`;
+
+// Preview para localização do número na nota fiscal
+const NFELocationPreview = styled.div`
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background-color: #fff;
+  margin-bottom: 1rem;
+  border: 1px solid #eaeaea;
+  
+  p {
+    margin-bottom: 0.8rem;
+    font-size: 0.9rem;
+    color: #A91918;
+  }
+  
+  img {
+    width: 100%;
+    height: auto;
+    max-height: 250px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 0.8rem;
+
+    @media (max-width: 768px){
+      height: 450px;
+      object-fit: cover;
+      object-position: right;
+    }
+  }
+  
+  span {
+    font-size: 0.8rem;
+    color: #666;
   }
 `;
 
@@ -175,10 +241,9 @@ const MinimalUpload = styled.label`
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem;
+  padding: 0.8rem;
   margin-bottom: 1rem;
   width: 100%;
-  max-width: 500px;
   border: 1px dashed #ddd;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -1176,6 +1241,36 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
     });
   };
 
+  // Estado para controle da entrada direta do número da nota
+  const [inputMode, setInputMode] = useState('foto'); // 'foto' ou 'numero'
+  
+  // Lidar com o resultado da nota processada pelo número
+  const handleNotaProcessada = useCallback((dadosNota) => {
+    console.log('✅ Nota processada via número:', dadosNota);
+    
+    // Exibir informações da nota no formato adequado para o componente
+    setResult({
+      orderNumber: dadosNota.numero,
+      issueDate: dadosNota.dataEmissao,
+      customer: dadosNota.cliente?.nome || 'Cliente',
+      totalValue: parseFloat(dadosNota.valorTotal),
+      totalPoints: dadosNota.pontos,
+      items: dadosNota.produtos?.map(p => ({
+        code: p.codigo,
+        name: p.descricao,
+        unitValue: p.valor,
+        points: p.pontos
+      })) || [],
+      sapData: true // Indicador que os dados vieram do SAP
+    });
+    
+    setShowResult(true);
+    setTimeout(() => {
+      setShowAnimatedRows(true);
+    }, 300);
+    
+  }, []);
+
   return (
     <Container>
       <MainContent>
@@ -1184,22 +1279,59 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
             <>
               <MinimalHeader>
                 <h1>Enviar Nota Fiscal</h1>
-                <p>Faça upload da nota fiscal para processar seus pontos.</p>
+                <p>Faça upload ou digite a sua nota fiscal para processar seus pontos.</p>
               </MinimalHeader>
-              <MinimalUpload htmlFor="file-upload">
-                <input id="file-upload" type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }} onChange={handleFileInput} />
-                <FiFile size={38} color={selectedFile ? '#28a745' : '#A91918'} style={{ marginBottom: 8 }} />
-                <div style={{ color: '#444', fontWeight: 500, marginBottom: 4 }}>
-                  {selectedFile ? selectedFile.name : 'Arraste ou clique para selecionar'}
-                </div>
-                <div style={{ color: '#888', fontSize: 13 }}>
-                  {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : 'JPG, PNG ou PDF, até 10MB'}
-                </div>
-              </MinimalUpload>
-              <MinimalButton disabled={!selectedFile} onClick={handleProcess}>
-                Processar Nota
-              </MinimalButton>
-              {error && <div style={{ color: '#A91918', marginTop: 10, fontSize: 15, textAlign: 'center', width: '100%', maxWidth: 420 }}>{error}</div>}
+              
+              {/* Botões de alternância entre método de upload e input manual */}
+              <InputModeSelector>
+                <ModeButton 
+                  active={inputMode === 'foto'} 
+                  onClick={() => setInputMode('foto')}
+                >
+                  <FiUpload /> Tirar foto
+                </ModeButton>
+                <ModeButton 
+                  active={inputMode === 'numero'} 
+                  onClick={() => setInputMode('numero')}
+                >
+                  <FiFileText /> Digitar número
+                </ModeButton>
+              </InputModeSelector>
+              
+              {/* Exibir componente baseado no modo selecionado */}
+              {inputMode === 'foto' ? (
+                <>
+                  <MinimalUpload htmlFor="file-upload">
+                    <input id="file-upload" type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }} onChange={handleFileInput} />
+                    
+                    {/* Adicionando previsualização de onde encontrar o número */}
+                    <NFELocationPreview>
+                      <p>Tire uma foto clara do número da nota fiscal, igual ao exemplo:</p>
+                      <img src="/nota-fiscal-exemplo.png" alt="Exemplo de nota fiscal" />
+                      <span>Posicione a câmera para capturar o código ou número claramente</span>
+                    </NFELocationPreview>
+                  
+                    <FiFile size={38} color={selectedFile ? '#28a745' : '#A91918'} style={{ marginBottom: 8 }} />
+                    <div style={{ color: '#444', fontWeight: 500, marginBottom: 4 }}>
+                      {selectedFile ? selectedFile.name : 'Arraste ou clique para selecionar'}
+                    </div>
+                    <div style={{ color: '#888', fontSize: 13 }}>
+                      {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : 'JPG, PNG ou PDF, até 10MB'}
+                    </div>
+                  </MinimalUpload>
+                  
+                  <MinimalButton disabled={!selectedFile} onClick={handleProcess}>
+                    Processar Nota
+                  </MinimalButton>
+                  
+                  {error && <div style={{ color: '#A91918', marginTop: 10, fontSize: 15, textAlign: 'center', width: '100%', maxWidth: 420 }}>{error}</div>}
+                </>
+              ) : (
+                <NotaFiscalInput 
+                  onNotaProcessada={handleNotaProcessada} 
+                  clienteId={user?.id} 
+                />
+              )}
             </>
           )}
 
