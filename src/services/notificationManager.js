@@ -14,19 +14,23 @@ class NotificationManager {
             return;
         }
 
-        // Pedir permissão após o usuário usar o app por um tempo
-        setTimeout(() => {
-            this.requestPermissionGently();
-        }, 60000); // 1 minuto após carregar
-
-        this.isEnabled = Notification.permission === 'granted';
-
-        if (this.isEnabled) {
-            this.scheduleNotifications();
-        }
+        // Notificações desativadas conforme solicitação do cliente
+        // Não será mais solicitada permissão automaticamente
+        
+        this.isEnabled = false; // Desabilitando completamente as notificações
+        
+        // Comentado para evitar qualquer solicitação de permissão
+        // if (this.isEnabled) {
+        //     this.scheduleNotifications();
+        // }
     }
 
     async requestPermissionGently() {
+        // Método desativado conforme solicitação do cliente
+        console.log('Sistema de notificações desativado');
+        return false;
+        
+        /* Código original comentado
         if (Notification.permission === 'default') {
             // Mostrar uma mensagem explicativa antes de pedir permissão
             const shouldAsk = confirm(
@@ -54,6 +58,7 @@ class NotificationManager {
             this.scheduleNotifications();
             console.log('✅ Notificações já estavam habilitadas');
         }
+        */
     }
 
     sendWelcomeNotification() {
@@ -177,6 +182,11 @@ class NotificationManager {
     }
 
     sendNotification(title, body, url = '/', tag = 'general') {
+        // Sistema de notificações desativado conforme solicitação
+        console.log('Notificação desativada:', title);
+        return;
+        
+        /* Código original comentado
         if (!this.isEnabled) return;
 
         // Verificar se a mesma notificação foi enviada recentemente
@@ -233,6 +243,7 @@ class NotificationManager {
                 new Notification(title, options);
             }
         }
+        */
     }
 
     // Método para ser chamado quando o usuário resgata um prêmio
@@ -276,20 +287,26 @@ class NotificationManager {
     }
 }
 
-// Instância global do gerenciador de notificações
+// Instância global do gerenciador de notificações (desativada)
 export const notificationManager = new NotificationManager();
 
-// Funções utilitárias para usar nos componentes
+// Funções utilitárias para usar nos componentes - todas desativadas
 export const notifyPrizeRedeemed = (prizeName) => {
-    notificationManager.onPrizeRedeemed(prizeName);
+    console.log('Sistema de notificações desativado - Prêmio resgatado:', prizeName);
+    // Notificações desativadas
+    // notificationManager.onPrizeRedeemed(prizeName);
 };
 
 export const notifyPointsEarned = (points) => {
-    notificationManager.onPointsEarned(points);
+    console.log('Sistema de notificações desativado - Pontos ganhos:', points);
+    // Notificações desativadas
+    // notificationManager.onPointsEarned(points);
 };
 
 export const testNotifications = () => {
-    notificationManager.testNotification();
+    console.log('Sistema de notificações desativado - Teste de notificação não será exibido');
+    // Notificações desativadas
+    // notificationManager.testNotification();
 };
 
 export default notificationManager;

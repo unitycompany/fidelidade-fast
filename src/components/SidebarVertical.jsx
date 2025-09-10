@@ -192,7 +192,6 @@ const gerenteItems = [
 
 // Itens para admins (acesso total)
 const adminItems = [
-  { key: 'admin-config', label: 'Configuração de Pontos', icon: FiDollarSign },
   { key: 'admin-resgates', label: 'Resgates Admin', icon: FiSettings },
   { key: 'admin-catalogo', label: 'Catálogo de Prêmios', icon: FiGift },
   { key: 'admin-estatisticas', label: 'Estatísticas', icon: FiBarChart2 },
