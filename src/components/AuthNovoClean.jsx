@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import toast from 'react-hot-toast';
-import { FiUser, FiLock, FiMail, FiPhone, FiLogIn, FiUserPlus, FiLoader, FiFileText, FiCheck } from 'react-icons/fi';
+import { FiUser, FiLock, FiMail, FiPhone, FiLogIn, FiUserPlus, FiLoader, FiFileText, FiCheck, FiRefreshCw, FiArrowLeft } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import LoadingGif from './LoadingGif';
 import Regulamento from './Regulamento';
+
+// Detect dev vs prod to decide webhook base (Vite injects import.meta.env.DEV)
+const N8N_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV)
+    ? '' // dev: use Vite proxy with relative path
+    : 'https://n8n.unitycompany.com.br';
 
 // Animações
 const fadeIn = keyframes`
@@ -212,6 +217,78 @@ const Button = styled.button`
   }
 `;
 
+const SecondaryButton = styled(Button)`
+    background: #fff;
+    color: #A91918;
+    border: 1px solid #A91918;
+    &:hover:not(:disabled) {
+        animation: none;
+        background: #fff3f3;
+    }
+`;
+
+const Inline = styled.div`
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+`;
+
+const Alert = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 7px;
+    padding: 12px 16px;
+    margin: 10px 0 0 0;
+    font-size: 0.95rem;
+    min-height: 38px;
+    text-align: center;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+`;
+
+const AlertOk = styled(Alert)`
+    color: #0a7f4b;
+    background: #eafaf1;
+    border-color: #b6e7d2;
+`;
+
+const AlertErr = styled(Alert)`
+    color: #b00020;
+    background: #fff0f0;
+    border-color: #f5bfc0;
+`;
+
+const OtpContainer = styled.div`
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 8px;
+`;
+
+const OtpInput = styled.input`
+    width: 46px;
+    height: 46px;
+    text-align: center;
+    font-size: 1.15rem;
+    letter-spacing: 2px;
+    padding: 0;
+    border-radius: 8px;
+    background: #f9f9f9;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    &:focus {
+        outline: none;
+        border-color: #A91918;
+        box-shadow: 0 0 0 3px rgba(169, 25, 24, 0.1);
+        background: #fff;
+    }
+`;
+
 const LoadingSpinner = styled(FiLoader)`
   animation: spin 1s linear infinite;
   
@@ -291,6 +368,18 @@ const AuthNovoClean = ({ onLogin }) => {
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
 
+    // ===== Login por WhatsApp (OTP) =====
+    const [otpStep, setOtpStep] = useState('phone'); // 'phone' | 'code'
+    const [phoneInput, setPhoneInput] = useState('+55 ');
+    const [currentPhoneE164, setCurrentPhoneE164] = useState('');
+    const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+    const [sendingCode, setSendingCode] = useState(false);
+    const [verifying, setVerifying] = useState(false);
+    const [resendLeft, setResendLeft] = useState(0);
+    const [msgPhone, setMsgPhone] = useState('');
+    const [msgCode, setMsgCode] = useState('');
+    const [cooldownId, setCooldownId] = useState(null);
+
     // Estados para login
     const [loginData, setLoginData] = useState({
         identifier: '', // CPF/CNPJ ou email
@@ -329,6 +418,58 @@ const AuthNovoClean = ({ onLogin }) => {
         return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
     };
 
+    // Helpers para máscara BR/E.164
+    const digitsOnly = (s) => (s.match(/\d+/g) || []).join('');
+    const formatBRMask = (v) => {
+        let d = digitsOnly(v);
+        if (!d.startsWith('55')) d = '55' + d;
+        d = d.slice(0, 13); // 55 + 11 dígitos
+        const local = d.slice(2), ddd = local.slice(0, 2), rest = local.slice(2);
+        let out = '+55';
+        if (ddd) out += ` (${ddd})`;
+        if (rest) {
+            if (rest.length <= 5) out += ` ${rest}`;
+            else out += ` ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+        }
+        return out;
+    };
+    const toE164 = (masked) => {
+        const d = digitsOnly(masked);
+        if (!d.startsWith('55')) return null;
+        const local = d.slice(2);
+        if (local.length < 10 || local.length > 11) return null;
+        return '+' + d;
+    };
+    const isE164 = (p) => /^\+\d{8,15}$/.test(p);
+    const maskFromDigitsBR = (digits) => {
+        // digits = 10 ou 11 (DDD + número)
+        if (digits.length < 10) return null;
+        const ddd = digits.slice(0, 2);
+        const rest = digits.slice(2);
+        if (rest.length === 9) return `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5)}`;
+        if (rest.length === 8) return `(${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+        // fallback 11
+        return `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+    };
+
+    // Cooldown para reenvio
+    const startCooldown = (seconds = 60) => {
+        if (cooldownId) {
+            clearInterval(cooldownId);
+        }
+        setResendLeft(seconds);
+        const id = setInterval(() => {
+            setResendLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(id);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        setCooldownId(id);
+    };
+
     // Validações
     const validateCPFCNPJ = (value) => {
         const numbers = value.replace(/\D/g, '');
@@ -341,51 +482,177 @@ const AuthNovoClean = ({ onLogin }) => {
     };
 
     // Handlers
-    const handleLogin = async (e) => {
+    const handleLoginSendCode = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        setErrors({});
-
+        setMsgPhone('');
+        const masked = formatBRMask(phoneInput);
+        setPhoneInput(masked);
+        const e164 = toE164(masked);
+        if (!e164 || !isE164(e164)) {
+            setMsgPhone('Telefone inválido. Use +55 (DDD) 9XXXX-XXXX.');
+            return;
+        }
         try {
-            console.log('🔐 Tentando login com:', loginData.identifier);
-
-            // Determinar se é email ou CPF/CNPJ
-            const isEmail = loginData.identifier.includes('@');
-            const searchField = isEmail ? 'email' : 'cpf_cnpj';
-
-            console.log('🔍 Buscando por:', searchField, '=', loginData.identifier);
-
-            // Buscar usuário
-            const { data: userData, error } = await supabase
-                .from('clientes_fast')
-                .select('*')
-                .eq(searchField, loginData.identifier)
-                .single();
-
-            if (error || !userData) {
-                console.error('❌ Usuário não encontrado:', error);
-                setErrors({ identifier: 'Usuário não encontrado' });
-                return;
+            setSendingCode(true);
+            // Disparar webhook de início
+            const res = await fetch(`${N8N_BASE}/webhook/start-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: e164 })
+            });
+            let ok = res.ok;
+            try {
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const j = await res.json();
+                    ok = j.ok !== false;
+                } else {
+                    await res.text();
+                }
+            } catch (_) { /* ignore parse errors */ }
+            if (ok) {
+                setCurrentPhoneE164(e164);
+                setOtpDigits(['', '', '', '', '', '']);
+                setOtpStep('code');
+                startCooldown(60);
+                setMsgCode('Código enviado por WhatsApp.');
+                toast.success('Código enviado por WhatsApp.');
+            } else {
+                setMsgPhone('Não foi possível enviar o código. Tente novamente.');
+                toast.error('Falha ao enviar o código.');
             }
-
-            console.log('✅ Usuário encontrado:', userData.nome);
-
-            // Verificar senha (implementação simples - em produção usar hash)
-            if (userData.senha !== loginData.senha) {
-                console.error('❌ Senha incorreta');
-                setErrors({ senha: 'Senha incorreta' });
-                return;
-            }
-
-            console.log('✅ Login realizado com sucesso');
-            toast.success(`Bem-vindo, ${userData.nome}!`);
-            onLogin(userData);
-
-        } catch (error) {
-            console.error('❌ Erro no login:', error);
-            toast.error('Erro ao fazer login');
+        } catch (err) {
+            console.error('Erro ao enviar OTP:', err);
+            setMsgPhone('Falha na requisição. Tente novamente.');
+            toast.error('Falha na requisição.');
         } finally {
-            setLoading(false);
+            setSendingCode(false);
+        }
+    };
+
+    const findUserByPhone = async (e164) => {
+        const d = digitsOnly(e164).slice(2); // remove 55
+        const masked = maskFromDigitsBR(d);
+        // 1) tentativa por máscara padrão
+        let { data: userData, error } = await supabase
+            .from('clientes_fast')
+            .select('*')
+            .eq('telefone', masked)
+            .single();
+        if (!error && userData) return userData;
+        // 2) tentativa por E.164
+        ({ data: userData, error } = await supabase
+            .from('clientes_fast')
+            .select('*')
+            .eq('telefone', e164)
+            .single());
+        if (!error && userData) return userData;
+        // 3) fallback: buscar por sufixo de 8 dígitos
+        const suffix = d.slice(-8);
+        const { data: list } = await supabase
+            .from('clientes_fast')
+            .select('*')
+            .ilike('telefone', `%${suffix}%`)
+            .limit(1);
+        if (list && list.length) return list[0];
+        return null;
+    };
+
+    const handleLoginVerifyCode = async (e) => {
+        e.preventDefault();
+        setMsgCode('');
+        const code = otpDigits.join('').replace(/\D/g, '');
+        if (code.length !== 6) {
+            setMsgCode('Digite os 6 dígitos do código.');
+            return;
+        }
+        try {
+            setVerifying(true);
+            const res = await fetch(`${N8N_BASE}/webhook/check-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: currentPhoneE164, code })
+            });
+            let approved = false;
+            let status = 'unknown';
+            let serverText = '';
+            try {
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const j = await res.json();
+                    approved = !!j.approved;
+                    status = j.status || status;
+                } else {
+                    const t = await res.text();
+                    serverText = t;
+                    approved = res.ok;
+                    status = res.ok ? 'ok' : (t || 'erro');
+                }
+            } catch (_) { /* ignore */ }
+
+            if (approved) {
+                // Buscar usuário pela conta vinculada ao telefone
+                const user = await findUserByPhone(currentPhoneE164);
+                if (user) {
+                    toast.success(`Bem-vindo, ${user.nome}!`);
+                    onLogin(user);
+                } else {
+                    setMsgCode('Código válido, mas não encontramos uma conta com este WhatsApp.');
+                    toast.error('Conta não encontrada para este WhatsApp.');
+                }
+            } else {
+                let msg = 'Código inválido. Tente novamente.';
+                if (status === 'expired') msg = 'Código expirado. Clique em Reenviar.';
+                if (status === 'blocked') msg = 'Muitas tentativas. Aguarde e solicite um novo código.';
+                if (!res.ok && serverText) {
+                    msg += ` (detalhe do servidor: ${serverText.slice(0, 180)})`;
+                }
+                setMsgCode(msg);
+                toast.error(msg);
+            }
+        } catch (err) {
+            console.error('Erro na verificação OTP:', err);
+            setMsgCode('Falha na verificação. Tente novamente.');
+            toast.error('Falha na verificação.');
+        } finally {
+            setVerifying(false);
+        }
+    };
+
+    const handleResend = async () => {
+        if (!currentPhoneE164 || resendLeft > 0) return;
+        setMsgCode('');
+        try {
+            setSendingCode(true);
+            const res = await fetch(`${N8N_BASE}/webhook/start-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: currentPhoneE164, resend: true })
+            });
+            let ok = res.ok;
+            try {
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const j = await res.json();
+                    ok = j.ok !== false;
+                } else {
+                    await res.text();
+                }
+            } catch (_) { }
+            if (ok) {
+                startCooldown(60);
+                setMsgCode('Novo código enviado.');
+                toast.success('Novo código enviado.');
+            } else {
+                setMsgCode('Não foi possível reenviar agora. Tente novamente.');
+                toast.error('Falha ao reenviar.');
+            }
+        } catch (err) {
+            console.error('Erro ao reenviar OTP:', err);
+            setMsgCode('Falha ao reenviar. Tente novamente.');
+            toast.error('Falha ao reenviar.');
+        } finally {
+            setSendingCode(false);
         }
     };
 
@@ -512,58 +779,94 @@ const AuthNovoClean = ({ onLogin }) => {
                 </TabContainer>
 
                 {activeTab === 'login' ? (
-                    <Form onSubmit={handleLogin}>
-                        <FormGroup>
-                            <Label>CPF/CNPJ ou Email</Label>
-                            <InputWrapper>
-                                <InputIcon>
-                                    <FiUser />
-                                </InputIcon>
-                                <Input
-                                    type="text"
-                                    value={loginData.identifier}
-                                    onChange={(e) => setLoginData(prev => ({ ...prev, identifier: e.target.value }))}
-                                    placeholder="Digite seu CPF/CNPJ ou email"
-                                    required
-                                />
-                            </InputWrapper>
-                            {errors.identifier && <ErrorMessage>{errors.identifier}</ErrorMessage>}
-                        </FormGroup>
+                    <Form onSubmit={otpStep === 'phone' ? handleLoginSendCode : handleLoginVerifyCode}>
+                        {otpStep === 'phone' ? (
+                            <>
+                                <FormGroup>
+                                    <Label>Seu WhatsApp</Label>
+                                    <InputWrapper>
+                                        <InputIcon>
+                                            <FiPhone />
+                                        </InputIcon>
+                                        <Input
+                                            type="tel"
+                                            value={phoneInput}
+                                            onChange={(e) => setPhoneInput(formatBRMask(e.target.value))}
+                                            placeholder="+55 (DDD) 9XXXX-XXXX"
+                                        />
+                                    </InputWrapper>
+                                    {msgPhone && <AlertErr>{msgPhone}</AlertErr>}
+                                </FormGroup>
 
-                        <FormGroup>
-                            <Label>Senha</Label>
-                            <InputWrapper>
-                                <InputIcon>
-                                    <FiLock />
-                                </InputIcon>
-                                <Input
-                                    type="password"
-                                    value={loginData.senha}
-                                    onChange={(e) => setLoginData(prev => ({ ...prev, senha: e.target.value }))}
-                                    placeholder="Digite sua senha"
-                                    required
-                                />
-                            </InputWrapper>
-                            {errors.senha && <ErrorMessage>{errors.senha}</ErrorMessage>}
-                        </FormGroup>
+                                <Button type="submit" disabled={sendingCode}>
+                                    {sendingCode ? (
+                                        <><Spinner /> Enviando...</>
+                                    ) : (
+                                        <><FiLogIn /> Enviar código por WhatsApp</>
+                                    )}
+                                </Button>
 
-                        <Button type="submit" disabled={loading}>
-                            {loading ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <Spinner />
-                                    Entrando...
-                                </div>
-                            ) : (
-                                <>
-                                    <FiLogIn />
-                                    Entrar
-                                </>
-                            )}
-                        </Button>
+                                <HelpText>
+                                    Usaremos o número cadastrado na sua conta.
+                                </HelpText>
+                            </>
+                        ) : (
+                            <>
+                                <HelpText>
+                                    Enviamos um código para <b>{currentPhoneE164}</b>. <br />
+                                    <button
+                                        type="button"
+                                        onClick={() => { setOtpStep('phone'); setMsgPhone(''); setMsgCode(''); }}
+                                        style={{ background: 'none', border: 'none', color: '#A91918', textDecoration: 'underline', cursor: 'pointer' }}
+                                    >
+                                        <FiArrowLeft style={{ verticalAlign: 'middle' }} /> alterar número
+                                    </button>
+                                </HelpText>
 
-                        <HelpText>
-                            Não tem conta? Clique em "Cadastrar" acima
-                        </HelpText>
+                                <OtpContainer>
+                                    {otpDigits.map((d, i) => (
+                                        <OtpInput
+                                            key={i}
+                                            maxLength={1}
+                                            inputMode="numeric"
+                                            value={d}
+                                            onChange={(e) => {
+                                                const v = e.target.value.replace(/\D/g, '').slice(0, 1);
+                                                const arr = [...otpDigits];
+                                                arr[i] = v;
+                                                setOtpDigits(arr);
+                                                // foco automático próximo
+                                                if (v && i < 5) {
+                                                    const next = e.target.parentElement.querySelectorAll('input')[i + 1];
+                                                    next && next.focus();
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Backspace' && !otpDigits[i] && i > 0) {
+                                                    const prev = e.currentTarget.parentElement.querySelectorAll('input')[i - 1];
+                                                    prev && prev.focus();
+                                                }
+                                            }}
+                                        />
+                                    ))}
+                                </OtpContainer>
+
+                                <Inline>
+                                    <Button type="submit" disabled={verifying} style={{ flex: 1, minWidth: 180 }}>
+                                        {verifying ? (<><Spinner /> Validando...</>) : (<><FiCheck /> Validar código</>)}
+                                    </Button>
+                                    <SecondaryButton type="button" onClick={handleResend} disabled={sendingCode || resendLeft > 0} style={{ flex: 1, minWidth: 180 }}>
+                                        <FiRefreshCw /> Reenviar {resendLeft > 0 ? `(${resendLeft}s)` : ''}
+                                    </SecondaryButton>
+                                </Inline>
+
+                                {msgCode && (
+                                    msgCode.toLowerCase().includes('código enviado') || msgCode.toLowerCase().includes('novo código')
+                                        ? <AlertOk>{msgCode}</AlertOk>
+                                        : <AlertErr>{msgCode}</AlertErr>
+                                )}
+                            </>
+                        )}
                     </Form>
                 ) : (
                     <Form onSubmit={handleRegister}>
