@@ -23,7 +23,7 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
       return;
     }
 
-    setLoading(true);
+  setLoading(true);
     setError('');
     setPontosCreditados(false);
     
@@ -208,6 +208,11 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
 
   return (
     <Container>
+      {loading && (
+        <FullScreenLoader>
+          <LoaderCircle />
+        </FullScreenLoader>
+      )}
       <Title>Consulta por Número da NF-e</Title>
       
       {/* Entrada do número da nota */}
@@ -221,7 +226,7 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
         />
         <SearchButton onClick={handleConsultaNota} disabled={loading || !numeroNota}>
           {loading ? <LoadingSpinner /> : <FiSearch />}
-          {loading ? 'Consultando...' : 'Consultar'}
+          {!loading && 'Consultar'}
         </SearchButton>
       </InputGroup>
 
@@ -412,14 +417,15 @@ const LoadingSpinner = styled.div`
 `;
 
 const ErrorMessage = styled.div`
-  color: #A91918;
-  background-color: #f8f8f8;
-  padding: 0.8rem;
+  color: #991b1b;
+  background-color: #fff5f5;
+  padding: 0.9rem 1rem;
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid #eaeaea;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
 `;
 
 const PreviewSection = styled.div`
@@ -627,3 +633,25 @@ const InfoMessage = styled.div`
 `;
 
 export default NotaFiscalInput;
+
+// Overlay loader (no text)
+const FullScreenLoader = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+`;
+
+const LoaderCircle = styled.div`
+  width: 80px;
+  height: 80px;
+  border: 4px solid #f0f0f0;
+  border-top: 4px solid #A91918;
+  border-right: 4px solid #A91918;
+  border-radius: 50%;
+  animation: spin 1.2s linear infinite;
+  position: relative;
+`;

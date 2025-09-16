@@ -528,30 +528,26 @@ const StepSpinnerLarge = styled.div`
   }
 `;
 
-const StepText = styled.div`
-  color: #A91918;
-  font-size: 1.1rem;
-  font-weight: 600;
-  text-align: center;
-  animation: ${slideInUp} 0.6s ease-out;
-  min-height: 1.5rem;
+// Full-screen overlay loader (no text)
+const FullScreenLoader = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 9999;
 `;
 
-const StepIcon = styled.div`
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: ${props => props.completed ? '#28a745' : props.active ? '#A91918' : '#ccc'};
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  font-weight: bold;
-  min-width: 24px;
+// Better error box styling
+const ErrorBox = styled.div`
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 16px;
+  margin-top: 8px;
+  border-radius: 4px;
+  font-size: 0.98rem;
 `;
 
 function UploadPedidoNovo({ user, onUserUpdate }) {
@@ -559,34 +555,14 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const [currentStep, setCurrentStep] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState([]);
-  const [stepTextKey, setStepTextKey] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [showAnimatedRows, setShowAnimatedRows] = useState(false);
-
-  const processingSteps = [
-    { id: 1, text: 'Enviando ao n8n', icon: FiUpload },
-    { id: 2, text: 'Creditando pontos', icon: FiGift },
-    { id: 3, text: 'Salvando nota fiscal', icon: FiDatabase }
-  ];
-
-  const updateProcessingStep = (stepId, completed = false) => {
-    setCurrentStep(stepId);
-    setStepTextKey(prev => prev + 1); // Força re-render da animação
-    if (completed) {
-      setCompletedSteps(prev => [...prev, stepId]);
-    }
-  };
 
   const resetForm = () => {
     setSelectedFile(null);
     setIsProcessing(false);
     setResult(null);
     setError('');
-    setCurrentStep(0);
-    setCompletedSteps([]);
-    setStepTextKey(0);
     setShowResult(false);
     setShowAnimatedRows(false);
   };
@@ -609,17 +585,11 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
 
   const handleProcess = async () => {
     if (!selectedFile) return;
-    setIsProcessing(true);
     setError('');
     setResult(null);
     setShowResult(false);
-    setCurrentStep(0);
-    setCompletedSteps([]);
 
     try {
-      // Etapa 1: Enviar dados ao webhook n8n
-      updateProcessingStep(1);
-      
       let base64, mimeType, format, fileType;
       
       // Verificar se é imagem para comprimir
@@ -659,7 +629,8 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         }
       });
 
-      // Enviar para o webhook do n8n com timeout
+      // Enviar para o webhook do n8n com timeout (somente aqui mostra o loading)
+      setIsProcessing(true);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos
       
@@ -717,9 +688,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         }
       }
 
-      // Etapa 2: Creditar pontos retornados
-      updateProcessingStep(2);
-      
+      // Concluiu o envio ao n8n: remover loading agora
+      setIsProcessing(false);
+
       // Processar resposta do n8n (pode ser array ou objeto)
       let pontosCalculados = 0;
       
@@ -802,9 +773,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         window.dispatchEvent(new CustomEvent('userUpdated'));
       }
 
-      // Etapa 3: Salvar dados da nota fiscal na coleção
-      updateProcessingStep(3);
-      
+      // Salvar dados da nota fiscal na coleção
       let dadosNotaParaSalvar = null;
       
       if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
@@ -891,6 +860,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       setShowResult(true);
       setTimeout(() => setShowAnimatedRows(true), 300);
     } finally {
+      // Garantir que o loading desliga em qualquer cenário
       setIsProcessing(false);
     }
   };
@@ -1045,7 +1015,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
                     Processar Nota
                   </MinimalButton>
                   
-                  {error && <div style={{ color: '#A91918', marginTop: 10, fontSize: 15, textAlign: 'center', width: '100%', maxWidth: 420 }}>{error}</div>}
+                  {/* Mensagens de erro serão exibidas em uma interface dedicada após o processamento */}
                 </div>
               ) : (
                 <NotaFiscalInput 
@@ -1057,18 +1027,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
           )}
 
           {isProcessing && (
-            <ProcessingContainer>
-              <CurrentStep>
-                {currentStep > 0 && (
-                  <div>
-                    <StepSpinnerLarge />
-                    <StepText key={stepTextKey}>
-                      {processingSteps.find(step => step.id === currentStep)?.text || 'Processando...'}
-                    </StepText>
-                  </div>
-                )}
-              </CurrentStep>
-            </ProcessingContainer>
+            <FullScreenLoader>
+              <StepSpinnerLarge />
+            </FullScreenLoader>
           )}
 
           {showResult && result && (
@@ -1077,59 +1038,65 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
                 <h2 className={result.error ? 'error' : 'success'} style={{ justifyContent: 'center', fontSize: 20, marginBottom: 24 }}>
                   {result.error ? <FiX /> : <FiCheck />} {result.error ? 'Erro no processamento' : 'Nota processada com sucesso!'}
                 </h2>
-                <div className="summary" style={{ margin: 0 }}>
-                  <ExcelTable>
-                    <tbody>
-                      {showAnimatedRows && (
-                        <AnimatedTableRow $delay={0.1}>
-                          <ExcelTh>NF-e</ExcelTh>
-                          <ExcelTd>{result.orderNumber}</ExcelTd>
-                        </AnimatedTableRow>
-                      )}
-                      {showAnimatedRows && (
-                        <AnimatedTableRow $delay={0.3}>
-                          <ExcelTh>Data de Expedição</ExcelTh>
-                          <ExcelTd>{result.orderDate ? new Date(result.orderDate).toLocaleDateString('pt-BR') : '-'}</ExcelTd>
-                        </AnimatedTableRow>
-                      )}
-                      {showAnimatedRows && (
-                        <AnimatedTableRow $delay={0.5}>
-                          <ExcelTh>Total de Pontos</ExcelTh>
-                          <ExcelTd><strong>+{result.totalPoints} pontos</strong></ExcelTd>
-                        </AnimatedTableRow>
-                      )}
-                    </tbody>
-                  </ExcelTable>
+                {!result.error ? (
+                  <div className="summary" style={{ margin: 0 }}>
+                    <ExcelTable>
+                      <tbody>
+                        {showAnimatedRows && (
+                          <AnimatedTableRow $delay={0.1}>
+                            <ExcelTh>NF-e</ExcelTh>
+                            <ExcelTd>{result.orderNumber}</ExcelTd>
+                          </AnimatedTableRow>
+                        )}
+                        {showAnimatedRows && (
+                          <AnimatedTableRow $delay={0.3}>
+                            <ExcelTh>Data de Expedição</ExcelTh>
+                            <ExcelTd>{result.orderDate ? new Date(result.orderDate).toLocaleDateString('pt-BR') : '-'}</ExcelTd>
+                          </AnimatedTableRow>
+                        )}
+                        {showAnimatedRows && (
+                          <AnimatedTableRow $delay={0.5}>
+                            <ExcelTh>Total de Pontos</ExcelTh>
+                            <ExcelTd><strong>+{result.totalPoints} pontos</strong></ExcelTd>
+                          </AnimatedTableRow>
+                        )}
+                      </tbody>
+                    </ExcelTable>
 
-                  {showAnimatedRows && (
-                    <div style={{
-                      color: '#666',
-                      fontSize: 14,
-                      marginTop: 16,
-                      textAlign: 'center'
-                    }} className="fade-in-text">
-                      {result.totalPoints > 0 ?
-                        `${result.totalPoints} pontos foram creditados na sua conta` :
-                        'Nenhum ponto foi creditado para esta nota'
-                      }
-                    </div>
-                  )}
+                    {showAnimatedRows && (
+                      <div style={{
+                        color: '#666',
+                        fontSize: 14,
+                        marginTop: 16,
+                        textAlign: 'center'
+                      }} className="fade-in-text">
+                        {result.totalPoints > 0 ?
+                          `${result.totalPoints} pontos foram creditados na sua conta` :
+                          'Nenhum ponto foi creditado para esta nota'
+                        }
+                      </div>
+                    )}
 
-                  {/* Exibir código de retirada se existir */}
-                  {result.codigo_resgate && showAnimatedRows && (
-                    <div className="fade-in-codigo">
-                      <CodigoAviso><FiInfo style={{ fontSize: 18, color: '#A91918' }} /> Apresente este código para retirar seu produto em uma loja credenciada:</CodigoAviso>
-                      <CodigoBox>{result.codigo_resgate}</CodigoBox>
-                    </div>
-                  )}
+                    {/* Exibir código de retirada se existir */}
+                    {result.codigo_resgate && showAnimatedRows && (
+                      <div className="fade-in-codigo">
+                        <CodigoAviso><FiInfo style={{ fontSize: 18, color: '#A91918' }} /> Apresente este código para retirar seu produto em uma loja credenciada:</CodigoAviso>
+                        <CodigoBox>{result.codigo_resgate}</CodigoBox>
+                      </div>
+                    )}
 
-                  {/* Exemplo de status visual, se necessário */}
-                  {result.status && showAnimatedRows && (
-                    <div className="fade-in-status" style={{ marginTop: 8 }}>
-                      <StatusBadge status={result.status}>{result.status}</StatusBadge>
-                    </div>
-                  )}
-                </div>
+                    {/* Exemplo de status visual, se necessário */}
+                    {result.status && showAnimatedRows && (
+                      <div className="fade-in-status" style={{ marginTop: 8 }}>
+                        <StatusBadge status={result.status}>{result.status}</StatusBadge>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <ErrorBox>
+                    {error || result.errorMessage}
+                  </ErrorBox>
+                )}
               </MinimalResult>
               <SecondaryButton onClick={resetForm} className="fade-in-button">
                 Processar outra nota

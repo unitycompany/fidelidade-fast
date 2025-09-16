@@ -264,9 +264,9 @@ const AlertErr = styled(Alert)`
 
 const OtpContainer = styled.div`
     display: flex;
-    gap: 12px;
-    justify-content: center;
-    margin-top: 8px;
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 22px;
 `;
 
 const OtpInput = styled.input`
@@ -276,7 +276,6 @@ const OtpInput = styled.input`
     font-size: 1.15rem;
     letter-spacing: 2px;
     padding: 0;
-    border-radius: 8px;
     background: #f9f9f9;
     border: 1px solid #e9ecef;
     transition: all 0.2s ease;
@@ -284,7 +283,7 @@ const OtpInput = styled.input`
     &:focus {
         outline: none;
         border-color: #A91918;
-        box-shadow: 0 0 0 3px rgba(169, 25, 24, 0.1);
+        box-shadow: 0 0 0 1px rgba(169, 25, 24, 0.1);
         background: #fff;
     }
 `;
