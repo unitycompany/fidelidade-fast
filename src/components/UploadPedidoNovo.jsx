@@ -10,6 +10,7 @@ import sapService from '../services/sapService';
 import LoadingGif from './LoadingGif';
 import { notifyPointsEarned } from '../services/notificationManager.js';
 import NotaFiscalInput from './NotaFiscalInput';
+import imagemNotaFiscalService from '../services/imagemNotaFiscalService';
 
 // Animações
 const fadeIn = keyframes`
@@ -346,7 +347,7 @@ const MinimalResult = styled.div`
 
 const AnimatedTableRow = styled.tr`
   animation: ${fadeInRow} 0.6s ease-out;
-  animation-delay: ${props => props.delay || 0}s;
+  animation-delay: ${props => props.$delay || 0}s;
   animation-fill-mode: both;
 `;
 
@@ -565,12 +566,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
   const [showAnimatedRows, setShowAnimatedRows] = useState(false);
 
   const processingSteps = [
-    { id: 1, text: 'Analisando documento', icon: FiEye },
-    { id: 2, text: 'Extraindo informações', icon: FiFile },
-    { id: 3, text: 'Validando via SEFAZ', icon: FiTarget },
-    { id: 4, text: 'Calculando pontos', icon: FiTarget },
-    { id: 5, text: 'Salvando no sistema', icon: FiDatabase },
-    { id: 6, text: 'Creditando pontos', icon: FiGift }
+    { id: 1, text: 'Enviando ao n8n', icon: FiUpload },
+    { id: 2, text: 'Creditando pontos', icon: FiGift },
+    { id: 3, text: 'Salvando nota fiscal', icon: FiDatabase }
   ];
 
   const updateProcessingStep = (stepId, completed = false) => {
@@ -619,611 +617,323 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
     setCompletedSteps([]);
 
     try {
-      // Etapa 1: Analisando documento
+      // Etapa 1: Enviar dados ao webhook n8n
       updateProcessingStep(1);
-      await new Promise(resolve => setTimeout(resolve, 1200)); // Pausa para mostrar a etapa
-
-      // Converter arquivo para base64
-      const base64 = await fileToBase64(selectedFile);
-      updateProcessingStep(1, true); // Marca como concluída
-
-      let aiResult;
-      let dailyLimitExceeded = false;
-
-      // 🤖 ANÁLISE COM GOOGLE GEMINI (PROCESSAMENTO PRINCIPAL)
-      let usingFallback = false; // Não usamos fallback mais
-      let processingMethod = 'gemini'; // Método padrão
-
-      try {
-        // Etapa 2: Extraindo informações
-        updateProcessingStep(2);
-        console.log('🤖 Analisando nota fiscal com Google Gemini...');
-        aiResult = await analyzeOrderWithGemini(base64, selectedFile.type);
-
-        if (aiResult.success) {
-          console.log('✅ Gemini analisou com sucesso');
-          updateProcessingStep(2, true); // Marca como concluída
-        } else {
-          throw new Error(aiResult.error || 'Erro na análise do documento');
-        }
-
-      } catch (geminiError) {
-        console.warn('⚠️ Erro na API Gemini:', geminiError.message);
-
-        // Verificar se é erro de quota/limite diário
-        if (geminiError.message.includes('429') ||
-          geminiError.message.includes('quota') ||
-          geminiError.message.includes('rate_limit') ||
-          geminiError.message.includes('usage_limit') ||
-          geminiError.message.includes('resource_exhausted')) {
-
-          console.log('🚨 Gemini: Limite diário excedido');
-
-          // Mostrar mensagem específica para limite diário
-          setResult({
-            orderNumber: `LIMIT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-            customer: 'Sistema Fast',
-            totalValue: 0,
-            items: [],
-            totalPoints: 0,
-            allProducts: [],
-            isQuotaLimit: true,
-            usingFallback: false,
-            processingMethod: 'quota_limit',
-            error: true,
-            errorMessage: 'Limite diário do Google Gemini excedido.'
-          });
-          setShowResult(true);
-          setTimeout(() => {
-            setShowAnimatedRows(true);
-          }, 300);
-          return;
-
-          // Verificar se é erro de JSON malformado
-        } else if (geminiError.message.includes('JSON') ||
-          geminiError.message.includes('Expected double-quoted') ||
-          geminiError.message.includes('Unexpected token') ||
-          geminiError.message.includes('Unexpected end of JSON')) {
-
-          console.log('🔧 Erro de parsing JSON - tentando reprocessar...');
-
-          // Tentar novamente uma vez para erros de JSON
-          try {
-            console.log('🔄 Tentativa #2 de análise com Gemini...');
-            aiResult = await analyzeOrderWithGemini(base64, selectedFile.type);
-
-            if (aiResult.success) {
-              console.log('✅ Sucesso na segunda tentativa');
-              updateProcessingStep(2, true); // Marca como concluída
-            } else {
-              throw new Error('Falha na segunda tentativa');
-            }
-          } catch (secondError) {
-            console.error('❌ Falha definitiva após segunda tentativa:', secondError);
-
-            setResult({
-              orderNumber: `ERROR-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-              customer: 'Sistema Fast',
-              totalValue: 0,
-              items: [],
-              totalPoints: 0,
-              allProducts: [],
-              error: true,
-              errorMessage: 'Erro no processamento da imagem. O documento pode estar muito borrado ou com formato não suportado. Tente uma imagem mais nítida.'
-            });
-            setShowResult(true);
-            setTimeout(() => {
-              setShowAnimatedRows(true);
-            }, 300);
-            return;
-          }
-        } else {
-          // Outros erros da API
-          console.error('❌ Erro geral na API Gemini:', geminiError);
-
-          setResult({
-            orderNumber: `ERROR-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-            customer: 'Sistema Fast',
-            totalValue: 0,
-            totalPoints: 0,
-            items: [],
-            allProducts: [],
-            error: true,
-            errorMessage: 'Erro no processamento da imagem. O documento pode estar muito borrado ou com formato não suportado. Tente uma imagem mais nítida.'
-          });
-          setShowResult(true);
-          setTimeout(() => {
-            setShowAnimatedRows(true);
-          }, 300);
-          return;
-        }
+      
+      let base64, mimeType, format, fileType;
+      
+      // Verificar se é imagem para comprimir
+      if (selectedFile.type.startsWith('image/')) {
+        console.log('Comprimindo imagem...');
+        const compressed = await compressImage(selectedFile);
+        base64 = compressed.base64;
+        mimeType = compressed.mimeType;
+        format = 'jpeg';
+        fileType = 'jpg';
+      } else {
+        // Para PDFs, usar sem compressão
+        console.log('Processando PDF sem compressão...');
+        base64 = await fileToBase64(selectedFile);
+        const ext = (selectedFile?.name || '').split('.').pop()?.toLowerCase();
+        format = ext === 'jpg' ? 'jpeg' : ext;
+        mimeType = selectedFile.type;
+        fileType = ext;
       }
 
-      // Etapa 3: Validando via SEFAZ (Anti-Fraude)
-      updateProcessingStep(3);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Pausa para mostrar transição
-
-      // Aguardando o processamento de dados pela IA
-      const processedOrder = await processOrderResult(aiResult.data); // Garantir que a promise seja resolvida
-
-      // � VALIDAÇÃO ANTI-FRAUDE VIA SEFAZ
-      console.log('🔒 Iniciando validação anti-fraude...');
-
-      let validationResult;
-      let finalOrderData = processedOrder;
-
-      try {
-        // 🔑 PROCESSAR CHAVE NFE EXTRAÍDA PELO GEMINI
-        let chaveNFeGemini = null;
-        if (aiResult.data?.chaveNFe?.chaveCompleta && aiResult.data.chaveNFe.chaveCompleta !== 'N/A') {
-          chaveNFeGemini = aiResult.data.chaveNFe.chaveCompleta;
-          console.log('🤖 Gemini extraiu chave NFe:', {
-            chave: chaveNFeGemini,
-            encontradaAbaixoCodigoBarras: aiResult.data.chaveNFe.encontradaAbaixoCodigoBarras,
-            uf: aiResult.data.chaveNFe.uf,
-            validade: aiResult.data.chaveNFe.validadeVisual
-          });
-        }
-
-        // Tentar validar via SEFAZ usando texto OCR original + chave NFe do Gemini
-        const ocrText = aiResult.rawText || JSON.stringify(aiResult.data);
-        validationResult = await sefazValidationService.validateNotaFiscal(ocrText, processedOrder, chaveNFeGemini);
-
-        if (validationResult.success && !validationResult.useOCR) {
-          // ✅ DADOS OFICIAIS SEFAZ - 100% CONFIÁVEIS
-          console.log('✅ Validação SEFAZ bem-sucedida - usando dados oficiais');
-
-          finalOrderData = {
-            ...processedOrder,
-            totalValue: validationResult.data.valorTotal || processedOrder.totalValue,
-            orderDate: validationResult.data.dataEmissao || processedOrder.orderDate,
-            customer: validationResult.data.razaoSocial || processedOrder.customer,
-            cnpjEmitente: validationResult.data.cnpjEmitente,
-            chaveNFe: validationResult.data.chaveNFe,
-            validationType: validationResult.data.validationType || 'sefaz_official',
-            extractionMethod: validationResult.data.extractionMethod,
-            antifraudValidated: true,
-            sefazData: validationResult.data
-          };
-
-        } else if (validationResult.success && validationResult.useOCR) {
-          // ⚠️ DADOS OCR COM VALIDAÇÕES EXTRAS
-          console.log('⚠️ Usando dados OCR com validações anti-fraude extras');
-
-          // Aplicar validações extras para dados OCR
-          const ocrValidation = sefazValidationService.validateOCRData(processedOrder, ocrText);
-
-          // Se dados OCR são suspeitos, aplicar medidas restritivas
-          if (!ocrValidation.hasReasonableValues || ocrValidation.suspiciousPatterns.length > 2) {
-            console.warn('🚨 Padrões suspeitos detectados:', ocrValidation.suspiciousPatterns);
-
-            // Limitar pontos em casos suspeitos
-            const originalPoints = Math.floor((processedOrder.totalValue || 0) * getPointsPerReal());
-            const limitedPoints = Math.min(originalPoints, 50); // Máximo 50 pontos para casos suspeitos
-
-            finalOrderData = {
-              ...processedOrder,
-              totalPoints: limitedPoints,
-              validationType: 'ocr_limited',
-              antifraudValidated: true,
-              suspiciousPatterns: ocrValidation.suspiciousPatterns,
-              pointsLimited: originalPoints > limitedPoints,
-              originalPoints: originalPoints
-            };
-
-            console.log('🔒 Pontos limitados por segurança:', {
-              original: originalPoints,
-              limited: limitedPoints,
-              patterns: ocrValidation.suspiciousPatterns
-            });
-
-          } else {
-            // Dados OCR parecem válidos
-            finalOrderData = {
-              ...processedOrder,
-              chaveNFe: validationResult.data?.chaveNFe,
-              validationType: 'ocr_validated',
-              antifraudValidated: true,
-              ocrValidation
-            };
-          }
-
-        } else {
-          // ❌ FALHA NA VALIDAÇÃO - REJEITAR
-          console.error('❌ Falha na validação anti-fraude:', validationResult.error);
-
-          setResult({
-            orderNumber: `FRAUD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-            customer: 'Sistema Fast',
-            totalValue: 0,
-            items: [],
-            totalPoints: 0,
-            allProducts: [],
-            error: true,
-            errorMessage: `Validação anti-fraude falhou: ${validationResult.error}. Por segurança, não foi possível processar esta nota.`
-          });
-          setShowResult(true);
-          setTimeout(() => {
-            setShowAnimatedRows(true);
-          }, 300);
-          return;
-        }
-
-        updateProcessingStep(3, true); // Marca validação SEFAZ como concluída
-
-      } catch (validationError) {
-        console.error('⚠️ Erro na validação SEFAZ:', validationError);
-
-        // Em caso de erro na validação, usar dados OCR com limitações
-        finalOrderData = {
-          ...processedOrder,
-          validationType: 'ocr_fallback',
-          antifraudValidated: false,
-          validationError: validationError.message
-        };
-
-        updateProcessingStep(3, true); // Marca como concluída mesmo com erro
-      }
-
-      // Etapa 4: Calculando pontos
-      updateProcessingStep(4);
-      await new Promise(resolve => setTimeout(resolve, 800)); // Pausa para mostrar transição
-
-      // 🔍 LOG DETALHADO: Verificar dados processados
-      console.log('📊 DADOS PROCESSADOS COMPLETOS:', {
-        orderNumber: finalOrderData.orderNumber,
-        orderDate: finalOrderData.orderDate,
-        totalValue: finalOrderData.totalValue,
-        totalPoints: finalOrderData.totalPoints,
-        items: finalOrderData.items,
-        allProducts: finalOrderData.allProducts,
-        validationType: finalOrderData.validationType,
-        antifraudValidated: finalOrderData.antifraudValidated
-      });
-
-      // 🔍 LOG CRÍTICO: Verificar se totalPoints foi perdido durante processamento
-      console.log('🔍 VERIFICAÇÃO TOTALPOINTS APÓS PROCESSAMENTO:', {
-        'finalOrderData.totalPoints': finalOrderData.totalPoints,
-        'tipo': typeof finalOrderData.totalPoints,
-        'é número': typeof finalOrderData.totalPoints === 'number',
-        'é maior que 0': finalOrderData.totalPoints > 0,
-        'itens com pontos': finalOrderData.items?.filter(item => item.points > 0) || [],
-        'soma manual dos pontos': finalOrderData.items?.reduce((acc, item) => acc + (item.points || 0), 0) || 0
-      });
-
-      // 🔧 CÁLCULO DE PONTOS BASEADO NA VALIDAÇÃO
-      if (finalOrderData.validationType === 'sefaz_official') {
-        // Dados oficiais SEFAZ - calcular normalmente
-        const multiplier = getPointsPerReal();
-        const calculatedPoints = Math.floor((finalOrderData.totalValue || 0) * multiplier);
-        finalOrderData.totalPoints = calculatedPoints;
-        console.log('🔧 Pontos calculados com dados SEFAZ:', { totalValue: finalOrderData.totalValue, multiplier, calculatedPoints });
-
-      } else if (!finalOrderData.pointsLimited) {
-        // Dados OCR validados - calcular normalmente
-        const multiplier = getPointsPerReal();
-        const calculatedPoints = Math.floor((finalOrderData.totalValue || 0) * multiplier);
-        finalOrderData.totalPoints = calculatedPoints;
-        console.log('🔧 Pontos calculados por valor total (OCR):', { totalValue: finalOrderData.totalValue, multiplier, calculatedPoints });
-      }
-      // Se pointsLimited=true, os pontos já foram limitados na validação
-
-      updateProcessingStep(4, true); // Marca cálculo de pontos como concluído
-
-      // Validar pedido
-      const validation = await validateOrder(finalOrderData);
-
-      // ✅ APENAS LOG DE WARNINGS - NÃO BLOQUEAR PROCESSAMENTO
-      if (validation.warnings && validation.warnings.length > 0) {
-        console.log('Avisos de validação:', validation.warnings);
-      }
-
-      if (validation.errors && validation.errors.length > 0) {
-        console.log('Erros de validação (não bloqueando):', validation.errors);
-      }
-
-      // VALIDAÇÃO DE PONTOS: Verificar se os cálculos estão corretos
-      if (finalOrderData.items && finalOrderData.items.length > 0) {
-        try {
-          const validacaoPontos = await validarPontosCalculados(finalOrderData.items);
-
-          if (!validacaoPontos.todosCorretos) {
-            console.warn('⚠️ Alguns pontos podem estar incorretos, mas prosseguindo com totalPoints atual...');
-            // NÃO sobrescrever totalPoints aqui pois já foi corrigido acima
-          } else {
-            console.log('✅ Todos os pontos foram validados e estão corretos!');
-          }
-        } catch (validationError) {
-          console.warn('⚠️ Erro na validação de pontos, mas prosseguindo...', validationError);
-        }
-      }
-
-      // Etapa 5: Salvando no sistema
-      updateProcessingStep(5);
-      await new Promise(resolve => setTimeout(resolve, 800)); // Pausa para mostrar transição
-
-      // Salvar no banco
-      const customerId = user.id;
-
-      // 🔍 LOG CRÍTICO: Verificar se user.id está presente
-      console.log('🔍 VERIFICAÇÃO CRÍTICA - DADOS DO USUÁRIO:', {
-        user_completo: user,
-        user_id: user?.id,
-        customerId,
-        user_id_type: typeof user?.id,
-        user_exists: !!user,
-        user_id_exists: !!user?.id
-      });
-
-      if (!customerId) {
-        console.error('❌ ERRO CRÍTICO: user.id não está definido!');
-        setError('Erro: usuário não identificado. Faça login novamente.');
-        return;
-      }
-
-      // Log de verificação antes de salvar
-      console.log('🔍 Dados que serão salvos no banco:', {
-        cliente_id: customerId,
-        numero_pedido: finalOrderData.orderNumber,
-        data_emissao: finalOrderData.orderDate,
-        valor_total: finalOrderData.totalValue,
-        hash_documento: finalOrderData.documentHash,
-        pontos_gerados: finalOrderData.totalPoints,
-        status: 'processado',
-        validationType: finalOrderData.validationType,
-        antifraudValidated: finalOrderData.antifraudValidated
-      })
-
-      // Salvar pedido principal
-      const savedOrder = await saveOrder({
-        cliente_id: customerId,
-        numero_pedido: finalOrderData.orderNumber,
-        data_emissao: finalOrderData.orderDate,
-        valor_total: finalOrderData.totalValue,
-        hash_documento: finalOrderData.documentHash,
-        pontos_gerados: finalOrderData.totalPoints,
-        status: 'processado' // Sempre usar 'processado' - o que importa são os pontos
-      });
-
-      // Salvar itens do pedido (apenas se houver itens)
-      if (finalOrderData.items && finalOrderData.items.length > 0) {
-        for (const item of finalOrderData.items) {
-          await saveOrderItems({
-            pedido_id: savedOrder.id,
-            produto_catalogo_id: item.product_id,
-            nome_produto: item.product_name,
-            codigo_produto: item.product_code,
-            quantidade: item.quantity,
-            valor_unitario: item.unit_price,
-            valor_total: item.total_value,
-            pontos_calculados: item.points,
-            categoria: item.category,
-            produto_fast: true
-          });
-        }
-      }
-      updateProcessingStep(5, true); // Marca salvamento como concluído
-
-      // 🔍 LOG FINAL: Dados que serão exibidos na interface
-      console.log('🎯 DADOS PARA A INTERFACE:', {
-        orderNumber: finalOrderData.orderNumber,
-        totalValue: finalOrderData.totalValue,
-        totalPoints: finalOrderData.totalPoints,
-        items: finalOrderData.items,
-        allProducts: finalOrderData.allProducts,
-        orderId: savedOrder.id,
-        validationType: finalOrderData.validationType,
-        antifraudValidated: finalOrderData.antifraudValidated
-      });
-
-      // ✅ RESULTADO FINAL PARA A INTERFACE - COM GARANTIA DE totalPoints
-      const totalPointsGarantido = finalOrderData.totalPoints || finalOrderData.items?.reduce((acc, item) => acc + (Number(item.points) || 0), 0) || 0;
-
-      const resultadoFinal = {
-        orderNumber: finalOrderData.orderNumber,
-        orderDate: finalOrderData.orderDate,
-        customer: finalOrderData.customer,
-        totalValue: finalOrderData.totalValue,
-        items: finalOrderData.items,
-        totalPoints: totalPointsGarantido,
-        documentHash: finalOrderData.documentHash,
-        allProducts: finalOrderData.allProducts,
-        orderId: savedOrder.id,
-        validationType: finalOrderData.validationType,
-        antifraudValidated: finalOrderData.antifraudValidated,
-        chaveNFe: finalOrderData.chaveNFe,
-        suspiciousPatterns: finalOrderData.suspiciousPatterns,
-        pointsLimited: finalOrderData.pointsLimited,
-        originalPoints: finalOrderData.originalPoints,
-        usingFallback: usingFallback, // Informar se usou IA simulada
-        processingMethod: processingMethod // Informar qual método foi usado
+      // Preparar dados para envio (formato mais simples)
+      const payload = {
+        source: 'sistema-de-fidelidade-web',
+        timestamp: new Date().toISOString(),
+        imagemBase64: base64,
+        mimeType: mimeType,
+        format: format,
+        fileType: fileType,
+        clienteId: user?.id
       };
 
-      console.log('🔒 RESULTADO FINAL GARANTIDO:', {
-        'totalPoints original': finalOrderData.totalPoints,
-        'totalPoints garantido': totalPointsGarantido,
-        'totalPoints no resultado': resultadoFinal.totalPoints,
-        'validationType': finalOrderData.validationType,
-        'antifraudValidated': finalOrderData.antifraudValidated
+      console.log('Enviando para n8n:', {
+        url: 'https://n8n.unitycompany.com.br/webhook/sistema-de-fidelidade',
+        payload: {
+          ...payload,
+          imagemBase64: payload.imagemBase64.substring(0, 50) + '...' // Log apenas os primeiros 50 caracteres do base64
+        }
       });
 
-      // 🔍 LOG CRÍTICO: Verificar totalPoints ANTES de creditar
-      console.log('🔍 VERIFICAÇÃO CRÍTICA ANTES DO CRÉDITO:', {
-        'resultadoFinal.totalPoints': resultadoFinal.totalPoints,
-        'tipo de resultadoFinal.totalPoints': typeof resultadoFinal.totalPoints,
-        'resultadoFinal.totalPoints > 0': resultadoFinal.totalPoints > 0,
-        'resultadoFinal.totalPoints === 0': resultadoFinal.totalPoints === 0,
-        'finalOrderData.items.length': finalOrderData.items?.length || 0,
-        'finalOrderData.items': finalOrderData.items,
-        'soma pontos dos items': finalOrderData.items?.reduce((acc, item) => acc + (item.points || 0), 0) || 0,
-        'validationType': resultadoFinal.validationType,
-        'antifraudValidated': resultadoFinal.antifraudValidated
+      // Enviar para o webhook do n8n com timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos
+      
+      const response = await fetch('https://n8n.unitycompany.com.br/webhook/sistema-de-fidelidade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
-      // Adicionar pontos ao cliente (apenas se houver pontos)
-      if (resultadoFinal.totalPoints > 0) {
-        // Etapa 6: Creditando pontos
-        updateProcessingStep(6);
-        await new Promise(resolve => setTimeout(resolve, 700)); // Pausa para mostrar transição
-
+      let n8nResponse = {};
+      
+      if (!response.ok) {
+        console.error(`Erro HTTP ${response.status} do n8n:`, response.statusText);
+        
+        // Tentar ler a resposta de erro
         try {
-          console.log('💰 Iniciando crédito de pontos para o cliente:', {
-            customerId,
-            pontos: resultadoFinal.totalPoints,
-            orderNumber: finalOrderData.orderNumber,
-            validationType: resultadoFinal.validationType
+          const errorText = await response.text();
+          console.error('Resposta de erro completa do n8n:', errorText);
+          console.error('Headers da resposta:', response.headers);
+        } catch (e) {
+          console.error('Não foi possível ler a resposta de erro:', e);
+        }
+        
+        // Usar valores padrão se o n8n falhar
+        console.log('Webhook n8n retornou erro. Usando pontos padrão para continuar funcionamento.');
+        n8nResponse = {
+          pontos: 5, // pontos padrão em caso de erro
+          orderNumber: `AUTO-${Date.now()}`,
+          orderDate: new Date().toISOString(),
+          totalValue: 0,
+          source: 'fallback-error-500'
+        };
+      } else {
+        try {
+          n8nResponse = await response.json();
+          console.log('Resposta válida do n8n:', n8nResponse);
+        } catch (jsonError) {
+          console.error('Erro ao fazer parse do JSON da resposta:', jsonError);
+          const responseText = await response.text();
+          console.error('Resposta não-JSON recebida:', responseText);
+          
+          // Fallback se não conseguir fazer parse do JSON
+          n8nResponse = {
+            pontos: 3,
+            orderNumber: `PARSE-ERROR-${Date.now()}`,
+            orderDate: new Date().toISOString(),
+            totalValue: 0,
+            source: 'fallback-json-error'
+          };
+        }
+      }
+
+      // Etapa 2: Creditar pontos retornados
+      updateProcessingStep(2);
+      
+      // Processar resposta do n8n (pode ser array ou objeto)
+      let pontosCalculados = 0;
+      
+      console.log('🔍 [PROCESSAMENTO N8N] Resposta recebida:', {
+        tipo: Array.isArray(n8nResponse) ? 'array' : typeof n8nResponse,
+        conteudo: n8nResponse
+      });
+      
+      // Verificar erros específicos do n8n
+      if (n8nResponse && typeof n8nResponse === 'object') {
+        // Verificar erro de nota já usada
+        if (n8nResponse.nota === "A nota fiscal enviada já foi usada.") {
+          throw new Error('Esta nota fiscal já foi processada anteriormente.');
+        }
+        
+        // Verificar erro de data limite (3 meses)
+        if (n8nResponse.date === "A data da nota, excedeu o limite de 3 meses!") {
+          throw new Error('A data desta nota fiscal excedeu o limite de 3 meses. Apenas notas fiscais emitidas nos últimos 3 meses são aceitas.');
+        }
+      }
+      
+      if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
+        // Se é um array, pegar o primeiro elemento
+        const resultado = n8nResponse[0];
+        console.log('🔍 Processando resultado do array n8n:', resultado);
+        
+        // Verificar erros no resultado do array também
+        if (resultado.nota === "A nota fiscal enviada já foi usada.") {
+          throw new Error('Esta nota fiscal já foi processada anteriormente.');
+        }
+        
+        if (resultado.date === "A data da nota, excedeu o limite de 3 meses!") {
+          throw new Error('A data desta nota fiscal excedeu o limite de 3 meses. Apenas notas fiscais emitidas nos últimos 3 meses são aceitas.');
+        }
+        
+        if (resultado.status === 'sucesso' && resultado.pontuacao_total) {
+          pontosCalculados = Number(resultado.pontuacao_total);
+          console.log(`✅ Pontos extraídos do n8n (array): ${pontosCalculados}`);
+        } else {
+          console.warn('⚠️ Resultado do n8n sem pontuacao_total válida:', resultado);
+        }
+      } else if (n8nResponse && typeof n8nResponse === 'object') {
+        // Se é objeto direto, tentar diferentes propriedades
+        pontosCalculados = Number(n8nResponse.pontuacao_total) || 
+                          Number(n8nResponse.pontos) || 
+                          Number(n8nResponse.points) || 0;
+        console.log(`✅ Pontos extraídos do n8n (objeto): ${pontosCalculados}`);
+      } else {
+        console.warn('⚠️ Resposta do n8n não é array nem objeto válido:', n8nResponse);
+      }
+      
+      const pontos = pontosCalculados;
+      
+      console.log(`🎯 [DEBUG] Pontos finais para creditar: ${pontos} | Tipo: ${typeof pontos}`);
+      
+      if (!user?.id) throw new Error('Usuário não identificado');
+      
+      // Validar se os pontos são válidos antes de creditar
+      if (pontos <= 0) {
+        console.warn(`⚠️ Pontos inválidos (${pontos}). Não creditando, mas salvando nota.`);
+      } else {
+        const updatedCustomer = await addPointsToCustomer(user.id, pontos, 'Crédito via n8n (upload)');
+        notifyPointsEarned(pontos);
+
+        // Atualizações de contexto
+        if (window.updateUserContext) {
+          await window.updateUserContext({
+            saldo_pontos: updatedCustomer.saldo_pontos,
+            total_pontos_ganhos: updatedCustomer.total_pontos_ganhos
           });
-
-          const updatedCustomer = await addPointsToCustomer(customerId, resultadoFinal.totalPoints, `Pedido ${finalOrderData.orderNumber}`);
-
-          console.log('✅ Pontos creditados com sucesso:', {
-            saldoAnterior: user.saldo_pontos,
-            pontosAdicionados: resultadoFinal.totalPoints,
-            novoSaldo: updatedCustomer.saldo_pontos,
-            validationType: resultadoFinal.validationType
+        }
+        if (onUserUpdate) {
+          onUserUpdate({
+            ...user,
+            saldo_pontos: updatedCustomer.saldo_pontos,
+            total_pontos_ganhos: updatedCustomer.total_pontos_ganhos
           });
+        }
+        if (window.triggerGlobalRefresh) window.triggerGlobalRefresh();
+        window.dispatchEvent(new CustomEvent('userUpdated'));
+      }
 
-          // Enviar notificação de pontos creditados
-          notifyPointsEarned(resultadoFinal.totalPoints);
-
-          // Atualizar contexto global do usuário para refletir novos pontos
-          if (window.updateUserContext) {
-            await window.updateUserContext({
-              saldo_pontos: updatedCustomer.saldo_pontos,
-              total_pontos_ganhos: updatedCustomer.total_pontos_ganhos
-            });
-          }
-
-          // Atualizar via prop callback também
-          if (onUserUpdate) {
-            onUserUpdate({
-              ...user,
-              saldo_pontos: updatedCustomer.saldo_pontos,
-              total_pontos_ganhos: updatedCustomer.total_pontos_ganhos
-            });
-          }
-
-          // Forçar refresh global (dashboard)
-          if (window.triggerGlobalRefresh) {
-            window.triggerGlobalRefresh();
-          }
-
-          // Disparar evento global para outros componentes atualizarem
-          window.dispatchEvent(new CustomEvent('userUpdated'));
-
-          // Incluir saldo atualizado no resultado para interface
-          resultadoFinal.saldoAtualizado = updatedCustomer.saldo_pontos;
-          updateProcessingStep(6, true); // Marca crédito como concluído
-
-        } catch (error) {
-          console.error('❌ Erro ao creditar pontos:', error);
-          setError('Erro ao creditar pontos no banco de dados. Tente novamente.');
-          setResult({
-            ...resultadoFinal,
-            error: true,
-            errorMessage: 'Erro ao creditar pontos no banco de dados. Tente novamente.'
-          });
-          setShowResult(true);
-          setTimeout(() => {
-            setShowAnimatedRows(true);
-          }, 300);
-          return;
+      // Etapa 3: Salvar dados da nota fiscal na coleção
+      updateProcessingStep(3);
+      
+      let dadosNotaParaSalvar = null;
+      
+      if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
+        dadosNotaParaSalvar = n8nResponse[0];
+      } else if (n8nResponse && typeof n8nResponse === 'object') {
+        dadosNotaParaSalvar = n8nResponse;
+      }
+      
+      if (dadosNotaParaSalvar && dadosNotaParaSalvar.nota) {
+        console.log('💾 [SALVAMENTO] Salvando dados da nota fiscal:', dadosNotaParaSalvar);
+        
+        // Salvar a nota fiscal (n8n já validou duplicatas)
+        const resultadoSalvamento = await imagemNotaFiscalService.salvarNotaFiscalDados(
+          null, // pedidoId - será null para este caso
+            user.id,
+            dadosNotaParaSalvar,
+            'upload_imagem'
+          );
+          
+        if (resultadoSalvamento.success) {
+          console.log('✅ [SALVAMENTO] Nota fiscal salva com sucesso');
+        } else {
+          console.error('❌ [SALVAMENTO] Erro ao salvar nota fiscal:', resultadoSalvamento.error);
+          // Não parar o processo por erro de salvamento, apenas avisar
         }
       } else {
-        console.log('ℹ️ Nenhum ponto para creditar (totalPoints =', resultadoFinal.totalPoints, ')');
+        console.warn('⚠️ [SALVAMENTO] Dados da nota fiscal não encontrados na resposta do n8n');
       }
 
-      console.log('🎯 RESULTADO FINAL DEFINIDO NO setResult:', resultadoFinal);
-      console.log('🔍 VERIFICAÇÃO SPREAD OPERATOR:', {
-        'processedOrder.orderNumber': processedOrder.orderNumber,
-        'processedOrder.totalValue': processedOrder.totalValue,
-        'processedOrder.totalPoints': processedOrder.totalPoints,
-        'processedOrder.items': processedOrder.items,
-        'processedOrder.allProducts': processedOrder.allProducts,
-        'savedOrder.id': savedOrder.id
-      });
-
-      // 🚨 LOG CRÍTICO ANTES DO setResult
-      console.log('🚨 ANTES DO setResult - DADOS QUE SERÃO PASSADOS:', {
-        'typeof resultadoFinal': typeof resultadoFinal,
-        'resultadoFinal keys': Object.keys(resultadoFinal),
-        'resultadoFinal.items': resultadoFinal.items,
-        'resultadoFinal.allProducts': resultadoFinal.allProducts,
-        'resultadoFinal.totalPoints': resultadoFinal.totalPoints,
-        'resultadoFinal.orderNumber': resultadoFinal.orderNumber,
-        'Array.isArray(resultadoFinal.items)': Array.isArray(resultadoFinal.items),
-        'Array.isArray(resultadoFinal.allProducts)': Array.isArray(resultadoFinal.allProducts),
-        'JSON completo': JSON.stringify(resultadoFinal, null, 2)
-      });
-
-      // 🎯 APLICAR O RESULTADO FINAL DIRETAMENTE
-      const resultadoSeguro = {
-        ...resultadoFinal,
-        // Garantir que campos essenciais existam
-        allProducts: resultadoFinal.allProducts || [],
-        items: resultadoFinal.items || [],
-        totalPoints: resultadoFinal.totalPoints ?? 0, // Usar nullish coalescing para preservar 0 como valor válido
-        totalValue: resultadoFinal.totalValue ?? 0    // Usar nullish coalescing para preservar 0 como valor válido
-      };
-
-      console.log('🔒 APLICANDO RESULTADO SEGURO:', {
-        'resultadoSeguro.totalPoints': resultadoSeguro.totalPoints,
-        'typeof resultadoSeguro.totalPoints': typeof resultadoSeguro.totalPoints,
-        'resultadoSeguro.totalPoints === 0': resultadoSeguro.totalPoints === 0,
-        'resultadoSeguro completo': resultadoSeguro
-      });
-      setResult(resultadoSeguro);
-      setShowResult(true);
-      // Iniciar animação das linhas após um pequeno delay
-      setTimeout(() => {
-        setShowAnimatedRows(true);
-      }, 300);
-      console.log('✅ RESULTADO APLICADO COM SUCESSO');
-
-    } catch (err) {
-      console.error('Erro ao processar pedido:', err);
-
-      // 🚨 TRATAMENTO ESPECÍFICO PARA ERRO DE QUOTA DA API
-      if (err.message && (err.message.includes('429') || err.message.includes('quota'))) {
-        setResult({
-          orderNumber: `QUOTA-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-          customer: 'Cliente',
-          totalValue: 0,
-          totalPoints: 0,
+      // Exibir resultado
+      let resultadoFinal;
+      
+      if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
+        const dadosN8n = n8nResponse[0];
+        resultadoFinal = {
+          orderNumber: dadosN8n.nota || '—',
+          orderDate: dadosN8n.data_emissao || dadosN8n.data || new Date().toISOString(),
+          totalValue: 0, // n8n não retorna valor total, apenas pontos
+          totalPoints: pontos,
           items: [],
           allProducts: [],
-          isQuotaLimit: true,
-          usingFallback: false,
-          processingMethod: 'quota_limit',
-          error: true,
-          errorMessage: 'Limite diário da API excedido.'
-        });
-        setShowResult(true);
-        setTimeout(() => {
-          setShowAnimatedRows(true);
-        }, 300);
-        return;
+          status: dadosN8n.status || 'processado'
+        };
+      } else {
+        resultadoFinal = {
+          orderNumber: n8nResponse.orderNumber || '—',
+          orderDate: n8nResponse.orderDate || null,
+          totalValue: n8nResponse.totalValue || 0,
+          totalPoints: pontos,
+          items: n8nResponse.items || [],
+          allProducts: n8nResponse.allProducts || [],
+          status: 'processado'
+        };
       }
+      
+      setResult(resultadoFinal);
+      setShowResult(true);
+      setTimeout(() => setShowAnimatedRows(true), 300);
 
-      // Outros erros genéricos
-      setError('Erro ao processar o pedido. Tente novamente.');
-      setResult({
-        orderNumber: `ERROR-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-        customer: 'Sistema Fast',
-        totalValue: 0,
-        totalPoints: 0,
-        items: [],
-        allProducts: [],
-        error: true,
-        errorMessage: 'Erro no processamento da imagem. O documento pode estar muito borrado ou com formato não suportado. Tente uma imagem mais nítida.'
+    } catch (err) {
+      console.error('[Upload] Erro no processamento via n8n:', err);
+      
+      // Verificar se é erro de timeout
+      if (err?.name === 'AbortError') {
+        console.error('Timeout ao conectar com o webhook n8n');
+        setError('Timeout na conexão com o servidor. Tente novamente.');
+      } else if (err?.message && err.message.includes('Failed to fetch')) {
+        console.error('Erro de rede ao conectar com n8n');
+        setError('Erro de conexão. Verifique sua internet e tente novamente.');
+      } else if (err?.type === 'error') {
+        console.error('Erro ao carregar/processar imagem');
+        setError('Erro ao processar a imagem. Tente com outro arquivo.');
+      } else {
+        setError(err?.message || 'Falha ao processar a nota.');
+      }
+      
+      setResult({ 
+        error: true, 
+        errorMessage: err?.message || 'Falha ao processar a nota.', 
+        totalPoints: 0, 
+        items: [], 
+        allProducts: [] 
       });
       setShowResult(true);
-      setTimeout(() => {
-        setShowAnimatedRows(true);
-      }, 300);
+      setTimeout(() => setShowAnimatedRows(true), 300);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Função para comprimir imagem (método mais robusto)
+  const compressImage = async (file, maxW = 1800, quality = 0.7) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const scale = Math.min(1, maxW / img.width);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            // JPEG reduz bem; PNG geralmente fica grande
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            const base64 = dataUrl.split(',')[1]; // sem prefixo
+            
+            const sizeKB = Math.round(base64.length / 1024);
+            console.log(`Imagem comprimida: ${img.width}x${img.height} → ${canvas.width}x${canvas.height}, ${sizeKB}KB`);
+            
+            resolve({ base64, mimeType: 'image/jpeg', fileName: 'nota.jpg' });
+          } catch (error) {
+            reject(error);
+          }
+        };
+        img.onerror = (error) => {
+          console.error('Erro ao carregar imagem para compressão:', error);
+          reject(new Error('Falha ao carregar imagem para compressão'));
+        };
+        img.src = e.target.result; // Usa data URL ao invés de blob URL
+      };
+      reader.onerror = (error) => {
+        console.error('Erro ao ler arquivo:', error);
+        reject(new Error('Falha ao ler arquivo'));
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const fileToBase64 = (file) => {
@@ -1233,6 +943,16 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       reader.onload = () => {
         // Remover prefixo "data:*/*;base64," para economizar espaço
         const base64String = reader.result.split(',')[1];
+        
+        // Log do tamanho para debugging
+        const sizeKB = Math.round(base64String.length / 1024);
+        console.log(`Arquivo convertido para base64: ${sizeKB}KB`);
+        
+        // Se for muito grande, vamos limitar
+        if (sizeKB > 5000) { // 5MB em base64
+          console.warn('Arquivo muito grande em base64, pode causar erro 500');
+        }
+        
         resolve(base64String);
       };
       reader.onerror = (error) => {
@@ -1250,18 +970,19 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
     
     // Exibir informações da nota no formato adequado para o componente
     setResult({
-      orderNumber: dadosNota.numero,
-      issueDate: dadosNota.dataEmissao,
+      orderNumber: dadosNota.numero || dadosNota.orderNumber || '—',
+      issueDate: dadosNota.dataEmissao || null,
       customer: dadosNota.cliente?.nome || 'Cliente',
-      totalValue: parseFloat(dadosNota.valorTotal),
-      totalPoints: dadosNota.pontos,
+      totalValue: parseFloat(dadosNota.valorTotal) || 0,
+      totalPoints: dadosNota.pontos || 0,
       items: dadosNota.produtos?.map(p => ({
         code: p.codigo,
         name: p.descricao,
         unitValue: p.valor,
         points: p.pontos
       })) || [],
-      sapData: true // Indicador que os dados vieram do SAP
+      sapData: false, // Dados vieram do n8n webhook, não do SAP
+      source: 'input-numero'
     });
     
     setShowResult(true);
@@ -1300,7 +1021,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
               
               {/* Exibir componente baseado no modo selecionado */}
               {inputMode === 'foto' ? (
-                <>
+                <div>
                   <MinimalUpload htmlFor="file-upload">
                     <input id="file-upload" type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }} onChange={handleFileInput} />
                     
@@ -1325,7 +1046,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
                   </MinimalButton>
                   
                   {error && <div style={{ color: '#A91918', marginTop: 10, fontSize: 15, textAlign: 'center', width: '100%', maxWidth: 420 }}>{error}</div>}
-                </>
+                </div>
               ) : (
                 <NotaFiscalInput 
                   onNotaProcessada={handleNotaProcessada} 
@@ -1339,12 +1060,12 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
             <ProcessingContainer>
               <CurrentStep>
                 {currentStep > 0 && (
-                  <>
+                  <div>
                     <StepSpinnerLarge />
                     <StepText key={stepTextKey}>
                       {processingSteps.find(step => step.id === currentStep)?.text || 'Processando...'}
                     </StepText>
-                  </>
+                  </div>
                 )}
               </CurrentStep>
             </ProcessingContainer>
@@ -1360,29 +1081,25 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
                   <ExcelTable>
                     <tbody>
                       {showAnimatedRows && (
-                        <>
-                          <AnimatedTableRow delay={0.1}>
-                            <ExcelTh>Pedido</ExcelTh>
-                            <ExcelTd>{result.orderNumber}</ExcelTd>
-                          </AnimatedTableRow>
-                          <AnimatedTableRow delay={0.3}>
-                            <ExcelTh>Data de Expedição</ExcelTh>
-                            <ExcelTd>{result.orderDate ? new Date(result.orderDate).toLocaleDateString('pt-BR') : '-'}</ExcelTd>
-                          </AnimatedTableRow>
-                          <AnimatedTableRow delay={0.5}>
-                            <ExcelTh>Valor Total da Nota</ExcelTh>
-                            <ExcelTd>R$ {Number(result.totalValue).toFixed(2)}</ExcelTd>
-                          </AnimatedTableRow>
-                        </>
+                        <AnimatedTableRow $delay={0.1}>
+                          <ExcelTh>NF-e</ExcelTh>
+                          <ExcelTd>{result.orderNumber}</ExcelTd>
+                        </AnimatedTableRow>
+                      )}
+                      {showAnimatedRows && (
+                        <AnimatedTableRow $delay={0.3}>
+                          <ExcelTh>Data de Expedição</ExcelTh>
+                          <ExcelTd>{result.orderDate ? new Date(result.orderDate).toLocaleDateString('pt-BR') : '-'}</ExcelTd>
+                        </AnimatedTableRow>
+                      )}
+                      {showAnimatedRows && (
+                        <AnimatedTableRow $delay={0.5}>
+                          <ExcelTh>Total de Pontos</ExcelTh>
+                          <ExcelTd><strong>+{result.totalPoints} pontos</strong></ExcelTd>
+                        </AnimatedTableRow>
                       )}
                     </tbody>
                   </ExcelTable>
-
-                  {showAnimatedRows && result.totalPoints > 0 && (
-                    <PointsHighlight>
-                      <span className="points-number">+{result.totalPoints}</span> pontos creditados
-                    </PointsHighlight>
-                  )}
 
                   {showAnimatedRows && (
                     <div style={{

@@ -345,6 +345,81 @@ class ImagemNotaFiscalService {
         console.log('Sincronização com Cloudflare não implementada ainda');
         return false;
     }
+
+    /**
+     * Salvar registro de nota fiscal sem imagem (baseado nos dados do n8n)
+     * @param {string} pedidoId - ID do pedido
+     * @param {string} clienteId - ID do cliente
+     * @param {object} dadosNota - Dados da nota fiscal extraídos pelo n8n
+     * @param {string} origem - Origem dos dados ('input_manual' ou 'upload_imagem')
+     */
+    async salvarNotaFiscalDados(pedidoId, clienteId, dadosNota, origem = 'input_manual') {
+        try {
+            console.log('💾 [NOTA FISCAL] Salvando dados da nota fiscal:', {
+                pedidoId,
+                clienteId,
+                dadosNota,
+                origem
+            });
+
+            // Obter IP
+            const clientIP = await this.obterIP();
+
+            // Dados para inserir na tabela
+            const notaData = {
+                pedido_id: pedidoId,
+                cliente_id: clienteId,
+                nome_arquivo: `${origem}_${dadosNota.nota || Date.now()}.json`,
+                tipo_arquivo: 'application/json',
+                tamanho_bytes: JSON.stringify(dadosNota).length,
+                numero_nota: dadosNota.nota || null,
+                chave_acesso: dadosNota.chave_acesso || null,
+                status_upload: 'processado',
+                ip_origem: clientIP,
+                user_agent: navigator.userAgent
+            };
+
+            console.log('💾 [NOTA FISCAL] Dados preparados para inserção:', notaData);
+
+            // Inserir no banco de dados (n8n já validou duplicatas)
+            const { data: notaRecord, error: dbError } = await supabase
+                .from('imagens_notas_fiscais')
+                .insert([notaData])
+                .select()
+                .single();
+
+            if (dbError) {
+                console.error('❌ [NOTA FISCAL] Erro ao salvar no banco:', dbError);
+                throw dbError;
+            }
+
+            console.log('✅ [NOTA FISCAL] Nota fiscal salva com sucesso:', notaRecord);
+
+            return {
+                success: true,
+                data: notaRecord
+            };
+
+        } catch (error) {
+            console.error('💥 [NOTA FISCAL] Erro ao salvar nota fiscal:', error);
+            return {
+                success: false,
+                error: error.message || 'Erro ao salvar nota fiscal'
+            };
+        }
+    }
+
+    /**
+     * Verificar se uma nota fiscal já foi processada
+     * @param {string} clienteId - ID do cliente
+     * @param {string} numeroNota - Número da nota fiscal
+     * @param {string} chaveAcesso - Chave de acesso (opcional)
+     * @deprecated - Validação agora é feita pelo n8n
+     */
+    async verificarNotaExistente(clienteId, numeroNota, chaveAcesso = null) {
+        console.warn('⚠️ [VERIFICAÇÃO] Função descontinuada - validação agora é feita pelo n8n');
+        return { exists: false };
+    }
 }
 
 // Instância singleton
