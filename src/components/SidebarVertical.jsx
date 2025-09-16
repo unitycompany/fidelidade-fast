@@ -180,13 +180,15 @@ const LogoutButton = styled.button`
 // Itens de navegação para clientes
 const clienteItems = [
   { key: 'upload', label: 'Enviar Nota', icon: FiUpload },
-  { key: 'premios', label: 'Prêmios', icon: FiGift }
+  { key: 'premios', label: 'Prêmios', icon: FiGift },
+  { key: 'perfil', label: 'Perfil', icon: FiUser }
 ];
 
 // Itens para gerentes (cliente + resgates admin)
 const gerenteItems = [
   { key: 'upload', label: 'Enviar Nota', icon: FiUpload },
   { key: 'premios', label: 'Prêmios', icon: FiGift },
+  { key: 'perfil', label: 'Perfil', icon: FiUser },
   { key: 'gerente-resgates', label: 'Resgates Admin', icon: FiSettings }
 ];
 

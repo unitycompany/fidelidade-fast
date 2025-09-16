@@ -17,6 +17,7 @@ import AdminPanelNovo from './components/AdminPanelNovo'
 import AdminUsuarios from './components/AdminUsuarios'
 import GerenteResgates from './components/GerenteResgates'
 import MeusResgates from './components/MeusResgates'
+import Perfil from './components/Perfil'
 import { inicializarProdutosElegiveis } from './utils/inicializarProdutos'
 import { inicializarPremios } from './utils/inicializarPremios'
 import SidebarVertical from './components/SidebarVertical'
@@ -237,6 +238,8 @@ function App() {
   const renderPage = () => {
     // Verificar permissões antes de renderizar páginas
     switch (currentPage) {
+      case 'perfil':
+        return temPermissao('cliente') ? <Perfil user={user} onUserUpdate={handleUserUpdate} /> : <div>Acesso negado</div>
       case 'upload':
         return temPermissao('cliente') ? <UploadPedidoNovo user={user} onUserUpdate={handleUserUpdate} /> : <div>Acesso negado</div>
       case 'premios':

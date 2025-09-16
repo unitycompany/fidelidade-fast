@@ -258,7 +258,8 @@ const Overlay = styled.div`
 const navigationItems = [
   { key: 'dashboard', label: 'Dashboard', icon: FiHome },
   { key: 'upload', label: 'Enviar Nota', icon: FiUpload },
-  { key: 'premios', label: 'Prêmios', icon: FiGift }
+  { key: 'premios', label: 'Prêmios', icon: FiGift },
+  { key: 'perfil', label: 'Perfil', icon: FiUser }
 ];
 
 // Itens administrativos (apenas para admins)
@@ -425,6 +426,18 @@ function NavigationResponsivo({ currentPage, onPageChange, user, onLogout }) {
                 {item.label}
               </MobileNavLink>
             ))}
+
+            {/* Garantir opção Perfil no mobile mesmo se não vier dos itens (ex: admin) */}
+            {allNavigationItems.every(i => i.key !== 'perfil') && (
+              <MobileNavLink
+                key="perfil"
+                $active={currentPage === 'perfil'}
+                onClick={() => handlePageChange('perfil')}
+              >
+                <FiUser />
+                Perfil
+              </MobileNavLink>
+            )}
 
             <MobileNavLink onClick={handleLogout}>
               <FiLogOut />

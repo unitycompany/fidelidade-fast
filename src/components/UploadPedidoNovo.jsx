@@ -270,7 +270,7 @@ const MinimalButton = styled.button`
   font-weight: 600;
   margin-top: 1.2rem;
   width: 100%;
-  max-width: 420px;
+  max-width: 100%;
   align-self: center;
   cursor: pointer;
   transition: background 0.2s;
