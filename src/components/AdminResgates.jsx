@@ -283,13 +283,14 @@ function AdminResgates({ user }) {
     coletados: 0,
     hoje: 0
   });
+  const [confirmCpfModal, setConfirmCpfModal] = useState({ open: false, resgate: null, cpf: '' });
 
   const carregarResgates = async () => {
     try {
       setLoading(true);
 
       // Buscar resgates com joins para ter dados completos
-      const { data: resgatesData, error: resgatesError } = await supabase
+    const { data: resgatesData, error: resgatesError } = await supabase
         .from('resgates')
         .select(`
                     *,
@@ -303,8 +304,9 @@ function AdminResgates({ user }) {
                     clientes_fast!inner(
                         id,
                         nome,
-                        email,
-                        telefone
+            email,
+            telefone,
+            cpf_cnpj
                     )
                 `)
         .order('created_at', { ascending: false });
@@ -334,6 +336,7 @@ function AdminResgates({ user }) {
           cliente_nome: resgate.clientes_fast.nome,
           cliente_email: resgate.clientes_fast.email,
           cliente_telefone: resgate.clientes_fast.telefone,
+          cliente_cpf: resgate.clientes_fast.cpf_cnpj,
           // Dados do prêmio
           premio_nome: resgate.premios_catalogo.nome,
           premio_categoria: resgate.premios_catalogo.categoria,
@@ -369,6 +372,32 @@ function AdminResgates({ user }) {
   useEffect(() => {
     carregarResgates();
   }, []);
+
+  const somenteDigitos = (v) => (v || '').toString().replace(/\D/g, '');
+
+  const abrirConfirmacaoCPF = (resgate) => {
+    setConfirmCpfModal({ open: true, resgate, cpf: '' });
+  };
+
+  const confirmarEntregaComCPF = async () => {
+    const esperado = somenteDigitos(confirmCpfModal.resgate?.cliente_cpf);
+    const informado = somenteDigitos(confirmCpfModal.cpf);
+    if (!esperado) {
+      toast.error('CPF do cliente não está cadastrado. Não é possível validar.');
+      return;
+    }
+    if (!informado) {
+      toast.error('Digite o CPF do titular da conta que resgatou.');
+      return;
+    }
+    if (informado !== esperado) {
+      toast.error('CPF não confere com a conta que realizou o resgate.');
+      return;
+    }
+    // OK: prosseguir com a entrega
+    setConfirmCpfModal(prev => ({ ...prev, open: false }));
+    await marcarComoResgatado(confirmCpfModal.resgate.codigo_resgate);
+  };
 
   // Utilitário para formatar retirada: "Nome | Cidade/UF"
   const formatRetiradaInfo = (gerente, loja) => {
@@ -556,7 +585,7 @@ function AdminResgates({ user }) {
               {!resgate.coletado && (
                 <ActionButton
                   variant="success"
-                  onClick={() => marcarComoResgatado(resgate.codigo_resgate)}
+                  onClick={() => abrirConfirmacaoCPF(resgate)}
                   disabled={processando}
                 >
                   <FiCheck />
@@ -638,6 +667,34 @@ function AdminResgates({ user }) {
               >
                 Fechar
               </ActionButton>
+            </div>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* Modal de confirmação por CPF */}
+      {confirmCpfModal.open && confirmCpfModal.resgate && (
+        <Modal onClick={() => setConfirmCpfModal({ open: false, resgate: null, cpf: '' })}>
+          <ModalContent onClick={e => e.stopPropagation()}>
+            <h3>Confirmar entrega do prêmio</h3>
+            <p style={{ color: '#666', lineHeight: 1.5 }}>
+              Para concluir a entrega, confirme o CPF do titular da conta que realizou o resgate.
+              <br />
+              <strong>Atenção:</strong> Solicite ao cliente um comprovante de CPF da conta que resgatou o prêmio.
+            </p>
+            <div style={{ margin: '1rem 0' }}>
+              <label style={{ display: 'block', fontWeight: 600, marginBottom: '.25rem' }}>CPF do titular</label>
+              <input
+                type="text"
+                placeholder="000.000.000-00"
+                value={confirmCpfModal.cpf}
+                onChange={(e) => setConfirmCpfModal(prev => ({ ...prev, cpf: e.target.value }))}
+                style={{ width: '100%', padding: '.75rem 1rem', border: '1px solid #ddd' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
+              <ActionButton variant="info" onClick={() => setConfirmCpfModal({ open: false, resgate: null, cpf: '' })}>Cancelar</ActionButton>
+              <ActionButton variant="success" onClick={confirmarEntregaComCPF}><FiCheck /> Confirmar e Entregar</ActionButton>
             </div>
           </ModalContent>
         </Modal>

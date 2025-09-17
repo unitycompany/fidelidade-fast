@@ -401,6 +401,7 @@ function GerenteResgates({ user }) {
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [processando, setProcessando] = useState({});
+  const [confirmCpfModal, setConfirmCpfModal] = useState({ open: false, resgateId: null, cpf: '' });
   const [stats, setStats] = useState({
     pendentes: 0,
     entregues: 0,
@@ -473,11 +474,14 @@ function GerenteResgates({ user }) {
   const processarResgate = async (resgateId, novoStatus) => {
     const resgate = resgates.find(r => r.id === resgateId);
     if (!resgate) return;
+    if (novoStatus === 'entregue') {
+      // Abrir modal para confirmar CPF do titular
+      setConfirmCpfModal({ open: true, resgateId, cpf: '' });
+      return;
+    }
 
-    const confirmMessage = novoStatus === 'entregue'
-      ? `Confirmar entrega do prêmio "${resgate.premios_catalogo.nome}" para ${resgate.clientes_fast.nome}?`
-      : `Cancelar o resgate do prêmio "${resgate.premios_catalogo.nome}"?`;
-
+    // Fluxo de cancelamento mantém confirmação simples
+    const confirmMessage = `Cancelar o resgate do prêmio "${resgate.premios_catalogo.nome}"?`;
     if (!confirm(confirmMessage)) return;
 
     setProcessando(prev => ({ ...prev, [resgateId]: true }));
@@ -488,15 +492,6 @@ function GerenteResgates({ user }) {
         data_processamento: new Date().toISOString()
       };
 
-      // Se está entregando, adicionar informações do gerente
-      if (novoStatus === 'entregue') {
-        updateData.processado_por = user.id;
-        const lojaNome = user?.loja_nome || user?.lojas?.nome || '';
-        const lojaSemPrefixo = (lojaNome || '').replace(/^Loja\s*\|?\s*/i, '').trim();
-        const retiradaTxt = lojaSemPrefixo ? `${user.nome} | ${lojaSemPrefixo}` : `${user.nome}`;
-        updateData.observacoes_gerente = `Entregue por ${retiradaTxt}`;
-      }
-
       const { error } = await supabase
         .from('resgates_premios')
         .update(updateData)
@@ -504,15 +499,61 @@ function GerenteResgates({ user }) {
 
       if (error) throw error;
 
-      const statusText = novoStatus === 'entregue' ? 'entregue' : 'cancelado';
-      toast.success(`Resgate ${statusText} com sucesso!`);
-
-      // Atualizar a lista
+      toast.success('Resgate cancelado com sucesso!');
       carregarResgates();
-
     } catch (error) {
       console.error('Erro ao processar resgate:', error);
       toast.error('Erro ao processar resgate');
+    } finally {
+      setProcessando(prev => ({ ...prev, [resgateId]: false }));
+    }
+  };
+
+  const somenteDigitos = (v) => (v || '').toString().replace(/\D/g, '');
+
+  const confirmarEntregaComCPF = async () => {
+    const resgate = resgates.find(r => r.id === confirmCpfModal.resgateId);
+    if (!resgate) { setConfirmCpfModal({ open: false, resgateId: null, cpf: '' }); return; }
+    const esperado = somenteDigitos(resgate?.clientes_fast?.cpf_cnpj);
+    const informado = somenteDigitos(confirmCpfModal.cpf);
+    if (!esperado) {
+      toast.error('CPF do cliente não está cadastrado. Não é possível validar.');
+      return;
+    }
+    if (!informado) {
+      toast.error('Digite o CPF do titular da conta que resgatou.');
+      return;
+    }
+    if (informado !== esperado) {
+      toast.error('CPF não confere com a conta que realizou o resgate.');
+      return;
+    }
+    // Prosseguir com a entrega
+    const resgateId = confirmCpfModal.resgateId;
+    setConfirmCpfModal({ open: false, resgateId: null, cpf: '' });
+    setProcessando(prev => ({ ...prev, [resgateId]: true }));
+    try {
+      const updateData = {
+        status: 'entregue',
+        data_processamento: new Date().toISOString(),
+        processado_por: user.id,
+      };
+      const lojaNome = user?.loja_nome || user?.lojas?.nome || '';
+      const lojaSemPrefixo = (lojaNome || '').replace(/^Loja\s*\|?\s*/i, '').trim();
+      const retiradaTxt = lojaSemPrefixo ? `${user.nome} | ${lojaSemPrefixo}` : `${user.nome}`;
+      updateData.observacoes_gerente = `Entregue por ${retiradaTxt}`;
+
+      const { error } = await supabase
+        .from('resgates_premios')
+        .update(updateData)
+        .eq('id', resgateId);
+
+      if (error) throw error;
+      toast.success('Resgate entregue com sucesso!');
+      carregarResgates();
+    } catch (error) {
+      console.error('Erro ao concluir entrega:', error);
+      toast.error('Erro ao concluir entrega');
     } finally {
       setProcessando(prev => ({ ...prev, [resgateId]: false }));
     }
@@ -724,6 +765,36 @@ function GerenteResgates({ user }) {
             ))
           )}
         </ResgatesContainer>
+
+        {/* Modal de confirmação por CPF */}
+        {confirmCpfModal.open && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+            onClick={() => setConfirmCpfModal({ open: false, resgateId: null, cpf: '' })}
+          >
+            <div style={{ background: 'white', padding: '1.5rem', maxWidth: 520, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+              <h3 style={{ marginTop: 0 }}>Confirmar entrega do prêmio</h3>
+              <p style={{ color: '#666', lineHeight: 1.5 }}>
+                Para concluir a entrega, confirme o CPF do titular da conta que realizou o resgate.
+                <br />
+                <strong>Atenção:</strong> peça ao cliente o comprovante de CPF da conta que resgatou o prêmio.
+              </p>
+              <div style={{ margin: '1rem 0' }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '.25rem' }}>CPF do titular</label>
+                <input
+                  type="text"
+                  placeholder="000.000.000-00"
+                  value={confirmCpfModal.cpf}
+                  onChange={(e) => setConfirmCpfModal(prev => ({ ...prev, cpf: e.target.value }))}
+                  style={{ width: '100%', padding: '.75rem 1rem', border: '1px solid #E2E8F0' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
+                <ActionButton onClick={() => setConfirmCpfModal({ open: false, resgateId: null, cpf: '' })}>Cancelar</ActionButton>
+                <ActionButton $action="entregar" onClick={confirmarEntregaComCPF}><FiCheck /> Confirmar e Entregar</ActionButton>
+              </div>
+            </div>
+          </div>
+        )}
       </MainContent>
     </Container>
   );
