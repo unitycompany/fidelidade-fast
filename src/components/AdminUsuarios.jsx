@@ -602,6 +602,7 @@ function AdminUsuarios({ user }) {
         nome: '',
         email: '',
         cpf: '',
+        cnpj_opcional: '',
         telefone: '',
         senha: '',
         role: 'cliente',
@@ -651,6 +652,7 @@ function AdminUsuarios({ user }) {
                 ativo: c.status === 'ativo',
                 status: c.status || 'ativo',
                 cpf: c.cpf_cnpj,
+                cnpj_opcional: c.cnpj_opcional || '',
                 loja_nome: c.loja_nome || 'N/A',
                 telefone: c.telefone || '',
                 email: c.email || '',
@@ -907,6 +909,7 @@ function AdminUsuarios({ user }) {
                 nome: usuario.nome || '',
                 email: usuario.email || '',
                 cpf: usuario.cpf || usuario.cpf_cnpj || '',
+                cnpj_opcional: usuario.cnpj_opcional || '',
                 telefone: usuario.telefone || '',
                 senha: '', // Não mostrar senha existente
                 role: usuario.role || 'cliente',
@@ -920,6 +923,7 @@ function AdminUsuarios({ user }) {
                 nome: '',
                 email: '',
                 cpf: '',
+                cnpj_opcional: '',
                 telefone: '',
                 senha: '',
                 role: 'cliente',
@@ -939,6 +943,7 @@ function AdminUsuarios({ user }) {
             nome: '',
             email: '',
             cpf: '',
+            cnpj_opcional: '',
             telefone: '',
             senha: '',
             role: 'cliente',
@@ -1010,7 +1015,8 @@ function AdminUsuarios({ user }) {
                     telefone: dadosUsuario.telefone,
                     role: dadosUsuario.role,
                     status: (usuarioEditando?.status === 'bloqueado') ? 'bloqueado' : (dadosUsuario.ativo ? 'ativo' : 'inativo'),
-                    saldo_pontos: dadosUsuario.saldo_pontos
+                    saldo_pontos: dadosUsuario.saldo_pontos,
+                    cnpj_opcional: (formData.cnpj_opcional || '').replace(/\D/g, '') || null,
                 };
 
                 // Adicionar loja_nome apenas se o role for gerente
@@ -1041,7 +1047,8 @@ function AdminUsuarios({ user }) {
                     senha: dadosUsuario.senha,
                     role: dadosUsuario.role,
                     status: 'ativo',
-                    saldo_pontos: 0
+                    saldo_pontos: 0,
+                    cnpj_opcional: (formData.cnpj_opcional || '').replace(/\D/g, '') || null,
                 };
 
                 // Adicionar loja_nome apenas se o role for gerente
@@ -1201,6 +1208,17 @@ function AdminUsuarios({ user }) {
             </Container>
         );
     }
+
+    // Utilitário: formatar exibição de retirada: "Nome | Cidade/UF"
+    const formatRetiradaInfo = (gerente, loja) => {
+        const nome = (gerente || '').toString().trim();
+        const lojaClean = (loja || '').toString().trim();
+        if (!nome && !lojaClean) return null;
+        if (!lojaClean || lojaClean === 'N/A') return nome || null;
+        // Evitar repetir a palavra "Loja" caso já venha no texto
+        const lojaSemPrefixo = lojaClean.replace(/^Loja\s*\|?\s*/i, '').trim();
+        return `${nome}${nome && lojaSemPrefixo ? ' | ' : ''}${lojaSemPrefixo}`;
+    };
 
     return (
         <Container>
@@ -1427,6 +1445,19 @@ function AdminUsuarios({ user }) {
                                             />
                                         </FormGroup>
                                     </FormRow>
+
+                                    <FormRow $columns="1fr 1fr">
+                                        <FormGroup>
+                                            <FormLabel>CNPJ (opcional)</FormLabel>
+                                            <FormInput
+                                                type="text"
+                                                value={formData.cnpj_opcional}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, cnpj_opcional: e.target.value }))}
+                                                disabled={salvando}
+                                                placeholder="00.000.000/0000-00"
+                                            />
+                                        </FormGroup>
+                                    </FormRow>
                                 </FormSection>
 
                                 {/* Seção de Acesso e Segurança */}
@@ -1581,6 +1612,9 @@ function AdminUsuarios({ user }) {
                                             <ClientDetails>
                                                 <span><FiUserCheck size={14} />{usuarioDetalhes.email}</span>
                                                 <span><FiUserCheck size={14} />{usuarioDetalhes.cpf || 'CPF não informado'}</span>
+                                                {usuarioDetalhes.cnpj_opcional && (
+                                                    <span><FiUserCheck size={14} />CNPJ: {usuarioDetalhes.cnpj_opcional}</span>
+                                                )}
                                                 <span><FiUserCheck size={14} />{usuarioDetalhes.loja_nome || 'Loja não informada'}</span>
                                                 <span><FiFile size={14} />{imagensUsuario.length} imagem{imagensUsuario.length !== 1 ? 's' : ''}</span>
                                                 <span><FiGift size={14} />{premiosResgatados.length} prêmio{premiosResgatados.length !== 1 ? 's' : ''}</span>
@@ -1953,10 +1987,10 @@ function AdminUsuarios({ user }) {
                                                                     </div>
                                                                     {(resgate.gerente_retirada || resgate.loja_nome) && (
                                                                         <div style={{ fontSize: '0.7rem', color: '#15803D', marginTop: '0.25rem' }}>
-                                                                            Retirado por: {resgate.gerente_retirada || 'Gerente'}
-                                                                            {resgate.loja_nome && resgate.loja_nome !== 'N/A' && (
-                                                                                <span> | Loja | {resgate.loja_nome}</span>
-                                                                            )}
+                                                                            {(() => {
+                                                                                const text = formatRetiradaInfo(resgate.gerente_retirada, resgate.loja_nome);
+                                                                                return text ? `Retirado por: ${text}` : null;
+                                                                            })()}
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -2069,14 +2103,36 @@ function AdminUsuarios({ user }) {
                                                                         </div>
                                                                     </div>
                                                                 )}
-                                                                {imagem.dados_nota && (
-                                                                    <div>
-                                                                        <div style={{ color: '#718096', fontWeight: 500, marginBottom: '0.25rem' }}>Dados da Nota (resumo):</div>
-                                                                        <pre style={{ background: '#F7FAFC', border: '1px solid #E2E8F0', padding: '0.5rem', maxHeight: 150, overflow: 'auto', fontSize: '0.75rem' }}>
-{JSON.stringify(imagem.dados_nota, null, 2)}
-                                                                        </pre>
-                                                                    </div>
-                                                                )}
+                                                                {imagem.dados_nota && (() => {
+                                                                    try {
+                                                                        const d = typeof imagem.dados_nota === 'string' ? JSON.parse(imagem.dados_nota) : imagem.dados_nota;
+                                                                        // Normalizar chaves duplicadas: 'nf-e'->'nota', 'data-emissao'->'data_emissao'
+                                                                        const nota = d['nota'] || d['nf-e'] || d['nf_e'] || d['nfe'] || null;
+                                                                        const data_emissao = d['data_emissao'] || d['data-emissao'] || d['dataEmissao'] || null;
+                                                                        const apresentacao = {
+                                                                            nota: nota || undefined,
+                                                                            pontos: d.pontos || d.pontos_retornados || undefined,
+                                                                            data_emissao: data_emissao || undefined
+                                                                        };
+                                                                        return (
+                                                                            <div>
+                                                                                <div style={{ color: '#718096', fontWeight: 500, marginBottom: '0.25rem' }}>Dados da Nota (resumo):</div>
+                                                                                <pre style={{ background: '#F7FAFC', border: '1px solid #E2E8F0', padding: '0.5rem', maxHeight: 150, overflow: 'auto', fontSize: '0.75rem' }}>
+                {JSON.stringify(apresentacao, null, 2)}
+                                                                                </pre>
+                                                                            </div>
+                                                                        );
+                                                                    } catch (e) {
+                                                                        return (
+                                                                            <div>
+                                                                                <div style={{ color: '#718096', fontWeight: 500, marginBottom: '0.25rem' }}>Dados da Nota (resumo):</div>
+                                                                                <pre style={{ background: '#F7FAFC', border: '1px solid #E2E8F0', padding: '0.5rem', maxHeight: 150, overflow: 'auto', fontSize: '0.75rem' }}>
+                {typeof imagem.dados_nota === 'string' ? imagem.dados_nota : JSON.stringify(imagem.dados_nota, null, 2)}
+                                                                                </pre>
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                })()}
                                                             </div>
                                                         )}
                                                     </div>

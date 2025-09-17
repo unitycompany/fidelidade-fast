@@ -370,14 +370,24 @@ function AdminResgates({ user }) {
     carregarResgates();
   }, []);
 
+  // Utilitário para formatar retirada: "Nome | Cidade/UF"
+  const formatRetiradaInfo = (gerente, loja) => {
+    const nome = (gerente || '').toString().trim();
+    const lojaClean = (loja || '').toString().trim();
+    if (!nome && !lojaClean) return null;
+    if (!lojaClean) return nome || null;
+    const lojaSemPrefixo = lojaClean.replace(/^Loja\s*\|?\s*/i, '').trim();
+    return `${nome}${nome && lojaSemPrefixo ? ' | ' : ''}${lojaSemPrefixo}`;
+  };
+
   const marcarComoResgatado = async (codigo) => {
     try {
       setProcessando(true);
 
       // Preparar informações do gerente e loja
-      const gerenteNome = user?.nome || 'Gerente';
-      const lojaNome = user?.lojas?.nome || 'Loja';
-      const gerenteInfo = `${gerenteNome} | ${lojaNome}`;
+  const gerenteNome = user?.nome || 'Gerente';
+  const lojaNome = user?.loja_nome || user?.lojas?.nome || '';
+  const gerenteInfo = formatRetiradaInfo(gerenteNome, lojaNome) || gerenteNome;
 
       // Atualizar resgate como retirado usando o código
       const { data, error } = await supabase

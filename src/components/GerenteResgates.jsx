@@ -491,7 +491,10 @@ function GerenteResgates({ user }) {
       // Se está entregando, adicionar informações do gerente
       if (novoStatus === 'entregue') {
         updateData.processado_por = user.id;
-        updateData.observacoes_gerente = `Entregue por ${user.nome} - ${user.lojas?.nome || 'Sistema'}`;
+        const lojaNome = user?.loja_nome || user?.lojas?.nome || '';
+        const lojaSemPrefixo = (lojaNome || '').replace(/^Loja\s*\|?\s*/i, '').trim();
+        const retiradaTxt = lojaSemPrefixo ? `${user.nome} | ${lojaSemPrefixo}` : `${user.nome}`;
+        updateData.observacoes_gerente = `Entregue por ${retiradaTxt}`;
       }
 
       const { error } = await supabase
