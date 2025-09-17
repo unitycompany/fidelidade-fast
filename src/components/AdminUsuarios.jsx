@@ -1827,7 +1827,7 @@ function AdminUsuarios({ user }) {
                                                                 color: '#718096',
                                                                 fontWeight: '500'
                                                             }}>
-                                                                {new Date(resgate.created_at).toLocaleDateString('pt-BR')}
+                                                                {new Date(resgate.coletado && resgate.data_coleta ? resgate.data_coleta : resgate.created_at).toLocaleDateString('pt-BR')}
                                                             </div>
                                                         </div>
 
@@ -1953,9 +1953,9 @@ function AdminUsuarios({ user }) {
                                                                     </div>
                                                                     {(resgate.gerente_retirada || resgate.loja_nome) && (
                                                                         <div style={{ fontSize: '0.7rem', color: '#15803D', marginTop: '0.25rem' }}>
-                                                                            Por: {resgate.gerente_retirada || 'Gerente'}
+                                                                            Retirado por: {resgate.gerente_retirada || 'Gerente'}
                                                                             {resgate.loja_nome && resgate.loja_nome !== 'N/A' && (
-                                                                                <span> | {resgate.loja_nome}</span>
+                                                                                <span> | Loja | {resgate.loja_nome}</span>
                                                                             )}
                                                                         </div>
                                                                     )}
@@ -1999,24 +1999,13 @@ function AdminUsuarios({ user }) {
                                                         key={imagem.id}
                                                         style={{
                                                             border: '1px solid #E2E8F0',
-
                                                             padding: '1rem',
                                                             background: 'white',
-                                                            cursor: 'pointer',
                                                             transition: 'all 0.2s ease',
                                                             boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                                                         }}
-                                                        onClick={() => visualizarImagem(imagem)}
-                                                        onMouseEnter={(e) => {
-                                                            e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)';
-                                                            e.currentTarget.style.transform = 'translateY(-3px)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
-                                                            e.currentTarget.style.transform = 'translateY(0px)';
-                                                        }}
                                                     >
-                                                        {/* Header da Imagem */}
+                                                        {/* Header com status e data */}
                                                         <div style={{
                                                             display: 'flex',
                                                             justifyContent: 'space-between',
@@ -2025,7 +2014,6 @@ function AdminUsuarios({ user }) {
                                                         }}>
                                                             <div style={{
                                                                 padding: '0.25rem 0.75rem',
-
                                                                 fontSize: '0.65rem',
                                                                 fontWeight: 'bold',
                                                                 color: 'white',
@@ -2042,204 +2030,55 @@ function AdminUsuarios({ user }) {
                                                                 color: '#718096',
                                                                 fontWeight: 'bold'
                                                             }}>
-                                                                {new Date(imagem.created_at).toLocaleDateString('pt-BR')}
+                                                                {new Date(imagem.created_at).toLocaleDateString('pt-BR')} {new Date(imagem.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                             </div>
                                                         </div>
 
-                                                        {/* Preview da imagem */}
-                                                        {imagem.tipo_arquivo?.startsWith('image/') ? (
-                                                            <div style={{
-                                                                width: '100%',
-                                                                height: '140px',
-                                                                backgroundImage: `url(${imagem.url_supabase})`,
-                                                                backgroundSize: 'cover',
-                                                                backgroundPosition: 'center',
-
-                                                                marginBottom: '0.75rem',
-                                                                border: '1px solid #E2E8F0',
-                                                                position: 'relative'
-                                                            }}>
-                                                                {/* Overlay com informações rápidas */}
-                                                                <div style={{
-                                                                    position: 'absolute',
-                                                                    bottom: 0,
-                                                                    left: 0,
-                                                                    right: 0,
-                                                                    background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-
-                                                                    padding: '1rem 0.5rem 0.5rem',
-                                                                    color: 'white',
-                                                                    fontSize: '0.75rem'
-                                                                }}>
-                                                                    <div style={{ fontWeight: 'bold' }}>
-                                                                        {(imagem.tamanho_bytes / 1024 / 1024).toFixed(1)} MB
-                                                                    </div>
-                                                                    <div style={{ opacity: 0.9 }}>
-                                                                        Clique para ampliar
-                                                                    </div>
-                                                                </div>
+                                                        {/* Linha com tipo e horário */}
+                                                        <div style={{
+                                                            display: 'grid',
+                                                            gridTemplateColumns: '1fr 1fr',
+                                                            gap: '0.5rem',
+                                                            marginTop: '0.25rem',
+                                                            padding: '0.5rem',
+                                                            background: '#F7FAFC',
+                                                            fontSize: '0.75rem'
+                                                        }}>
+                                                            <div>
+                                                                <span style={{ color: '#718096' }}>Tipo:</span><br />
+                                                                <span style={{ color: '#4A5568', fontWeight: 'bold' }}>
+                                                                    {imagem.tipo_arquivo?.split('/')[1]?.toUpperCase() || 'N/A'}
+                                                                </span>
                                                             </div>
-                                                        ) : (
-                                                            <div style={{
-                                                                width: '100%',
-                                                                height: '140px',
-                                                                background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                                                            <div>
+                                                                <span style={{ color: '#718096' }}>Horário:</span><br />
+                                                                <span style={{ color: '#4A5568', fontWeight: 'bold' }}>
+                                                                    {new Date(imagem.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                            </div>
+                                                        </div>
 
-                                                                marginBottom: '0.75rem',
-                                                                border: '1px solid #E2E8F0',
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                color: 'white'
-                                                            }}>
-                                                                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
-                                                                    <FiFile size={32} />
-                                                                </div>
-                                                                <div style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>
-                                                                    {imagem.tipo_arquivo === 'application/pdf' ? 'PDF' : 'ARQUIVO'}
-                                                                </div>
-                                                                <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
-                                                                    {(imagem.tamanho_bytes / 1024 / 1024).toFixed(1)} MB
-                                                                </div>
+                                                        {/* Pontos retornados e dados da nota (resumo) */}
+                                                        {(typeof imagem.pontos_retornados !== 'undefined' || imagem.dados_nota) && (
+                                                            <div style={{ marginTop: '0.75rem' }}>
+                                                                {typeof imagem.pontos_retornados !== 'undefined' && (
+                                                                    <div style={{ marginBottom: '0.5rem' }}>
+                                                                        <div style={{ color: '#718096', fontWeight: 500 }}>Pontos retornados:</div>
+                                                                        <div style={{ color: '#10B981', fontWeight: 'bold' }}>
+                                                                            {(Number(imagem.pontos_retornados) || 0).toLocaleString('pt-BR')} pts
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {imagem.dados_nota && (
+                                                                    <div>
+                                                                        <div style={{ color: '#718096', fontWeight: 500, marginBottom: '0.25rem' }}>Dados da Nota (resumo):</div>
+                                                                        <pre style={{ background: '#F7FAFC', border: '1px solid #E2E8F0', padding: '0.5rem', maxHeight: 150, overflow: 'auto', fontSize: '0.75rem' }}>
+{JSON.stringify(imagem.dados_nota, null, 2)}
+                                                                        </pre>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
-
-                                                        {/* Informações detalhadas da nota */}
-                                                        <div>
-                                                            {/* Número da Nota */}
-                                                            <div style={{ marginBottom: '0.5rem' }}>
-                                                                <div style={{
-                                                                    fontSize: '0.75rem',
-                                                                    color: '#718096',
-                                                                    textTransform: 'uppercase',
-                                                                    fontWeight: 'bold',
-                                                                    letterSpacing: '0.5px'
-                                                                }}>
-                                                                    Número da Nota
-                                                                </div>
-                                                                <div style={{
-                                                                    fontSize: '0.875rem',
-                                                                    fontWeight: 'bold',
-                                                                    color: '#2D3748',
-                                                                    fontFamily: 'monospace'
-                                                                }}>
-                                                                    {imagem.numero_nota || 'Não identificado'}
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Chave de Acesso (se disponível) */}
-                                                            {imagem.chave_acesso && (
-                                                                <div style={{ marginBottom: '0.5rem' }}>
-                                                                    <div style={{
-                                                                        fontSize: '0.75rem',
-                                                                        color: '#718096',
-                                                                        textTransform: 'uppercase',
-                                                                        fontWeight: 'bold',
-                                                                        letterSpacing: '0.5px'
-                                                                    }}>
-                                                                        Chave de Acesso
-                                                                    </div>
-                                                                    <div style={{
-                                                                        fontSize: '0.75rem',
-                                                                        color: '#3B82F6',
-                                                                        fontFamily: 'monospace',
-                                                                        wordBreak: 'break-all'
-                                                                    }}>
-                                                                        {imagem.chave_acesso.substring(0, 20)}...
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Pedido Relacionado */}
-                                                            {imagem.pedidos_vendas && (
-                                                                <div style={{ marginBottom: '0.5rem' }}>
-                                                                    <div style={{
-                                                                        fontSize: '0.75rem',
-                                                                        color: '#718096',
-                                                                        textTransform: 'uppercase',
-                                                                        fontWeight: 'bold',
-                                                                        letterSpacing: '0.5px'
-                                                                    }}>
-                                                                        Pedido Relacionado
-                                                                    </div>
-                                                                    <div style={{
-                                                                        fontSize: '0.875rem',
-                                                                        color: '#10B981',
-                                                                        fontWeight: 'bold',
-                                                                        fontFamily: 'monospace'
-                                                                    }}>
-                                                                        {imagem.pedidos_vendas.numero_pedido}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Informações técnicas */}
-                                                            <div style={{
-                                                                display: 'grid',
-                                                                gridTemplateColumns: '1fr 1fr',
-                                                                gap: '0.5rem',
-                                                                marginTop: '0.75rem',
-                                                                padding: '0.5rem',
-                                                                background: '#F7FAFC',
-
-                                                                fontSize: '0.75rem'
-                                                            }}>
-                                                                <div>
-                                                                    <span style={{ color: '#718096' }}>Tipo:</span><br />
-                                                                    <span style={{ color: '#4A5568', fontWeight: 'bold' }}>
-                                                                        {imagem.tipo_arquivo?.split('/')[1]?.toUpperCase() || 'N/A'}
-                                                                    </span>
-                                                                </div>
-                                                                <div>
-                                                                    <span style={{ color: '#718096' }}>Horário:</span><br />
-                                                                    <span style={{ color: '#4A5568', fontWeight: 'bold' }}>
-                                                                        {new Date(imagem.created_at).toLocaleTimeString('pt-BR', {
-                                                                            hour: '2-digit',
-                                                                            minute: '2-digit'
-                                                                        })}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Pontos retornados e dados da nota (quando disponíveis) */}
-                                                            {(typeof imagem.pontos_retornados !== 'undefined' || imagem.dados_nota) && (
-                                                                <div style={{ marginTop: '0.75rem' }}>
-                                                                    {typeof imagem.pontos_retornados !== 'undefined' && (
-                                                                        <div style={{ marginBottom: '0.5rem' }}>
-                                                                            <div style={{ color: '#718096', fontWeight: 500 }}>Pontos retornados:</div>
-                                                                            <div style={{ color: '#10B981', fontWeight: 'bold' }}>
-                                                                                {(Number(imagem.pontos_retornados) || 0).toLocaleString('pt-BR')} pts
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                    {imagem.dados_nota && (
-                                                                        <div>
-                                                                            <div style={{ color: '#718096', fontWeight: 500, marginBottom: '0.25rem' }}>Dados da Nota (resumo):</div>
-                                                                            <pre style={{ background: '#F7FAFC', border: '1px solid #E2E8F0', padding: '0.5rem', maxHeight: 150, overflow: 'auto', fontSize: '0.75rem' }}>
-{JSON.stringify(imagem.dados_nota, null, 2)}
-                                                                            </pre>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Indicador de ação */}
-                                                            <div style={{
-                                                                marginTop: '0.75rem',
-                                                                textAlign: 'center',
-                                                                padding: '0.5rem',
-                                                                background: 'linear-gradient(135deg, #cc1515 0%, #9b0c0c 100%)',
-                                                                color: 'white',
-
-                                                                fontSize: '0.75rem',
-                                                                fontWeight: 'bold',
-                                                                textTransform: 'uppercase',
-                                                                letterSpacing: '0.5px'
-                                                            }}>
-                                                                Clique para ver detalhes
-                                                            </div>
-                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -2591,9 +2430,9 @@ function AdminUsuarios({ user }) {
                                     }}>
                                         {premioSelecionado.status === 'entregue' ? 'ENTREGUE' : 'PENDENTE'}
                                     </div>
-                                    <div style={{ fontSize: '0.875rem', color: '#4A5568' }}>
-                                        <strong>Resgatado em:</strong> {new Date(premioSelecionado.created_at).toLocaleString('pt-BR')}
-                                    </div>
+                                                        <div style={{ fontSize: '0.875rem', color: '#4A5568' }}>
+                                                            <strong>Resgatado em:</strong> {new Date(premioSelecionado.created_at).toLocaleString('pt-BR')}
+                                                        </div>
                                 </div>
 
                                 {/* Imagem do Prêmio */}
@@ -2717,7 +2556,7 @@ function AdminUsuarios({ user }) {
                                             <p style={{ margin: '0.5rem 0 0 0', color: '#15803D' }}>
                                                 <strong>Entregue por:</strong> {premioSelecionado.gerente_retirada || 'Gerente'}
                                                 {premioSelecionado.loja_nome && premioSelecionado.loja_nome !== 'N/A' && (
-                                                    <span> | {premioSelecionado.loja_nome}</span>
+                                                    <span> | Loja | {premioSelecionado.loja_nome}</span>
                                                 )}
                                             </p>
                                         )}
