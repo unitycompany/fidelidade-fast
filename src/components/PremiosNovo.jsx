@@ -477,7 +477,7 @@ const ModalButton = styled.button`
   }
 `;
 
-function PremiosNovo({ user, onUserUpdate }) {
+function PremiosNovo({ user, onUserUpdate, adminMode = false }) {
   const [premios, setPremios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroCategoria, setFiltroCategoria] = useState('todos');
@@ -517,7 +517,9 @@ function PremiosNovo({ user, onUserUpdate }) {
         .order('pontos_necessarios', { ascending: true });
 
       if (error) throw error;
-      setPremios(data || []);
+      // Mostrar apenas disponíveis (estoque ilimitado ou disponível > 0)
+      const filtrados = (data || []).filter(p => p.estoque_ilimitado === true || (Number(p.estoque_disponivel) || 0) > 0)
+      setPremios(filtrados);
     } catch (error) {
       console.error('Erro ao buscar prêmios:', error);
       toast.error('Erro ao carregar prêmios');
@@ -543,12 +545,13 @@ function PremiosNovo({ user, onUserUpdate }) {
     return premio.categoria === filtroCategoria;
   });
 
+  const premioDisponivel = (premio) => premio.estoque_ilimitado === true || (Number(premio.estoque_disponivel) || 0) > 0;
   const podeResgatar = (premio) => {
     const usuarioParaUsar = userAtualizado || user;
     const saldoUsuario = Number(usuarioParaUsar?.saldo_pontos) || 0;
     const pontosNecessarios = Number(premio.pontos_necessarios) || 0;
 
-    return saldoUsuario >= pontosNecessarios;
+    return saldoUsuario >= pontosNecessarios && premioDisponivel(premio);
   };
 
   const handleResgatar = async (premio) => {
@@ -703,6 +706,11 @@ function PremiosNovo({ user, onUserUpdate }) {
                     <PremioPontos>
                       {premio.pontos_necessarios?.toLocaleString()} pts
                     </PremioPontos>
+                    {adminMode && (
+                      <div style={{ fontSize: '0.8rem', color: '#4A5568' }}>
+                        {premio.estoque_ilimitado ? 'Estoque ilimitado' : `${Number(premio.estoque_disponivel) || 0} em estoque`}
+                      </div>
+                    )}
 
                     <BotaoResgatar
                       disabled={!podeResgatar(premio) || resgatandoPremio === premio.id}
@@ -721,7 +729,7 @@ function PremiosNovo({ user, onUserUpdate }) {
                       ) : (
                         <>
                           <FiX />
-                          Insuficiente
+                          Indisp./Insuficiente
                         </>
                       )}
                     </BotaoResgatar>

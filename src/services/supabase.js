@@ -156,6 +156,7 @@ export const db = {
     // ================================
 
     async buscarPremios() {
+        // Apenas prêmios ativos e disponíveis (estoque > 0) ou com estoque ilimitado
         const { data, error } = await supabase
             .from('premios_catalogo')
             .select('*')
@@ -163,7 +164,9 @@ export const db = {
             .order('pontos_necessarios', { ascending: true })
 
         if (error) throw error
-        return data || []
+        // Filtro client-side para disponibilidade
+        const filtrados = (data || []).filter(p => p.estoque_ilimitado === true || (Number(p.estoque_disponivel) || 0) > 0)
+        return filtrados
     },
 
     async processarResgate(clienteId, premioId, pontosGastos) {
@@ -225,7 +228,9 @@ export const db = {
             .order('pontos_necessarios', { ascending: true })
 
         if (error) throw error
-        return data || []
+        // Ocultar prêmios sem estoque (exceto ilimitados)
+        const filtrados = (data || []).filter(p => p.estoque_ilimitado === true || (Number(p.estoque_disponivel) || 0) > 0)
+        return filtrados
     },
 
     // Salvar pedido
@@ -376,7 +381,7 @@ export const db = {
     async redeemPrize(customerId, prizeId, pointsCost) {
         // Buscar dados do cliente e prêmio
         const [customerResult, prizeResult] = await Promise.all([
-            supabase.from('clientes_fast').select('saldo_pontos').eq('id', customerId).single(),
+            supabase.from('clientes_fast').select('saldo_pontos, total_pontos_gastos').eq('id', customerId).single(),
             supabase.from('premios_catalogo').select('*').eq('id', prizeId).single()
         ])
 
@@ -390,29 +395,34 @@ export const db = {
             throw new Error('Pontos insuficientes')
         }
 
-        if (prize.estoque <= 0) {
+        const ilimitado = prize.estoque_ilimitado === true
+        const disponivel = Number(prize.estoque_disponivel) || 0
+        if (!ilimitado && disponivel <= 0) {
             throw new Error('Prêmio fora de estoque')
         }
 
-        // Usar transação para garantir consistência
         const newBalance = customer.saldo_pontos - pointsCost
-        const newStock = prize.estoque - 1
+        const newTotalGastos = (customer.total_pontos_gastos || 0) + pointsCost
+
+        // Se não for ilimitado, decrementar estoque de forma segura
+        if (!ilimitado) {
+            const { error: stockError } = await supabase
+                .from('premios_catalogo')
+                .update({ estoque_disponivel: disponivel - 1 })
+                .eq('id', prizeId)
+                .eq('estoque_ilimitado', false)
+                .gt('estoque_disponivel', 0)
+
+            if (stockError) throw stockError
+        }
 
         // Atualizar saldo do cliente
         const { error: balanceError } = await supabase
             .from('clientes_fast')
-            .update({ saldo_pontos: newBalance })
+            .update({ saldo_pontos: newBalance, total_pontos_gastos: newTotalGastos })
             .eq('id', customerId)
 
         if (balanceError) throw balanceError
-
-        // Atualizar estoque do prêmio
-        const { error: stockError } = await supabase
-            .from('premios_catalogo')
-            .update({ estoque: newStock })
-            .eq('id', prizeId)
-
-        if (stockError) throw stockError
 
         // Registrar resgate
         const { data: redemption, error: redemptionError } = await supabase
@@ -420,8 +430,8 @@ export const db = {
             .insert({
                 cliente_id: customerId,
                 premio_id: prizeId,
-                pontos_gastos: pointsCost,
-                status: 'processando'
+                pontos_utilizados: pointsCost,
+                status: 'confirmado'
             })
             .select()
             .single()
@@ -493,7 +503,7 @@ export const getPrizeCatalog = async () => {
         .order('pontos_necessarios', { ascending: true })
 
     if (error) throw error
-    return data || []
+    return (data || []).filter(p => p.estoque_ilimitado === true || (Number(p.estoque_disponivel) || 0) > 0)
 }
 
 // Verificar se pedido já existe pelo hash
@@ -717,49 +727,84 @@ export const redeemPrize = async (customerId, prizeId, pointsCost) => {
         throw new Error('Pontos insuficientes')
     }
 
+    // Verificar disponibilidade
+    const ilimitado = prize.estoque_ilimitado === true
+    const disponivel = Number(prize.estoque_disponivel) || 0
+    if (!ilimitado && disponivel <= 0) {
+        throw new Error('Prêmio indisponível no momento')
+    }
+
     const newBalance = customer.saldo_pontos - pointsCost
     const newTotalGastos = (customer.total_pontos_gastos || 0) + pointsCost
 
-    // Atualizar saldo do cliente e total de pontos gastos
-    const { error: balanceError } = await supabase
-        .from('clientes_fast')
-        .update({
-            saldo_pontos: newBalance,
-            total_pontos_gastos: newTotalGastos
-        })
-        .eq('id', customerId)
+    // Se não for ilimitado, tentar decrementar estoque de forma segura
+    let stockDecremented = false
+    if (!ilimitado) {
+        const { data: decData, error: stockError } = await supabase
+            .from('premios_catalogo')
+            .update({ estoque_disponivel: disponivel - 1 })
+            .eq('id', prizeId)
+            .eq('estoque_ilimitado', false)
+            .gt('estoque_disponivel', 0)
+            .select('id, estoque_disponivel')
+            .single()
 
-    if (balanceError) throw balanceError
+        if (stockError || !decData) {
+            throw new Error('Prêmio fora de estoque')
+        }
+        stockDecremented = true
+    }
 
-    // Registrar resgate (o trigger irá gerar o código automaticamente)
-    const { data: redemption, error: redemptionError } = await supabase
-        .from('resgates')
-        .insert({
-            cliente_id: customerId,
-            premio_id: prizeId,
-            pontos_utilizados: pointsCost,
-            status: 'confirmado'
-        })
-        .select('id, codigo_resgate, created_at')
-        .single()
+    try {
+        // Atualizar saldo do cliente e total de pontos gastos
+        const { error: balanceError } = await supabase
+            .from('clientes_fast')
+            .update({
+                saldo_pontos: newBalance,
+                total_pontos_gastos: newTotalGastos
+            })
+            .eq('id', customerId)
 
-    if (redemptionError) throw redemptionError
+        if (balanceError) throw balanceError
 
-    console.log('✅ Resgate criado com código:', redemption.codigo_resgate)
+        // Registrar resgate (o trigger irá gerar o código automaticamente)
+        const { data: redemption, error: redemptionError } = await supabase
+            .from('resgates')
+            .insert({
+                cliente_id: customerId,
+                premio_id: prizeId,
+                pontos_utilizados: pointsCost,
+                status: 'confirmado'
+            })
+            .select('id, codigo_resgate, created_at')
+            .single()
 
-    // Registrar no histórico
-    await supabase
-        .from('historico_pontos')
-        .insert({
-            cliente_id: customerId,
-            tipo_operacao: 'resgate',
-            pontos: -pointsCost,
-            descricao: `Resgate: ${prize.nome}`,
-            saldo_anterior: customer.saldo_pontos,
-            saldo_posterior: newBalance
-        })
+        if (redemptionError) throw redemptionError
 
-    return redemption
+        // Registrar no histórico
+        await supabase
+            .from('historico_pontos')
+            .insert({
+                cliente_id: customerId,
+                tipo_operacao: 'resgate',
+                pontos: -pointsCost,
+                descricao: `Resgate: ${prize.nome}`,
+                saldo_anterior: customer.saldo_pontos,
+                saldo_posterior: newBalance
+            })
+
+        return redemption
+    } catch (err) {
+        // Compensar decremento de estoque em caso de falha
+        if (stockDecremented) {
+            await supabase
+                .from('premios_catalogo')
+                .update({ estoque_disponivel: disponivel })
+                .eq('id', prizeId)
+                .eq('estoque_ilimitado', false)
+        }
+        throw err
+    }
 }
 
 export default supabase

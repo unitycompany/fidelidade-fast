@@ -21,6 +21,7 @@ import MeusResgates from './components/MeusResgates'
 import Perfil from './components/Perfil'
 import { inicializarProdutosElegiveis } from './utils/inicializarProdutos'
 import { inicializarPremios } from './utils/inicializarPremios'
+import { ajustarEstoqueInicial } from './utils/ajustarEstoquePremios'
 import SidebarVertical from './components/SidebarVertical'
 import { supabase } from './services/supabase'
 import LoadingGif from './components/LoadingGif'
@@ -120,6 +121,8 @@ function App() {
       // Inicializar catálogo de prêmios automaticamente
       try {
         await inicializarPremios()
+        // Ajustar estoque inicial para prêmios existentes sem valor definido
+        await ajustarEstoqueInicial(10)
       } catch (error) {
         console.warn('⚠️ Não foi possível inicializar prêmios automaticamente:', error)
       }

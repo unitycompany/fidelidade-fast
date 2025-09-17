@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes, css } from 'styled-components';
-import { FiPackage, FiPlus, FiEdit3, FiTrash2, FiSave, FiX } from 'react-icons/fi';
+import { FiPackage, FiPlus, FiEdit3, FiTrash2, FiSave, FiX, FiAlertTriangle } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 import LoadingGif from './LoadingGif';
@@ -79,7 +79,7 @@ const Grid = styled.div`
 
 const PremioCard = styled.div`
   background: white;
-  padding: 1.5rem;
+  padding: 1rem;
   box-shadow: ${props => props.theme.shadows.md};
   transition: all 0.3s ease;
   position: relative;
@@ -101,7 +101,7 @@ const PremioCard = styled.div`
 const PremioHeader = styled.div`
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 1rem;
   
   h3 {
@@ -146,6 +146,20 @@ const PremioInfo = styled.div`
   color: ${props => props.theme.colors.textSecondary};
   font-size: 0.9rem;
   margin-bottom: 1rem;
+`;
+
+const EstoqueBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin: 14px 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: ${props => props.zero ? '#a71d2a' : '#0f5132'};
+  background: ${props => props.zero ? 'rgba(220,53,69,0.12)' : 'rgba(25,135,84,0.12)'};
+  border: 1px solid ${props => props.zero ? 'rgba(220,53,69,0.35)' : 'rgba(25,135,84,0.35)'};
 `;
 
 const PontosDisplay = styled.div`
@@ -334,7 +348,9 @@ function AdminPremios() {
     pontos_necessarios: 0,
     categoria: '',
     imagem_url: '',
-    ativo: true
+    ativo: true,
+    estoque_disponivel: 10,
+    estoque_ilimitado: false
   });
 
   useEffect(() => {
@@ -415,7 +431,9 @@ function AdminPremios() {
       pontos_necessarios: premio.pontos_necessarios,
       categoria: premio.categoria,
       imagem_url: premio.imagem_url || '',
-      ativo: premio.ativo
+      ativo: premio.ativo,
+      estoque_disponivel: premio.estoque_disponivel ?? 0,
+      estoque_ilimitado: premio.estoque_ilimitado ?? false
     });
     setShowModal(true);
   };
@@ -429,7 +447,9 @@ function AdminPremios() {
       pontos_necessarios: 0,
       categoria: '',
       imagem_url: '',
-      ativo: true
+      ativo: true,
+      estoque_disponivel: 10,
+      estoque_ilimitado: false
     });
   };
 
@@ -496,6 +516,20 @@ function AdminPremios() {
                 {premio.descricao && (
                   <p><strong>Descrição:</strong> {premio.descricao}</p>
                 )}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {premio.estoque_ilimitado ? (
+                    <EstoqueBadge>Estoque ilimitado</EstoqueBadge>
+                  ) : (
+                    <EstoqueBadge zero={(premio.estoque_disponivel ?? 0) <= 0}>
+                      {(premio.estoque_disponivel ?? 0)} em estoque
+                      {(premio.estoque_disponivel ?? 0) <= 0 && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <FiAlertTriangle size={14} /> Atenção
+                        </span>
+                      )}
+                    </EstoqueBadge>
+                  )}
+                </div>
                 <StatusBadge ativo={premio.ativo}>
                   {premio.ativo ? 'Ativo' : 'Inativo'}
                 </StatusBadge>
@@ -581,6 +615,28 @@ function AdminPremios() {
                   <option value="brindes">Brindes</option>
                   <option value="outros">Outros</option>
                 </Select>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>
+                  <input
+                    type="checkbox"
+                    checked={formData.estoque_ilimitado}
+                    onChange={(e) => setFormData(prev => ({ ...prev, estoque_ilimitado: e.target.checked }))}
+                  />
+                  {' '}Estoque ilimitado
+                </Label>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Quantidade disponível</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  disabled={formData.estoque_ilimitado}
+                  value={formData.estoque_disponivel}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estoque_disponivel: Math.max(0, parseInt(e.target.value) || 0) }))}
+                />
               </FormGroup>
 
               <FormGroup>
