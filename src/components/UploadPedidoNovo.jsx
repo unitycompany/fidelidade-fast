@@ -582,6 +582,10 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
     }
     setSelectedFile(file);
     setError('');
+    // Processar automaticamente após selecionar o arquivo
+    setTimeout(() => {
+      if (!isProcessing) handleProcess();
+    }, 0);
   };
 
   const handleProcess = async () => {

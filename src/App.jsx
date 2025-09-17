@@ -1,6 +1,7 @@
 import React, { useState, createContext, useContext, useEffect } from 'react'
 import { ThemeProvider } from 'styled-components'
-import { Toaster } from 'react-hot-toast'
+import styled from 'styled-components'
+import { Toaster, toast } from 'react-hot-toast'
 import { GlobalStyle } from './styles/GlobalStyle'
 import themeFast from './styles/themeFast'
 import NavigationResponsivo from './components/NavigationResponsivo'
@@ -45,6 +46,11 @@ function App() {
   const [isAdminMode, setIsAdminMode] = useState(false)
   // Novo: mostrar campo 'meus resgates' se houver resgates
   const [temResgates, setTemResgates] = useState(false);
+  // Modal bloqueante para gerente sem Cidade/UF
+  const [showLojaModal, setShowLojaModal] = useState(false);
+  const [lojaInput, setLojaInput] = useState('');
+  const [savingLoja, setSavingLoja] = useState(false);
+  const [lojaMsg, setLojaMsg] = useState('');
 
   // Função global para forçar refresh de dados
   const triggerGlobalRefresh = () => {
@@ -199,6 +205,57 @@ function App() {
     window.updateUserContext = updateGlobalUser
     window.triggerGlobalRefresh = triggerGlobalRefresh
   }, [])
+
+  // ===== Validação Cidade/UF (mesmo padrão do Perfil) =====
+  const validateLoja = (s) => {
+    if (!s) return false;
+    const parts = String(s).split('/');
+    if (parts.length !== 2) return false;
+    const cidade = parts[0].trim();
+    const uf = parts[1].trim();
+    if (!cidade || cidade.length < 2) return false;
+    if (!/^[A-Za-zÀ-ÿ0-9' .-]{2,}$/.test(cidade)) return false;
+    if (!/^[A-Za-z]{2}$/.test(uf)) return false;
+    return true;
+  };
+
+  // Abrir modal se gerente sem Cidade/UF válida
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === 'gerente' && !validateLoja(user.loja_nome)) {
+      setLojaInput(user.loja_nome || '');
+      setShowLojaModal(true);
+    } else {
+      setShowLojaModal(false);
+    }
+  }, [user]);
+
+  const handleSalvarLoja = async () => {
+    const val = (lojaInput || '').trim();
+    setLojaMsg('');
+    if (!validateLoja(val)) {
+      setLojaMsg('Informe no formato Cidade/UF. Exemplo: Campo Grande/RJ');
+      return;
+    }
+    try {
+      setSavingLoja(true);
+      const { error } = await supabase
+        .from('clientes_fast')
+        .update({ loja_nome: val })
+        .eq('id', user.id);
+      if (error) throw error;
+      // Atualizar contexto/localStorage
+      updateGlobalUser({ loja_nome: val });
+      toast.success('Unidade (Cidade/UF) salva com sucesso.');
+      setShowLojaModal(false);
+    } catch (e) {
+      console.error('Erro ao salvar Cidade/UF do gerente:', e);
+      setLojaMsg('Não foi possível salvar agora. Tente novamente.');
+      toast.error('Erro ao salvar Cidade/UF');
+    } finally {
+      setSavingLoja(false);
+    }
+  };
 
   const handleLogout = () => {
     // Limpar estado
@@ -381,6 +438,41 @@ function App() {
             {renderPage()}
           </div>
         </div>
+        {/* Modal bloqueante para gerente sem Cidade/UF */}
+        {showLojaModal && (
+          <ModalOverlay>
+            <ModalCard>
+              <ModalHeader>Defina sua unidade (Cidade/UF)</ModalHeader>
+              <ModalBody>
+                <p style={{ margin: '0 0 10px 0', color: '#555' }}>
+                  Para continuar, informe a unidade responsável pelas coletas.
+                </p>
+                <InputWrap>
+                  <ModalInput
+                    type="text"
+                    value={lojaInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const parts = val.split('/');
+                      if (parts.length === 2) {
+                        setLojaInput(parts[0] + '/' + parts[1].toUpperCase());
+                      } else {
+                        setLojaInput(val);
+                      }
+                    }}
+                    placeholder="Cidade/UF (ex: Campo Grande/RJ)"
+                  />
+                </InputWrap>
+                {lojaMsg && <ModalError>{lojaMsg}</ModalError>}
+              </ModalBody>
+              <ModalFooter>
+                <PrimaryButton onClick={handleSalvarLoja} disabled={savingLoja}>
+                  {savingLoja ? 'Salvando...' : 'Salvar e continuar'}
+                </PrimaryButton>
+              </ModalFooter>
+            </ModalCard>
+          </ModalOverlay>
+        )}
         <style jsx global>{`
           @media (max-width: 900px) {
             .main-content-area {
@@ -396,3 +488,69 @@ function App() {
 }
 
 export default App
+
+// ===== Modal styles =====
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+`;
+
+const ModalCard = styled.div`
+  width: 92%;
+  max-width: 520px;
+  background: #fff;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+`;
+
+const ModalHeader = styled.div`
+  background: linear-gradient(135deg, #A91918, #d32f2f);
+  color: #fff;
+  padding: 14px 16px;
+  font-weight: 700;
+`;
+
+const ModalBody = styled.div`
+  padding: 16px;
+`;
+
+const ModalFooter = styled.div`
+  padding: 12px 16px 16px 16px;
+  display: flex;
+  justify-content: flex-end;
+`;
+
+const ModalInput = styled.input`
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  font-size: 15px;
+  outline: none;
+  &:focus { border-color: #A91918; box-shadow: 0 0 0 3px rgba(169,25,24,0.1); }
+`;
+
+const ModalError = styled.div`
+  margin-top: 8px;
+  color: #b00020;
+  background: #fff0f0;
+  border: 1px solid #f5bfc0;
+  padding: 8px 10px;
+`;
+
+const PrimaryButton = styled.button`
+  background: linear-gradient(135deg, #A91918 0%, #8B1514 100%);
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+`;
+
+const InputWrap = styled.div`
+  position: relative;
+`;
