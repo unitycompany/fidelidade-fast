@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
+
+const slideUp = keyframes`
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+`;
 
 const Modal = styled.div`
   position: fixed;
@@ -15,9 +20,8 @@ const Modal = styled.div`
   padding: 15px;
   
   @media (max-width: 768px) {
-    padding: 10px;
-    align-items: flex-start;
-    padding-top: 20px;
+    padding: 0;
+    align-items: flex-end; /* bottom sheet no mobile */
   }
 `;
 
@@ -33,12 +37,16 @@ const Container = styled.div`
   flex-direction: column;
   
   @media (max-width: 768px) {
-    max-height: 95vh;
+    max-height: 85vh; /* não ocupa toda a tela */
     max-width: 100%;
+    border-radius: 16px 16px 0 0; /* bordas arredondadas no topo */
+    border: none;
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.2);
+    animation: ${slideUp} 0.25s ease-out; /* sobe de baixo para cima */
   }
   
   @media (max-width: 480px) {
-    max-height: 98vh;
+    max-height: 88vh;
   }
 `;
 
@@ -87,6 +95,8 @@ const Content = styled.div`
   flex: 1;
   overflow-y: auto;
   background: #fafafa;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; /* rolagem suave no iOS */
   
   &::-webkit-scrollbar {
     width: 6px;
@@ -204,17 +214,17 @@ const Section = styled.div`
 `;
 
 const Footer = styled.div`
-  padding: 20px 25px;
+  position: sticky; /* mantém visível ao rolar */
+  bottom: 0;
+  padding: 16px 20px;
   background: #f8f9fa;
   border-top: 1px solid #e0e0e0;
   flex-shrink: 0;
+  z-index: 2;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
   
   @media (max-width: 768px) {
-    padding: 15px 20px;
-  }
-  
-  @media (max-width: 480px) {
-    padding: 12px 15px;
+    padding: 14px 16px calc(env(safe-area-inset-bottom) + 12px) 16px; /* respeita área segura */
   }
 `;
 
@@ -278,6 +288,10 @@ const ButtonContainer = styled.div`
   display: flex;
   gap: 15px;
   justify-content: flex-end;
+  
+  @media (max-width: 768px) {
+    position: relative;
+  }
   
   @media (max-width: 480px) {
     flex-direction: column-reverse;

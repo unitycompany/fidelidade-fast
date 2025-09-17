@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { FiSearch, FiCheck, FiClock, FiUser, FiGift, FiEye, FiEdit3, FiFilter } from 'react-icons/fi';
+import { FiSearch, FiCheck, FiClock, FiUser, FiGift, FiEye, FiEdit3, FiFilter, FiShield } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 import LoadingGif from './LoadingGif';
@@ -127,17 +127,25 @@ const ResgatesTable = styled.div`
   animation: ${fadeInUp} 0.6s ease-out 0.3s both;
 `;
 
+const TableScroll = styled.div`
+  max-height: 65vh;
+  overflow-y: auto;
+`;
+
 const TableHeader = styled.div`
   background: ${props => props.theme.colors.gradientPrimary};
   color: white;
   padding: 1rem 1.5rem;
   display: grid;
-  grid-template-columns: 120px 1fr 1fr 120px 120px 150px 100px;
+  grid-template-columns: 160px 1.1fr 1.1fr 140px 110px 220px 140px;
   gap: 1rem;
   font-weight: 600;
   font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
   
   @media (max-width: ${props => props.theme.breakpoints.lg}) {
     grid-template-columns: 1fr;
@@ -148,7 +156,7 @@ const TableHeader = styled.div`
 const TableRow = styled.div`
   padding: 1rem 1.5rem;
   display: grid;
-  grid-template-columns: 120px 1fr 1fr 120px 120px 150px 100px;
+  grid-template-columns: 160px 1.1fr 1.1fr 140px 110px 220px 140px;
   gap: 1rem;
   border-bottom: 1px solid ${props => props.theme.colors.gray100};
   align-items: center;
@@ -167,6 +175,30 @@ const TableRow = styled.div`
     gap: 0.5rem;
     padding: 1rem;
   }
+`;
+
+const Cell = styled.div`
+  min-width: 0; /* allow text-overflow */
+`;
+
+const CellTitle = styled.div`
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const CellSub = styled.div`
+  font-size: 0.8rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const CellRight = styled.div`
+  text-align: right;
+  font-weight: 600;
 `;
 
 const StatusBadge = styled.span`
@@ -242,7 +274,7 @@ const Modal = styled.div`
 const ModalContent = styled.div`
   background: white;
   padding: 2rem;
-  max-width: 500px;
+  max-width: 880px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
@@ -252,6 +284,104 @@ const ModalContent = styled.div`
     color: ${props => props.theme.colors.text};
     margin-bottom: 1rem;
   }
+`;
+
+const DetailsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(360px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1rem;
+  @media (max-width: ${props => props.theme.breakpoints.md}) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const Section = styled.div`
+  background: ${props => props.theme.colors.gray50};
+  border: 1px solid ${props => props.theme.colors.gray100};
+  padding: 1rem;
+  border-radius: 8px;
+`;
+
+const SectionTitle = styled.div`
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: ${props => props.theme.colors.text};
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
+`;
+
+const KV = styled.div`
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 0.75rem 1rem;
+  align-items: baseline;
+`;
+
+const K = styled.div`
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: 0.9rem;
+  text-align: right;
+`;
+
+const V = styled.div`
+  color: ${props => props.theme.colors.text};
+  font-weight: 600;
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: normal;
+  min-width: 0;
+  line-height: 1.4;
+`;
+
+const CodeBadge = styled.div`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid ${props => props.theme.colors.gray200};
+  background: ${props => props.theme.colors.gray50};
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: ${props => props.theme.colors.primary};
+  letter-spacing: 2px;
+`;
+
+const DetailsTable = styled.table`
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  margin-top: 0.75rem;
+`;
+
+const SectionHeaderCell = styled.td`
+  background: ${props => props.theme.colors.gray50};
+  border: 1px solid ${props => props.theme.colors.gray100};
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+  color: ${props => props.theme.colors.text};
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-radius: 8px;
+`;
+
+const KeyCell = styled.td`
+  width: 180px;
+  color: ${props => props.theme.colors.textSecondary};
+  text-align: right;
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+`;
+
+const ValCell = styled.td`
+  color: ${props => props.theme.colors.text};
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.45;
+  word-break: normal;
+  overflow-wrap: break-word;
 `;
 
 const CodigoDestaque = styled.div`
@@ -270,6 +400,30 @@ const CodigoDestaque = styled.div`
   }
 `;
 
+const Chip = styled.span`
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #0b5;
+  background: rgba(16, 185, 129, 0.1);
+`;
+
+// (removido botão pequeno de ícone)
+
+const InfoBanner = styled.div`
+  background: #fff8e1;
+  color: #7a5d00;
+  border: 1px solid #ffe58f;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+`;
+
 function AdminResgates({ user }) {
   const [resgates, setResgates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -284,6 +438,7 @@ function AdminResgates({ user }) {
     hoje: 0
   });
   const [confirmCpfModal, setConfirmCpfModal] = useState({ open: false, resgate: null, cpf: '' });
+  const cpfInputRef = useRef(null);
 
   const carregarResgates = async () => {
     try {
@@ -375,6 +530,30 @@ function AdminResgates({ user }) {
 
   const somenteDigitos = (v) => (v || '').toString().replace(/\D/g, '');
 
+  const formatCpf = (v) => {
+    const digits = somenteDigitos(v).slice(0, 11);
+    const parts = [];
+    if (digits.length > 0) parts.push(digits.slice(0, 3));
+    if (digits.length > 3) parts.push(digits.slice(3, 6));
+    if (digits.length > 6) parts.push(digits.slice(6, 9));
+    const rest = digits.slice(9, 11);
+    let out = '';
+    if (parts.length) out = parts.join('.');
+    if (rest) out += (out ? '-' : '') + rest;
+    return out;
+  };
+
+  // (removida dica de CPF final)
+
+  const normalizeRetiradaStr = (txt) => {
+    if (!txt) return '';
+    let out = String(txt);
+    // Remove repetições como "| Loja | Loja |"
+    out = out.replace(/\s*\|\s*Loja\s*/gi, ' | ');
+    out = out.replace(/\s*\|\s*\|\s*/g, ' | ');
+    return out.replace(/\s{2,}/g, ' ').replace(/^\s*\|\s*|\s*\|\s*$/g, '').trim();
+  };
+
   const abrirConfirmacaoCPF = (resgate) => {
     setConfirmCpfModal({ open: true, resgate, cpf: '' });
   };
@@ -398,6 +577,13 @@ function AdminResgates({ user }) {
     setConfirmCpfModal(prev => ({ ...prev, open: false }));
     await marcarComoResgatado(confirmCpfModal.resgate.codigo_resgate);
   };
+
+  useEffect(() => {
+    if (confirmCpfModal.open) {
+      // Focus no input do CPF ao abrir
+      setTimeout(() => cpfInputRef.current?.focus(), 0);
+    }
+  }, [confirmCpfModal.open]);
 
   // Utilitário para formatar retirada: "Nome | Cidade/UF"
   const formatRetiradaInfo = (gerente, loja) => {
@@ -476,6 +662,12 @@ function AdminResgates({ user }) {
 
   return (
     <Container>
+      <Header>
+        <h1>
+          <FiGift /> Resgates de Prêmios (Admin)
+        </h1>
+        <p>Gerencie as entregas com validação por CPF e mantenha a auditoria em dia.</p>
+      </Header>
 
       <Stats>
         <StatCard color="#007bff" delay="0.1s">
@@ -513,94 +705,103 @@ function AdminResgates({ user }) {
         </FilterSelect>
       </Filters>
 
+      <InfoBanner>
+        <FiShield /> Antes de entregar: confirme o CPF do titular e peça um comprovante de CPF.
+      </InfoBanner>
+
       <ResgatesTable>
-        <TableHeader>
-          <div>Código</div>
-          <div>Cliente</div>
-          <div>Prêmio</div>
-          <div>Data Resgate</div>
-          <div>Pontos</div>
-          <div>Status</div>
-          <div>Ações</div>
-        </TableHeader>
+        <TableScroll>
+          <TableHeader>
+            <div>Código</div>
+            <div>Cliente</div>
+            <div>Prêmio</div>
+            <div>Data Resgate</div>
+            <div>Pontos</div>
+            <div>Status</div>
+            <div>Ações</div>
+          </TableHeader>
 
-        {resgatesFiltrados.map((resgate, index) => (
-          <TableRow key={resgate.id}>
-            <CodigoDestaque style={{ margin: 0, padding: '0.5rem', display: 'inline-block' }}>
-              <div className="codigo" style={{ fontSize: '0.9rem' }}>
-                {resgate.codigo_resgate}
-              </div>
-            </CodigoDestaque>
-
-            <div>
-              <div style={{ fontWeight: '600' }}>{resgate.cliente_nome}</div>
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>{resgate.cliente_email}</div>
-            </div>
-
-            <div>
-              <div style={{ fontWeight: '600' }}>{resgate.premio_nome}</div>
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>{resgate.premio_categoria}</div>
-            </div>
-
-            <div>
-              {new Date(resgate.data_resgate).toLocaleDateString('pt-BR')}
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>
-                {resgate.dias_desde_resgate} dias atrás
-              </div>
-            </div>
-
-            <div style={{ fontWeight: '600' }}>
-              {resgate.pontos_utilizados} pts
-            </div>
-
-            <div>
-              <StatusBadge status={resgate.coletado ? 'resgatado' : 'pendente'}>
-                {resgate.status_retirada}
-              </StatusBadge>
-              {resgate.coletado && resgate.data_coleta && (
-                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
-                  <div style={{ fontWeight: '500' }}>
-                    Data da Entrega: {new Date(resgate.data_coleta).toLocaleDateString('pt-BR')}
+          {resgatesFiltrados.map((resgate, index) => (
+            <TableRow key={resgate.id}>
+              <Cell style={{ display: 'flex', alignItems: 'center', gap: '.25rem' }}>
+                <CodigoDestaque style={{ margin: 0, padding: '0.5rem', display: 'inline-block' }}>
+                  <div className="codigo" style={{ fontSize: '0.9rem' }}>
+                    {resgate.codigo_resgate}
                   </div>
-                </div>
-              )}
-              {resgate.coletado && resgate.gerente_retirada && (
-                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
-                  <div style={{ fontWeight: '500' }}>
-                    Retirado por: {resgate.gerente_retirada}
+                </CodigoDestaque>
+              </Cell>
+
+              <Cell>
+                <CellTitle title={resgate.cliente_nome}>{resgate.cliente_nome}</CellTitle>
+                <CellSub title={resgate.cliente_email}>{resgate.cliente_email}</CellSub>
+              </Cell>
+
+              <Cell>
+                <CellTitle title={resgate.premio_nome}>{resgate.premio_nome}</CellTitle>
+                <CellSub>
+                  {resgate.premio_categoria && (<Chip>{resgate.premio_categoria}</Chip>)}
+                </CellSub>
+              </Cell>
+
+              <Cell>
+                <CellTitle>{new Date(resgate.data_resgate).toLocaleDateString('pt-BR')}</CellTitle>
+                <CellSub>{resgate.dias_desde_resgate} dias atrás</CellSub>
+              </Cell>
+
+              <CellRight>
+                {Number(resgate.pontos_utilizados || 0).toLocaleString('pt-BR')} pts
+              </CellRight>
+
+              <Cell>
+                <StatusBadge status={resgate.coletado ? 'resgatado' : 'pendente'}>
+                  {resgate.status_retirada}
+                </StatusBadge>
+                {!resgate.coletado && (
+                  <div style={{ fontSize: '0.75rem', color: '#8a6d3b', marginTop: '0.25rem' }}>
+                    Exija documento com CPF para validar.
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+                {resgate.coletado && resgate.data_coleta && (
+                  <CellSub>
+                    <span style={{ fontWeight: 500 }}>Entregue em:</span> {new Date(resgate.data_coleta).toLocaleDateString('pt-BR')}
+                  </CellSub>
+                )}
+                {resgate.coletado && resgate.gerente_retirada && (
+                  <CellSub>
+                    <span style={{ fontWeight: 500 }}>Retirado por:</span> {normalizeRetiradaStr(resgate.gerente_retirada)}
+                  </CellSub>
+                )}
+              </Cell>
 
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <ActionButton
-                variant="info"
-                onClick={() => setModalDetalhes(resgate)}
-              >
-                <FiEye />
-                Ver
-              </ActionButton>
-
-              {!resgate.coletado && (
+              <Cell style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <ActionButton
-                  variant="success"
-                  onClick={() => abrirConfirmacaoCPF(resgate)}
-                  disabled={processando}
+                  variant="info"
+                  onClick={() => setModalDetalhes(resgate)}
                 >
-                  <FiCheck />
-                  Entregar
+                  <FiEye />
+                  Ver
                 </ActionButton>
-              )}
-            </div>
-          </TableRow>
-        ))}
 
-        {resgatesFiltrados.length === 0 && (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
-            Nenhum resgate encontrado com os filtros aplicados.
-          </div>
-        )}
+                {!resgate.coletado && (
+                  <ActionButton
+                    variant="success"
+                    onClick={() => abrirConfirmacaoCPF(resgate)}
+                    disabled={processando}
+                  >
+                    <FiCheck />
+                    Entregar
+                  </ActionButton>
+                )}
+              </Cell>
+            </TableRow>
+          ))}
+
+          {resgatesFiltrados.length === 0 && (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+              Nenhum resgate encontrado com os filtros aplicados.
+            </div>
+          )}
+        </TableScroll>
       </ResgatesTable>
 
       {/* Modal de Detalhes */}
@@ -609,47 +810,81 @@ function AdminResgates({ user }) {
           <ModalContent onClick={e => e.stopPropagation()}>
             <h3>Detalhes do Resgate</h3>
 
-            <CodigoDestaque>
-              <div className="codigo">{modalDetalhes.codigo_resgate}</div>
-            </CodigoDestaque>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <strong>Cliente:</strong> {modalDetalhes.cliente_nome}<br />
-              <strong>Email:</strong> {modalDetalhes.cliente_email}<br />
-              <strong>Telefone:</strong> {modalDetalhes.cliente_telefone || 'Não informado'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <CodeBadge>{modalDetalhes.codigo_resgate}</CodeBadge>
             </div>
 
-            <div style={{ marginBottom: '1rem' }}>
-              <strong>Prêmio:</strong> {modalDetalhes.premio_nome}<br />
-              <strong>Categoria:</strong> {modalDetalhes.premio_categoria}<br />
-              <strong>Descrição:</strong> {modalDetalhes.premio_descricao}
-            </div>
+            <DetailsTable>
+              <tbody>
+                <tr>
+                  <SectionHeaderCell colSpan={2}>Cliente</SectionHeaderCell>
+                </tr>
+                <tr>
+                  <KeyCell>Nome</KeyCell>
+                  <ValCell>{modalDetalhes.cliente_nome}</ValCell>
+                </tr>
+                <tr>
+                  <KeyCell>Email</KeyCell>
+                  <ValCell>{modalDetalhes.cliente_email}</ValCell>
+                </tr>
+                <tr>
+                  <KeyCell>Telefone</KeyCell>
+                  <ValCell>{modalDetalhes.cliente_telefone || 'Não informado'}</ValCell>
+                </tr>
 
-            <div style={{ marginBottom: '1rem' }}>
-              <strong>Data do Resgate:</strong> {new Date(modalDetalhes.data_resgate).toLocaleString('pt-BR')}<br />
-              <strong>Pontos Utilizados:</strong> {modalDetalhes.pontos_utilizados}<br />
-              <strong>Status:</strong> {modalDetalhes.status_retirada}
-            </div>
+                <tr>
+                  <SectionHeaderCell colSpan={2}>Prêmio</SectionHeaderCell>
+                </tr>
+                <tr>
+                  <KeyCell>Nome</KeyCell>
+                  <ValCell>{modalDetalhes.premio_nome}</ValCell>
+                </tr>
+                <tr>
+                  <KeyCell>Categoria</KeyCell>
+                  <ValCell>{modalDetalhes.premio_categoria}</ValCell>
+                </tr>
+                <tr>
+                  <KeyCell>Descrição</KeyCell>
+                  <ValCell>{modalDetalhes.premio_descricao}</ValCell>
+                </tr>
 
-            {modalDetalhes.coletado && modalDetalhes.data_coleta && (
-              <div style={{ marginBottom: '1rem' }}>
-                <strong>Data da Entrega:</strong> {new Date(modalDetalhes.data_coleta).toLocaleString('pt-BR')}
-                {modalDetalhes.gerente_retirada && (
-                  <>
-                    <br />
-                    <strong>Retirado por:</strong> {modalDetalhes.gerente_retirada}
-                  </>
+                <tr>
+                  <SectionHeaderCell colSpan={2}>Resumo</SectionHeaderCell>
+                </tr>
+                <tr>
+                  <KeyCell>Resgate</KeyCell>
+                  <ValCell>{new Date(modalDetalhes.data_resgate).toLocaleString('pt-BR')}</ValCell>
+                </tr>
+                <tr>
+                  <KeyCell>Pontos</KeyCell>
+                  <ValCell>{Number(modalDetalhes.pontos_utilizados || 0).toLocaleString('pt-BR')} pts</ValCell>
+                </tr>
+                <tr>
+                  <KeyCell>Status</KeyCell>
+                  <ValCell>{modalDetalhes.status_retirada}</ValCell>
+                </tr>
+                {modalDetalhes.coletado && modalDetalhes.data_coleta && (
+                  <tr>
+                    <KeyCell>Entregue</KeyCell>
+                    <ValCell>{new Date(modalDetalhes.data_coleta).toLocaleString('pt-BR')}</ValCell>
+                  </tr>
                 )}
-              </div>
-            )}
+                {modalDetalhes.coletado && modalDetalhes.gerente_retirada && (
+                  <tr>
+                    <KeyCell>Retirado por</KeyCell>
+                    <ValCell>{normalizeRetiradaStr(modalDetalhes.gerente_retirada)}</ValCell>
+                  </tr>
+                )}
+                {modalDetalhes.observacoes_admin && (
+                  <tr>
+                    <KeyCell>Observações</KeyCell>
+                    <ValCell>{modalDetalhes.observacoes_admin}</ValCell>
+                  </tr>
+                )}
+              </tbody>
+            </DetailsTable>
 
-            {modalDetalhes.observacoes_admin && (
-              <div style={{ marginBottom: '1rem' }}>
-                <strong>Observações:</strong> {modalDetalhes.observacoes_admin}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem' }}>
               {!modalDetalhes.coletado && (
                 <ActionButton
                   variant="success"
@@ -687,8 +922,10 @@ function AdminResgates({ user }) {
               <input
                 type="text"
                 placeholder="000.000.000-00"
+                ref={cpfInputRef}
                 value={confirmCpfModal.cpf}
-                onChange={(e) => setConfirmCpfModal(prev => ({ ...prev, cpf: e.target.value }))}
+                onChange={(e) => setConfirmCpfModal(prev => ({ ...prev, cpf: formatCpf(e.target.value) }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmarEntregaComCPF(); }}
                 style={{ width: '100%', padding: '.75rem 1rem', border: '1px solid #ddd' }}
               />
             </div>

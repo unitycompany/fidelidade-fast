@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import {
   FiPackage, FiCheck, FiX, FiClock, FiUser,
@@ -402,6 +402,7 @@ function GerenteResgates({ user }) {
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [processando, setProcessando] = useState({});
   const [confirmCpfModal, setConfirmCpfModal] = useState({ open: false, resgateId: null, cpf: '' });
+  const cpfInputRef = useRef(null);
   const [stats, setStats] = useState({
     pendentes: 0,
     entregues: 0,
@@ -511,6 +512,21 @@ function GerenteResgates({ user }) {
 
   const somenteDigitos = (v) => (v || '').toString().replace(/\D/g, '');
 
+  const formatCpf = (v) => {
+    const digits = somenteDigitos(v).slice(0, 11);
+    const parts = [];
+    if (digits.length > 0) parts.push(digits.slice(0, 3));
+    if (digits.length > 3) parts.push(digits.slice(3, 6));
+    if (digits.length > 6) parts.push(digits.slice(6, 9));
+    const rest = digits.slice(9, 11);
+    let out = '';
+    if (parts.length) out = parts.join('.');
+    if (rest) out += (out ? '-' : '') + rest;
+    return out;
+  };
+
+  // dica de CPF final removida
+
   const confirmarEntregaComCPF = async () => {
     const resgate = resgates.find(r => r.id === confirmCpfModal.resgateId);
     if (!resgate) { setConfirmCpfModal({ open: false, resgateId: null, cpf: '' }); return; }
@@ -558,6 +574,12 @@ function GerenteResgates({ user }) {
       setProcessando(prev => ({ ...prev, [resgateId]: false }));
     }
   };
+
+  useEffect(() => {
+    if (confirmCpfModal.open) {
+      setTimeout(() => cpfInputRef.current?.focus(), 0);
+    }
+  }, [confirmCpfModal.open]);
 
   const formatarData = (data) => {
     return new Date(data).toLocaleString('pt-BR', {
@@ -760,6 +782,11 @@ function GerenteResgates({ user }) {
                       </ProcessButton>
                     </ResgateActions>
                   )}
+                  {resgate.status === 'pendente' && (
+                    <div style={{ marginTop: '.5rem', color: '#7a5d00', background: '#fff8e1', border: '1px solid #ffe58f', padding: '.5rem .75rem', borderRadius: 8 }}>
+                      Antes de entregar: confirme o CPF do titular e peça um comprovante de CPF.
+                    </div>
+                  )}
                 </ResgateBody>
               </ResgateCard>
             ))
@@ -771,7 +798,7 @@ function GerenteResgates({ user }) {
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
             onClick={() => setConfirmCpfModal({ open: false, resgateId: null, cpf: '' })}
           >
-            <div style={{ background: 'white', padding: '1.5rem', maxWidth: 520, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ background: 'white', padding: '1.5rem', maxWidth: 520, width: '100%', borderRadius: 10 }} onClick={(e) => e.stopPropagation()}>
               <h3 style={{ marginTop: 0 }}>Confirmar entrega do prêmio</h3>
               <p style={{ color: '#666', lineHeight: 1.5 }}>
                 Para concluir a entrega, confirme o CPF do titular da conta que realizou o resgate.
@@ -783,9 +810,11 @@ function GerenteResgates({ user }) {
                 <input
                   type="text"
                   placeholder="000.000.000-00"
+                  ref={cpfInputRef}
                   value={confirmCpfModal.cpf}
-                  onChange={(e) => setConfirmCpfModal(prev => ({ ...prev, cpf: e.target.value }))}
-                  style={{ width: '100%', padding: '.75rem 1rem', border: '1px solid #E2E8F0' }}
+                  onChange={(e) => setConfirmCpfModal(prev => ({ ...prev, cpf: formatCpf(e.target.value) }))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') confirmarEntregaComCPF(); }}
+                  style={{ width: '100%', padding: '.75rem 1rem', border: '1px solid #E2E8F0', borderRadius: 8 }}
                 />
               </div>
               <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
