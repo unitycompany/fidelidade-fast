@@ -366,6 +366,7 @@ class ImagemNotaFiscalService {
             const clientIP = await this.obterIP();
 
             // Dados para inserir na tabela
+            const pontos = Number(dadosNota?.pontuacao_total || dadosNota?.pontos || dadosNota?.points || 0);
             const notaData = {
                 pedido_id: pedidoId,
                 cliente_id: clienteId,
@@ -376,7 +377,9 @@ class ImagemNotaFiscalService {
                 chave_acesso: dadosNota.chave_acesso || null,
                 status_upload: 'processado',
                 ip_origem: clientIP,
-                user_agent: navigator.userAgent
+                user_agent: navigator.userAgent,
+                pontos_retornados: isNaN(pontos) ? 0 : pontos,
+                dados_nota: dadosNota
             };
 
             console.log('💾 [NOTA FISCAL] Dados preparados para inserção:', notaData);

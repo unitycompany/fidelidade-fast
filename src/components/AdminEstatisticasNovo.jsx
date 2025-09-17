@@ -366,8 +366,8 @@ function AdminEstatisticasNovo() {
     totalResgates: 0,
     premiosAtivos: 0,
     resgatesUltimos30Dias: 0,
-    pontosUltimos30Dias: 0,
-    clientesAtivos: 0,
+    resgatesUltimos7Dias: 0,
+    resgatesHoje: 0,
     valorMedioResgates: 0
   });
 
@@ -521,23 +521,26 @@ function AdminEstatisticasNovo() {
         .select('*', { count: 'exact', head: true })
         .gte('created_at', dataLimite.toISOString());
 
-      // Pontos ganhos últimos 30 dias
-      const { data: pontosRecentes } = await supabase
-        .from('historico_pontos')
-        .select('pontos')
-        .eq('tipo', 'ganho')
-        .gte('created_at', dataLimite.toISOString());
+      // Resgates últimos 7 dias
+      const data7 = new Date();
+      data7.setDate(data7.getDate() - 7);
+      const { count: resgatesUltimos7Dias } = await supabase
+        .from('resgates')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', data7.toISOString());
 
-      const pontosUltimos30Dias = pontosRecentes?.reduce((sum, item) =>
-        sum + (item.pontos || 0), 0) || 0;
+      // Resgates hoje
+      const inicioHoje = new Date();
+      inicioHoje.setHours(0, 0, 0, 0);
+      const fimHoje = new Date();
+      fimHoje.setHours(23, 59, 59, 999);
+      const { count: resgatesHoje } = await supabase
+        .from('resgates')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', inicioHoje.toISOString())
+        .lte('created_at', fimHoje.toISOString());
 
-      // Clientes ativos (que enviaram pelo menos 1 nota) - contar clientes únicos
-      const { data: clientesAtivosData } = await supabase
-        .from('pedidos_fast')
-        .select('cliente_id');
-
-      const clientesUnicos = new Set(clientesAtivosData?.map(p => p.cliente_id) || []);
-      const clientesAtivos = clientesUnicos.size;
+      // Removed: pontos(30 dias) and clientes ativos (no longer displayed)
 
       // Valor médio dos resgates
       const { data: resgatesValor } = await supabase
@@ -554,8 +557,8 @@ function AdminEstatisticasNovo() {
         totalResgates: totalResgates || 0,
         premiosAtivos: premiosAtivos || 0,
         resgatesUltimos30Dias: resgatesUltimos30Dias || 0,
-        pontosUltimos30Dias,
-        clientesAtivos: clientesAtivos || 0,
+        resgatesUltimos7Dias: resgatesUltimos7Dias || 0,
+        resgatesHoje: resgatesHoje || 0,
         valorMedioResgates: Math.round(valorMedioResgates)
       });
 
@@ -673,31 +676,33 @@ function AdminEstatisticasNovo() {
           </StatHeader>
         </StatCard>
 
-        <StatCard color="#00b4d8">
+        <StatCard color="#f59e0b">
           <StatHeader>
-            <StatIcon color="#00b4d8">
-              <FiActivity />
+            <StatIcon color="#f59e0b">
+              <FiCalendar />
             </StatIcon>
             <StatContent>
-              <StatTitle>Pontos (30 dias)</StatTitle>
-              <StatValue color="#00b4d8">{stats.pontosUltimos30Dias.toLocaleString()}</StatValue>
-              <StatSubtitle>Ganhos recentes</StatSubtitle>
+              <StatTitle>Resgates (7 dias)</StatTitle>
+              <StatValue color="#f59e0b">{stats.resgatesUltimos7Dias}</StatValue>
+              <StatSubtitle>Últimos 7 dias</StatSubtitle>
             </StatContent>
           </StatHeader>
         </StatCard>
 
-        <StatCard color="#f56565">
+        <StatCard color="#ef4444">
           <StatHeader>
-            <StatIcon color="#f56565">
-              <FiUsers />
+            <StatIcon color="#ef4444">
+              <FiActivity />
             </StatIcon>
             <StatContent>
-              <StatTitle>Clientes Ativos</StatTitle>
-              <StatValue color="#f56565">{stats.clientesAtivos}</StatValue>
-              <StatSubtitle>Com notas enviadas</StatSubtitle>
+              <StatTitle>Resgates (hoje)</StatTitle>
+              <StatValue color="#ef4444">{stats.resgatesHoje}</StatValue>
+              <StatSubtitle>Desde 00:00</StatSubtitle>
             </StatContent>
           </StatHeader>
         </StatCard>
+
+        {/* Removed as requested: Pontos (30 dias) and Clientes Ativos cards */}
 
         <StatCard color="#9f7aea">
           <StatHeader>
@@ -705,7 +710,7 @@ function AdminEstatisticasNovo() {
               <FiCalendar />
             </StatIcon>
             <StatContent>
-              <StatTitle>Média de Resgates</StatTitle>
+              <StatTitle>Média Resgates</StatTitle>
               <StatValue color="#9f7aea">{stats.valorMedioResgates.toLocaleString()}</StatValue>
               <StatSubtitle>Pontos por resgate</StatSubtitle>
             </StatContent>

@@ -165,8 +165,8 @@ const PremiosContainer = styled.div`
   padding: 0;
   
   @media (max-width: 600px) {
-    grid-template-columns: 1fr;
-    gap: 1rem;
+    grid-template-columns: 1fr 1fr;
+    gap: .4rem;
   }
 `;
 
@@ -177,6 +177,12 @@ const PremioCard = styled.div`
   transition: all 0.3s ease;
   animation: ${fadeInUp} 0.6s ease-out;
   position: relative;
+
+  @media (max-width: 600px){
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
   
   &:hover {
     transform: translateY(-4px);
@@ -192,6 +198,12 @@ const PremioImageContainer = styled.div`
   margin-bottom: -20px;
   background: #ffffff;
   overflow: hidden;
+
+  @media (max-width: 600px){
+    height: 150px;
+    padding: 10px;
+    margin-bottom: 0;
+  }
 `;
 
 const PremioImage = styled.img`
@@ -200,14 +212,26 @@ const PremioImage = styled.img`
   object-fit: contain;
   padding-bottom: 20px;
   border-bottom: 1px solid #eee;
+
+  @media (max-width: 600px){
+    padding-bottom: 10px;
+  }
 `;
 
 const PremioContent = styled.div`
   padding: 1.5rem;
+
+  @media (max-width: 600px){
+    padding: 1rem;
+  }
 `;
 
 const PremioHeader = styled.div`
   margin-bottom: 1rem;
+
+  @media (max-width: 600px){
+    margin-bottom: 0.5rem;
+  }
 `;
 
 const PremioTitulo = styled.h3`
@@ -218,7 +242,7 @@ const PremioTitulo = styled.h3`
   line-height: 1.3;
 
    @media (max-width: 768px){
-      font-size: 1.3rem;
+      font-size: 1.1rem;
   }
 `;
 
@@ -236,6 +260,10 @@ const PremioCategoria = styled.span`
   letter-spacing: 0.5px;
   backdrop-filter: blur(4px);
   z-index: 2;
+
+  @media (max-width: 600px){
+    font-size: 0.6rem;
+  }
 `;
 
 const PremioDescricao = styled.p`
@@ -245,7 +273,8 @@ const PremioDescricao = styled.p`
   margin: 0 0 1rem 0;
 
    @media (max-width: 768px){
-    font-size: 1rem;
+    font-size: 0.9rem;
+    font-weight: 300;
   }
 `;
 
@@ -254,6 +283,13 @@ const PremioFooter = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-top: 1rem;
+
+  @media (max-width: 600px){
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 10px;
+  }
 `;
 
 const PremioPontos = styled.div`

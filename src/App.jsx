@@ -23,6 +23,7 @@ import { inicializarPremios } from './utils/inicializarPremios'
 import SidebarVertical from './components/SidebarVertical'
 import { supabase } from './services/supabase'
 import LoadingGif from './components/LoadingGif'
+import { RegulamentoPage } from './components/Regulamento'
 
 // Contexto para autenticação e estado global
 const AuthContext = createContext()
@@ -91,7 +92,7 @@ function App() {
           
           // Verificar role do usuário
           const userRole = userData.role || 'cliente'
-          if (userRole === 'admin') {
+          if (userRole === 'admin' || userRole === 'dev') {
             setIsAdminMode(true)
             setCurrentPage('admin')
           } else if (userRole === 'gerente') {
@@ -164,7 +165,7 @@ function App() {
 
     // Determinar página inicial baseado no role
     const userRole = userData.role || 'cliente'
-    if (userRole === 'admin') {
+    if (userRole === 'admin' || userRole === 'dev') {
       setIsAdminMode(true)
       setCurrentPage('admin')
     } else if (userRole === 'gerente') {
@@ -225,11 +226,12 @@ function App() {
 
     switch (permissaoRequerida) {
       case 'cliente':
-        return ['cliente', 'gerente', 'admin'].includes(userRole)
+        // Páginas de cliente agora são apenas para 'cliente'
+        return ['cliente'].includes(userRole)
       case 'gerente':
-        return ['gerente', 'admin'].includes(userRole)
+        return ['gerente', 'admin', 'dev'].includes(userRole)
       case 'admin':
-        return userRole === 'admin'
+        return ['admin', 'dev'].includes(userRole)
       default:
         return false
     }
@@ -246,6 +248,10 @@ function App() {
         return temPermissao('cliente') ? <PremiosNovo user={user} onUserUpdate={handleUserUpdate} /> : <div>Acesso negado</div>
       case 'meus-resgates':
         return temPermissao('cliente') ? <MeusResgates usuario={user} onClose={() => setCurrentPage('upload')} /> : <div>Acesso negado</div>
+
+      // Página informativa acessível a todos os perfis logados
+      case 'como-ganhar-pontos':
+        return <RegulamentoPage />
 
       // Páginas de Admin
       case 'admin':
@@ -278,7 +284,7 @@ function App() {
         const userRole = user?.role || 'cliente'
         if (userRole === 'gerente') {
           return <GerenteResgates user={user} />
-        } else if (userRole === 'admin') {
+        } else if (userRole === 'admin' || userRole === 'dev') {
           return <AdminPanelNovo section="config" />
         } else {
           return <UploadPedidoNovo user={user} onUserUpdate={handleUserUpdate} />

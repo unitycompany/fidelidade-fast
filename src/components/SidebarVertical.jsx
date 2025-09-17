@@ -15,7 +15,8 @@ import {
   FiMenu,
   FiUsers,
   FiShield,
-  FiPackage
+  FiPackage,
+  FiHelpCircle
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 
@@ -181,23 +182,23 @@ const LogoutButton = styled.button`
 const clienteItems = [
   { key: 'upload', label: 'Enviar Nota', icon: FiUpload },
   { key: 'premios', label: 'Prêmios', icon: FiGift },
-  { key: 'perfil', label: 'Perfil', icon: FiUser }
-];
-
-// Itens para gerentes (cliente + resgates admin)
-const gerenteItems = [
-  { key: 'upload', label: 'Enviar Nota', icon: FiUpload },
-  { key: 'premios', label: 'Prêmios', icon: FiGift },
   { key: 'perfil', label: 'Perfil', icon: FiUser },
-  { key: 'gerente-resgates', label: 'Resgates Admin', icon: FiSettings }
+  { key: 'como-ganhar-pontos', label: 'Como ganhar pontos?', icon: FiHelpCircle }
 ];
 
-// Itens para admins (acesso total)
+// Itens para gerentes (RESTRITO: apenas resgates)
+const gerenteItems = [
+  { key: 'gerente-resgates', label: 'Resgates Admin', icon: FiSettings },
+  { key: 'como-ganhar-pontos', label: 'Como ganhar pontos?', icon: FiHelpCircle }
+];
+
+// Itens para admins/desenvolvedores (acesso total)
 const adminItems = [
   { key: 'admin-resgates', label: 'Resgates Admin', icon: FiSettings },
   { key: 'admin-catalogo', label: 'Catálogo de Prêmios', icon: FiGift },
   { key: 'admin-estatisticas', label: 'Estatísticas', icon: FiBarChart2 },
-  { key: 'admin-usuarios', label: 'Usuários', icon: FiUsers }
+  { key: 'admin-usuarios', label: 'Usuários', icon: FiUsers },
+  { key: 'como-ganhar-pontos', label: 'Como ganhar pontos?', icon: FiHelpCircle }
 ];
 
 // Função para obter os itens corretos baseado no role do usuário
@@ -206,7 +207,7 @@ const getNavigationItems = (userRole, temResgates) => {
 
   let items = [];
 
-  if (role === 'admin') {
+  if (role === 'admin' || role === 'dev') {
     items = [...adminItems];
   } else if (role === 'gerente') {
     items = [...gerenteItems];
@@ -214,8 +215,8 @@ const getNavigationItems = (userRole, temResgates) => {
     items = [...clienteItems];
   }
 
-  // Adicionar "Meus Resgates" se o usuário tiver resgates (exceto para admin)
-  if (temResgates && role !== 'admin') {
+  // Adicionar "Meus Resgates" se o usuário tiver resgates (apenas clientes)
+  if (temResgates && role === 'cliente') {
     items.push({ key: 'meus-resgates', label: 'Meus Resgates', icon: FiStar });
   }
 
@@ -299,6 +300,8 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
     switch (userRole) {
       case 'admin':
         return 'Administrador';
+      case 'dev':
+        return 'Desenvolvedor';
       case 'gerente':
         return 'Gerente';
       case 'cliente':
@@ -328,12 +331,12 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
       <MobileHeader>
         <MobileLogo src="https://imagedelivery.net/1n9Gwvykoj9c9m8C_4GsGA/336e2c64-e66b-487b-d0e5-40df2b33d100/public" alt="Logo" />
         <MobilePoints>
-          {userRole !== 'admin' && (
+          {userRole !== 'admin' && userRole !== 'dev' && (
             <>
               {userAtualizado?.saldo_pontos?.toLocaleString() || '0'} pts
             </>
           )}
-          {userRole === 'admin' && (
+          {(userRole === 'admin' || userRole === 'dev') && (
             <>
               <FiShield />
               {getUserRoleLabel()}
@@ -348,7 +351,7 @@ function SidebarVertical({ currentPage, onPageChange, user, onLogout, isAdminMod
       <SidebarContainer open={mobileOpen}>
         <LogoSection>
           <LogoImg src="https://imagedelivery.net/1n9Gwvykoj9c9m8C_4GsGA/336e2c64-e66b-487b-d0e5-40df2b33d100/public" alt="Logo" />
-          {userRole !== 'admin' ? (
+          {userRole !== 'admin' && userRole !== 'dev' ? (
             <Points>
               {userAtualizado?.saldo_pontos?.toLocaleString() || '0'} <span>pts</span>
             </Points>

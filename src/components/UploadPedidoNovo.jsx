@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled, { keyframes, css } from 'styled-components';
-import { FiUpload, FiFile, FiCheck, FiX, FiStar, FiInfo, FiEye, FiTarget, FiDatabase, FiGift, FiFileText } from 'react-icons/fi';
+import { FiUpload, FiFile, FiCheck, FiX, FiStar, FiInfo, FiEye, FiTarget, FiDatabase, FiGift, FiFileText, FiUser } from 'react-icons/fi';
 import { analyzeOrderWithGemini } from '../services/geminiService';
 import { processOrderResult, validateOrder, validarPontosCalculados } from '../utils/pedidosFast'; // removed getProdutosElegiveis import
 import { saveOrder, saveOrderItems, addPointsToCustomer, checkOrderExists } from '../services/supabase';
@@ -10,6 +10,7 @@ import sapService from '../services/sapService';
 import LoadingGif from './LoadingGif';
 import { notifyPointsEarned } from '../services/notificationManager.js';
 import NotaFiscalInput from './NotaFiscalInput';
+import { supabase } from '../services/supabase';
 import imagemNotaFiscalService from '../services/imagemNotaFiscalService';
 
 // Animações
@@ -618,7 +619,18 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         mimeType: mimeType,
         format: format,
         fileType: fileType,
-        clienteId: user?.id
+        clienteId: user?.id,
+        cliente:
+          user ? {
+            id: user.id,
+            nome: user.nome,
+            email: user.email,
+            telefone: user.telefone,
+            cpf: user.cpf_cnpj,
+            cnpj: user.cnpj_opcional || null,
+            loja: user.loja_nome || user.lojas?.nome || null,
+            role: user.role || null
+          } : null
       };
 
       console.log('Enviando para n8n:', {
@@ -631,8 +643,8 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
 
       // Enviar para o webhook do n8n com timeout (somente aqui mostra o loading)
       setIsProcessing(true);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 segundos
       
       const response = await fetch('https://n8n.unitycompany.com.br/webhook/sistema-de-fidelidade', {
         method: 'POST',
@@ -649,49 +661,85 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       
       if (!response.ok) {
         console.error(`Erro HTTP ${response.status} do n8n:`, response.statusText);
-        
-        // Tentar ler a resposta de erro
+        // Ler corpo de erro para decidir UI
+        let errorText = '';
         try {
-          const errorText = await response.text();
+          errorText = await response.text();
           console.error('Resposta de erro completa do n8n:', errorText);
-          console.error('Headers da resposta:', response.headers);
-        } catch (e) {
-          console.error('Não foi possível ler a resposta de erro:', e);
-        }
-        
-        // Usar valores padrão se o n8n falhar
-        console.log('Webhook n8n retornou erro. Usando pontos padrão para continuar funcionamento.');
-        n8nResponse = {
-          pontos: 5, // pontos padrão em caso de erro
-          orderNumber: `AUTO-${Date.now()}`,
-          orderDate: new Date().toISOString(),
-          totalValue: 0,
-          source: 'fallback-error-500'
-        };
+        } catch (_) {}
+        // Não creditar pontos em falha; orientar input manual
+  setError('Houve um erro ao analisar a imagem da sua nota. Por favor, digite manualmente o número da NF-e abaixo.');
+  setShowResult(false);
+  setInputMode('numero');
+        return; // interromper fluxo
       } else {
         try {
-          n8nResponse = await response.json();
-          console.log('Resposta válida do n8n:', n8nResponse);
-        } catch (jsonError) {
-          console.error('Erro ao fazer parse do JSON da resposta:', jsonError);
-          const responseText = await response.text();
-          console.error('Resposta não-JSON recebida:', responseText);
-          
-          // Fallback se não conseguir fazer parse do JSON
-          n8nResponse = {
-            pontos: 3,
-            orderNumber: `PARSE-ERROR-${Date.now()}`,
-            orderDate: new Date().toISOString(),
-            totalValue: 0,
-            source: 'fallback-json-error'
-          };
+          // Evitar ler o body duas vezes: leia como texto uma única vez e tente fazer parse
+          const contentType = response.headers.get('content-type') || '';
+          const rawText = await response.text();
+
+          if (!rawText || !rawText.trim()) {
+            console.warn('Resposta do n8n vazia (204 ou corpo vazio).');
+            setError('Não recebemos dados suficientes para processar sua nota. Tente novamente ou digite manualmente o número da NF-e.');
+            setShowResult(false);
+            setInputMode('numero');
+            return;
+          } else if (contentType.includes('application/json')) {
+            try {
+              n8nResponse = JSON.parse(rawText);
+              console.log('Resposta JSON do n8n:', n8nResponse);
+            } catch (parseErr) {
+              console.error('Falha ao fazer JSON.parse no corpo:', parseErr);
+              console.error('Corpo recebido:', rawText);
+              setError('Tivemos um problema ao processar sua imagem. Por favor, digite manualmente o número da NF-e.');
+              setShowResult(false);
+              setInputMode('numero');
+              return;
+            }
+          } else {
+            // Tentar interpretar texto como JSON; se falhar, manter texto bruto em raw
+            try {
+              n8nResponse = JSON.parse(rawText);
+              console.log('Resposta (texto->JSON) do n8n:', n8nResponse);
+            } catch (_) {
+              console.warn('Resposta não JSON recebida do n8n. Usando fallback com raw.');
+              setError('Não conseguimos analisar sua imagem. Por favor, digite manualmente o número da NF-e.');
+              setShowResult(false);
+              setInputMode('numero');
+              return;
+            }
+          }
+        } catch (readError) {
+          console.error('Erro ao ler corpo da resposta do n8n:', readError);
+          setError('Erro ao processar a imagem. Tente novamente ou digite manualmente o número da NF-e.');
+          setShowResult(false);
+          setInputMode('numero');
+          return;
         }
       }
 
       // Concluiu o envio ao n8n: remover loading agora
       setIsProcessing(false);
 
-      // Processar resposta do n8n (pode ser array ou objeto)
+      // Normalizar novo esquema do n8n: se vier "nf-e", copiar para campo 'nota'; e "data-emissao" → 'data_emissao'
+      if (Array.isArray(n8nResponse)) {
+        n8nResponse = n8nResponse.map(item => (
+          (item && typeof item === 'object')
+            ? {
+                ...item,
+                ...(item['nf-e'] && !item.nota ? { nota: item['nf-e'] } : {}),
+                ...(item['data-emissao'] && !item.data_emissao ? { data_emissao: item['data-emissao'] } : {})
+              }
+            : item
+        ));
+      } else if (n8nResponse && typeof n8nResponse === 'object') {
+        const extra = {};
+        if (n8nResponse['nf-e'] && !n8nResponse.nota) extra.nota = n8nResponse['nf-e'];
+        if (n8nResponse['data-emissao'] && !n8nResponse.data_emissao) extra.data_emissao = n8nResponse['data-emissao'];
+        if (Object.keys(extra).length) n8nResponse = { ...n8nResponse, ...extra };
+      }
+
+      // Processar resposta do n8n (pode ser array, objeto ou número)
       let pontosCalculados = 0;
       
       console.log('🔍 [PROCESSAMENTO N8N] Resposta recebida:', {
@@ -701,29 +749,47 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       
       // Verificar erros específicos do n8n
       if (n8nResponse && typeof n8nResponse === 'object') {
+        // Erro genérico do leitor (orientar entrada manual)
+        if (n8nResponse.erro) {
+          setError('Houve um erro na análise da sua imagem. Por favor, digite manualmente o número da NF-e abaixo.');
+          setShowResult(false);
+          setInputMode('numero');
+          return;
+        }
         // Verificar erro de nota já usada
         if (n8nResponse.nota === "A nota fiscal enviada já foi usada.") {
-          throw new Error('Esta nota fiscal já foi processada anteriormente.');
+          throw new Error('Esta nota fiscal já foi usada anteriormente. Pela regulamentação, não é permitido enviar a mesma nota mais de uma vez.');
         }
         
-        // Verificar erro de data limite (3 meses)
-        if (n8nResponse.date === "A data da nota, excedeu o limite de 3 meses!") {
-          throw new Error('A data desta nota fiscal excedeu o limite de 3 meses. Apenas notas fiscais emitidas nos últimos 3 meses são aceitas.');
+        // Verificar erro de data limite (90 dias)
+        if (n8nResponse.date && /90\s*dias/i.test(n8nResponse.date)) {
+          throw new Error('A data desta nota fiscal excedeu o limite de 90 dias, conforme nossa regulamentação.');
         }
       }
       
-      if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
+      if (typeof n8nResponse === 'number') {
+        // Resposta simples: apenas pontos
+        pontosCalculados = Number(n8nResponse);
+        console.log(`✅ Pontos extraídos do n8n (número): ${pontosCalculados}`);
+      } else if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
         // Se é um array, pegar o primeiro elemento
         const resultado = n8nResponse[0];
         console.log('🔍 Processando resultado do array n8n:', resultado);
         
         // Verificar erros no resultado do array também
         if (resultado.nota === "A nota fiscal enviada já foi usada.") {
-          throw new Error('Esta nota fiscal já foi processada anteriormente.');
+          throw new Error('Esta nota fiscal já foi usada anteriormente. Pela regulamentação, não é permitido enviar a mesma nota mais de uma vez.');
         }
         
-        if (resultado.date === "A data da nota, excedeu o limite de 3 meses!") {
-          throw new Error('A data desta nota fiscal excedeu o limite de 3 meses. Apenas notas fiscais emitidas nos últimos 3 meses são aceitas.');
+        if (resultado.date && /90\s*dias/i.test(resultado.date)) {
+          throw new Error('A data desta nota fiscal excedeu o limite de 90 dias, conforme nossa regulamentação.');
+        }
+
+        // Nota não pertence ao usuário
+        if (resultado.nota && /nao pertence a voce|não pertence a você/i.test(resultado.nota)) {
+          const digits = (resultado.nota.match(/\d+/g) || []).join('');
+          const docHint = digits.substring(0, 5);
+          throw new Error(`Esta nota fiscal não pertence à sua conta. Verifique no seu Perfil se CPF e CNPJ estão cadastrados corretamente. Documento relacionado à nota inicia com: ${docHint || '*****'}.`);
         }
         
         if (resultado.status === 'sucesso' && resultado.pontuacao_total) {
@@ -734,9 +800,13 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         }
       } else if (n8nResponse && typeof n8nResponse === 'object') {
         // Se é objeto direto, tentar diferentes propriedades
-        pontosCalculados = Number(n8nResponse.pontuacao_total) || 
-                          Number(n8nResponse.pontos) || 
-                          Number(n8nResponse.points) || 0;
+        const candidates = [
+          n8nResponse.pontuacao_total,
+          n8nResponse.pontos,
+          n8nResponse.points,
+          n8nResponse.totalPoints
+        ];
+        pontosCalculados = Number(candidates.find(v => !isNaN(Number(v))) || 0);
         console.log(`✅ Pontos extraídos do n8n (objeto): ${pontosCalculados}`);
       } else {
         console.warn('⚠️ Resposta do n8n não é array nem objeto válido:', n8nResponse);
@@ -746,7 +816,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       
       console.log(`🎯 [DEBUG] Pontos finais para creditar: ${pontos} | Tipo: ${typeof pontos}`);
       
-      if (!user?.id) throw new Error('Usuário não identificado');
+  if (!user?.id) throw new Error('Usuário não identificado');
       
       // Validar se os pontos são válidos antes de creditar
       if (pontos <= 0) {
@@ -776,7 +846,14 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       // Salvar dados da nota fiscal na coleção
       let dadosNotaParaSalvar = null;
       
-      if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
+      if (typeof n8nResponse === 'number') {
+        // Criar um objeto mínimo para salvar a nota quando a resposta é numérica
+        dadosNotaParaSalvar = {
+          status: 'processado',
+          pontuacao_total: pontos,
+          origem: 'webhook-n8n-numeric'
+        };
+      } else if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
         dadosNotaParaSalvar = n8nResponse[0];
       } else if (n8nResponse && typeof n8nResponse === 'object') {
         dadosNotaParaSalvar = n8nResponse;
@@ -806,11 +883,21 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       // Exibir resultado
       let resultadoFinal;
       
-      if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
+      if (typeof n8nResponse === 'number') {
+        resultadoFinal = {
+          orderNumber: '—',
+          orderDate: new Date().toISOString(),
+          totalValue: 0,
+          totalPoints: pontos,
+          items: [],
+          allProducts: [],
+          status: 'processado'
+        };
+      } else if (Array.isArray(n8nResponse) && n8nResponse.length > 0) {
         const dadosN8n = n8nResponse[0];
         resultadoFinal = {
           orderNumber: dadosN8n.nota || '—',
-          orderDate: dadosN8n.data_emissao || dadosN8n.data || new Date().toISOString(),
+          orderDate: dadosN8n.data_emissao || dadosN8n['data-emissao'] || dadosN8n.data || new Date().toISOString(),
           totalValue: 0, // n8n não retorna valor total, apenas pontos
           totalPoints: pontos,
           items: [],
@@ -819,8 +906,8 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         };
       } else {
         resultadoFinal = {
-          orderNumber: n8nResponse.orderNumber || '—',
-          orderDate: n8nResponse.orderDate || null,
+          orderNumber: n8nResponse.orderNumber || n8nResponse.nota || n8nResponse['nf-e'] || '—',
+          orderDate: n8nResponse.orderDate || n8nResponse.data_emissao || n8nResponse['data-emissao'] || n8nResponse.data || null,
           totalValue: n8nResponse.totalValue || 0,
           totalPoints: pontos,
           items: n8nResponse.items || [],
@@ -838,26 +925,31 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       
       // Verificar se é erro de timeout
       if (err?.name === 'AbortError') {
-        console.error('Timeout ao conectar com o webhook n8n');
-        setError('Timeout na conexão com o servidor. Tente novamente.');
+        console.error('Timeout ao conectar com o webhook n8n (20s)');
+        setError('O servidor pode estar temporariamente fora do ar. Por favor, digite manualmente o número da NF-e abaixo.');
+        setShowResult(false);
+        setInputMode('numero');
       } else if (err?.message && err.message.includes('Failed to fetch')) {
         console.error('Erro de rede ao conectar com n8n');
-        setError('Erro de conexão. Verifique sua internet e tente novamente.');
+        setError('Erro de conexão. Se o problema persistir, digite manualmente o número da NF-e.');
       } else if (err?.type === 'error') {
         console.error('Erro ao carregar/processar imagem');
-        setError('Erro ao processar a imagem. Tente com outro arquivo.');
+        setError('Erro ao processar a imagem. Tente com outro arquivo ou digite manualmente o número da NF-e.');
       } else {
         setError(err?.message || 'Falha ao processar a nota.');
       }
       
-      setResult({ 
-        error: true, 
-        errorMessage: err?.message || 'Falha ao processar a nota.', 
-        totalPoints: 0, 
-        items: [], 
-        allProducts: [] 
-      });
-      setShowResult(true);
+      // Para o caso do leitor de imagem com erro, já exibimos o input acima (showResult permanece false)
+      if (!(err?.message || '').includes('digite manualmente')) {
+        setResult({ 
+          error: true, 
+          errorMessage: err?.message || 'Falha ao processar a nota.', 
+          totalPoints: 0, 
+          items: [], 
+          allProducts: [] 
+        });
+        setShowResult(true);
+      }
       setTimeout(() => setShowAnimatedRows(true), 300);
     } finally {
       // Garantir que o loading desliga em qualquer cenário
@@ -933,6 +1025,53 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
 
   // Estado para controle da entrada direta do número da nota
   const [inputMode, setInputMode] = useState('foto'); // 'foto' ou 'numero'
+  const [cnpjInline, setCnpjInline] = useState('');
+  const [savingCnpj, setSavingCnpj] = useState(false);
+
+  const formatCNPJ = (value) => {
+    const numbers = (value || '').replace(/\D/g, '').slice(0, 14);
+    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  };
+  const validateCNPJ = (cnpj) => {
+    const s = (cnpj || '').replace(/\D/g, '');
+    if (s.length !== 14) return false;
+    if (/^(\d)\1{13}$/.test(s)) return false;
+    const calc = (base) => {
+      let len = base.length - 7, sum = 0, pos = len - 7;
+      for (let i = len; i >= 1; i--) { sum += parseInt(base.charAt(len - i)) * pos--; if (pos < 2) pos = 9; }
+      let res = sum % 11; return (res < 2) ? 0 : 11 - res;
+    };
+    const base12 = s.substring(0, 12);
+    const d1 = calc(base12); const d2 = calc(base12 + d1);
+    return s.endsWith(`${d1}${d2}`);
+  };
+  const uniqueCnpj = async (cnpj) => {
+    const digits = (cnpj || '').replace(/\D/g, '');
+    try {
+      const { data } = await supabase.from('clientes_fast').select('id').or(`cpf_cnpj.eq.${digits},cnpj_opcional.eq.${digits}`).limit(1);
+      if (data && data.length === 1 && data[0].id === user.id) return true;
+      return !(data && data.length);
+    } catch (_) { return true; }
+  };
+  const handleSalvarCnpjInline = async () => {
+    try {
+      setSavingCnpj(true);
+      const digits = (cnpjInline || '').replace(/\D/g, '');
+      if (!digits) { toast.error('Informe o CNPJ'); return; }
+      if (!validateCNPJ(digits)) { toast.error('CNPJ inválido'); return; }
+      const ok = await uniqueCnpj(digits);
+      if (!ok) { toast.error('CNPJ já cadastrado em outra conta'); return; }
+      const { error } = await supabase.from('clientes_fast').update({ cnpj_opcional: digits }).eq('id', user.id);
+      if (error) throw error;
+      if (window.updateUserContext) window.updateUserContext({ cnpj_opcional: digits });
+      if (onUserUpdate) onUserUpdate({ ...user, cnpj_opcional: digits });
+      setCnpjInline('');
+      toast.success('CNPJ salvo com sucesso!');
+    } catch (e) {
+      console.error('Erro ao salvar CNPJ inline:', e);
+      toast.error('Erro ao salvar CNPJ');
+    } finally { setSavingCnpj(false); }
+  };
   
   // Lidar com o resultado da nota processada pelo número
   const handleNotaProcessada = useCallback((dadosNota) => {
@@ -941,7 +1080,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
     // Exibir informações da nota no formato adequado para o componente
     setResult({
       orderNumber: dadosNota.numero || dadosNota.orderNumber || '—',
-      issueDate: dadosNota.dataEmissao || null,
+      orderDate: dadosNota.orderDate || dadosNota.dataEmissao || null,
       customer: dadosNota.cliente?.nome || 'Cliente',
       totalValue: parseFloat(dadosNota.valorTotal) || 0,
       totalPoints: dadosNota.pontos || 0,
@@ -972,6 +1111,36 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
                 <h1>Enviar Nota Fiscal</h1>
                 <p>Faça upload ou digite a sua nota fiscal para processar seus pontos.</p>
               </MinimalHeader>
+
+              {!user?.cnpj_opcional && (
+                <div style={{ background: '#fff8f6', border: '1px solid #ffd6cc', padding: '12px', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: '#8B0000', marginBottom: 8 }}>
+                    <span>Antes de enviar a nota, preencha o CNPJ, pois se a compra foi feita no CNPJ da sua empresa, poderá ter problemas com pontos.</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <FiUser style={{ position: 'absolute', left: 10, top: 11, color: '#888' }} />
+                      <input
+                        type="text"
+                        value={cnpjInline}
+                        onChange={(e) => setCnpjInline(formatCNPJ(e.target.value))}
+                        placeholder="00.000.000/0000-00"
+                        style={{ width: '100%', padding: '10px 12px 10px 34px', border: '1px solid #ddd', borderRadius: 4 }}
+                      />
+                    </div>
+                    <button onClick={handleSalvarCnpjInline} disabled={savingCnpj} style={{ padding: '10px 12px', background: '#A91918', color: 'white', border: 'none', borderRadius: 4 }}>
+                      {savingCnpj ? 'Salvando...' : 'Salvar CNPJ'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Mensagem de erro global (quando não estamos mostrando o card de resultado) */}
+              {!showResult && error && (
+                <ErrorBox>
+                  {error}
+                </ErrorBox>
+              )}
               
               {/* Botões de alternância entre método de upload e input manual */}
               <InputModeSelector>
@@ -1020,7 +1189,8 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
               ) : (
                 <NotaFiscalInput 
                   onNotaProcessada={handleNotaProcessada} 
-                  clienteId={user?.id} 
+                  clienteId={user?.id}
+                  user={user}
                 />
               )}
             </>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { FiUser, FiMail, FiPhone, FiSave, FiLoader, FiEdit3, FiCheck, FiRefreshCw, FiArrowLeft } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiSave, FiLoader, FiEdit3, FiCheck, FiRefreshCw, FiArrowLeft, FiMapPin } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { supabase } from '../services/supabase';
 
@@ -199,6 +199,9 @@ const maskFromDigitsBR = (digits) => {
 
 export default function Perfil({ user, onUserUpdate }) {
   const [form, setForm] = useState({ nome: '', cpf_cnpj: '', telefone: '', email: '' });
+  const [cnpjOpcional, setCnpjOpcional] = useState('');
+  const [lojaNome, setLojaNome] = useState('');
+  const [savingCnpj, setSavingCnpj] = useState(false);
   const [saving, setSaving] = useState(false);
   const [otpStep, setOtpStep] = useState('form'); // 'form' | 'otp'
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
@@ -226,6 +229,16 @@ export default function Perfil({ user, onUserUpdate }) {
       telefone: masked || '+55 ',
       email: user.email || ''
     });
+    // Loja (Cidade/UF) quando gerente
+    setLojaNome(user.loja_nome || '');
+    // Pre-set CNPJ opcional if exists
+    if (user.cnpj_opcional) {
+      const digits = (user.cnpj_opcional || '').replace(/\D/g, '').slice(0,14);
+      const maskedCnpj = digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+      setCnpjOpcional(maskedCnpj);
+    } else {
+      setCnpjOpcional('');
+    }
   }, [user]);
 
   useEffect(() => () => { if (cooldownId) clearInterval(cooldownId); }, [cooldownId]);
@@ -249,6 +262,13 @@ export default function Perfil({ user, onUserUpdate }) {
 
   const handleSave = async () => {
     setMsg(''); setMsgCode('');
+    // Se for gerente, loja é obrigatória (Cidade/UF)
+    if (user?.role === 'gerente') {
+      if (!validateLoja(lojaNome)) {
+        toast.error('Informe o nome da loja no formato Cidade/UF, ex: Campo Grande/RJ');
+        return;
+      }
+    }
     // If phone changed, require OTP step before saving
     const newE164 = toE164(form.telefone);
     if (!newE164 || !isE164(newE164)) {
@@ -288,7 +308,34 @@ export default function Perfil({ user, onUserUpdate }) {
       return;
     }
 
-    // No phone change: persist immediately
+    // Se usuário não tinha CNPJ e preencheu agora, validar e salvar antes
+    if (!user?.cnpj_opcional && cnpjOpcional) {
+      const digits = (cnpjOpcional || '').replace(/\D/g, '');
+      if (digits) {
+        if (!validateCNPJ(digits)) { toast.error('CNPJ inválido'); return; }
+        const isUnique = await uniqueCnpj(digits);
+        if (!isUnique) { toast.error('CNPJ já cadastrado em outra conta'); return; }
+        try {
+          setSavingCnpj(true);
+          const { error } = await supabase
+            .from('clientes_fast')
+            .update({ cnpj_opcional: digits })
+            .eq('id', user.id);
+          if (error) throw error;
+          if (window.updateUserContext) window.updateUserContext({ cnpj_opcional: digits });
+          if (onUserUpdate) onUserUpdate({ ...user, cnpj_opcional: digits });
+        } catch (e) {
+          console.error('Erro ao salvar CNPJ com alterações:', e);
+          toast.error('Erro ao salvar CNPJ');
+          setSavingCnpj(false);
+          return;
+        } finally {
+          setSavingCnpj(false);
+        }
+      }
+    }
+
+    // Sem mudança de telefone: persistir demais alterações
     await persistChanges();
   };
 
@@ -304,6 +351,9 @@ export default function Perfil({ user, onUserUpdate }) {
         telefone: maskedBR || form.telefone, // fallback
         email: form.email?.trim() || null,
       };
+      if (user?.role === 'gerente') {
+        updates.loja_nome = (lojaNome || '').trim() || null;
+      }
       const { error } = await supabase
         .from('clientes_fast')
         .update(updates)
@@ -388,6 +438,63 @@ export default function Perfil({ user, onUserUpdate }) {
     } finally { setSendingCode(false); }
   };
 
+  // ====== CPF/CNPJ Validation helpers (reuse patterns) ======
+  const validateCNPJ = (cnpj) => {
+    const s = (cnpj || '').replace(/\D/g, '');
+    if (s.length !== 14) return false;
+    if (/^(\d)\1{13}$/.test(s)) return false;
+    const calc = (base) => {
+      let len = base.length - 7, sum = 0, pos = len - 7;
+      for (let i = len; i >= 1; i--) {
+        sum += parseInt(base.charAt(len - i)) * pos--;
+        if (pos < 2) pos = 9;
+      }
+      let res = sum % 11;
+      return (res < 2) ? 0 : 11 - res;
+    };
+    const base12 = s.substring(0, 12);
+    const d1 = calc(base12);
+    const d2 = calc(base12 + d1);
+    return s.endsWith(`${d1}${d2}`);
+  };
+
+  const formatCNPJ = (value) => {
+    const numbers = (value || '').replace(/\D/g, '').slice(0, 14);
+    if (numbers.length < 14) return numbers;
+    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  };
+
+  // Validação simples Cidade/UF
+  const validateLoja = (s) => {
+    if (!s) return false;
+    const parts = String(s).split('/');
+    if (parts.length !== 2) return false;
+    const cidade = parts[0].trim();
+    const uf = parts[1].trim();
+    if (!cidade || cidade.length < 2) return false;
+    if (!/^[A-Za-zÀ-ÿ0-9' .-]{2,}$/.test(cidade)) return false;
+    if (!/^[A-Za-z]{2}$/.test(uf)) return false;
+    return true;
+  };
+
+  const uniqueCnpj = async (cnpj) => {
+    const digits = (cnpj || '').replace(/\D/g, '');
+    try {
+      const { data } = await supabase
+        .from('clientes_fast')
+        .select('id')
+        .or(`cpf_cnpj.eq.${digits},cnpj_opcional.eq.${digits}`)
+        .limit(1);
+      // Allow if it's the current user's own CNPJ
+      if (data && data.length === 1 && data[0].id === user.id) return true;
+      return !(data && data.length);
+    } catch (_) {
+      return true;
+    }
+  };
+
+  // Removido botão próprio de CNPJ; será salvo junto com as demais alterações
+
   if (!user) return null;
 
   return (
@@ -449,6 +556,56 @@ export default function Perfil({ user, onUserUpdate }) {
                 </FormGroup>
               </Grid>
 
+              {user?.role === 'gerente' && (
+                <Grid>
+                  <FormGroup style={{ gridColumn: '1 / -1' }}>
+                    <Label>Loja (Cidade/UF) - obrigatório para gerente</Label>
+                    <InputWrap>
+                      <InputIcon><FiMapPin /></InputIcon>
+                      <Input
+                        type="text"
+                        value={lojaNome}
+                        onChange={(e) => {
+                          // manter UF em maiúsculas se existir '/'
+                          const val = e.target.value;
+                          const parts = val.split('/');
+                          if (parts.length === 2) {
+                            setLojaNome(parts[0] + '/' + parts[1].toUpperCase());
+                          } else {
+                            setLojaNome(val);
+                          }
+                        }}
+                        placeholder="Cidade/UF (ex: Campo Grande/RJ)"
+                      />
+                    </InputWrap>
+                    <Helper>Exemplo: Campo Grande/RJ. Use a sigla do estado com 2 letras.</Helper>
+                  </FormGroup>
+                </Grid>
+              )}
+
+              {/* CNPJ opcional: se ausente, permitir cadastro */}
+              {!(user?.cnpj_opcional) && (
+                <>
+                  <Grid>
+                    <FormGroup style={{ gridColumn: '1 / -1' }}>
+                      <Label>CNPJ (opcional)</Label>
+                      <InputWrap>
+                        <InputIcon><FiUser /></InputIcon>
+                        <Input
+                          type="text"
+                          value={cnpjOpcional}
+                          onChange={(e) => setCnpjOpcional(formatCNPJ(e.target.value))}
+                          placeholder="00.000.000/0000-00"
+                        />
+                      </InputWrap>
+                      <Helper>
+                        Se suas compras são faturadas no CNPJ da empresa, cadastre aqui para garantir a pontuação correta.
+                      </Helper>
+                    </FormGroup>
+                  </Grid>
+                </>
+              )}
+
               <ButtonRow>
                 <Button onClick={handleSave} disabled={saving || sendingCode}>
                   {saving ? <Spinner /> : <FiSave />} {saving ? 'Salvando...' : 'Salvar alterações'}
@@ -478,12 +635,16 @@ export default function Perfil({ user, onUserUpdate }) {
                     maxLength={1}
                     inputMode="numeric"
                     value={d}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const v = e.target.value.replace(/\D/g, '').slice(0, 1);
                       const arr = [...otpDigits]; arr[i] = v; setOtpDigits(arr);
                       if (v && i < 5) {
                         const inputs = e.currentTarget.parentElement.querySelectorAll('input');
                         inputs[i + 1] && inputs[i + 1].focus();
+                      }
+                      const joined = arr.join('');
+                      if (joined.length === 6) {
+                        await handleVerify();
                       }
                     }}
                     onKeyDown={(e) => {

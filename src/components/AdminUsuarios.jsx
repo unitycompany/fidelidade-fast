@@ -3,7 +3,8 @@ import styled, { keyframes } from 'styled-components';
 import {
     FiUsers, FiUserPlus, FiEdit3, FiTrash2, FiShield,
     FiSave, FiX, FiCheck, FiLoader, FiEye,
-    FiUserCheck, FiAlertCircle, FiSearch, FiGift, FiFile
+    FiUserCheck, FiAlertCircle, FiSearch, FiGift, FiFile,
+    FiSlash, FiUnlock
 } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
@@ -42,183 +43,159 @@ const MainContent = styled.div`
 
 // Header
 const Header = styled.div`
-  background: white;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  animation: ${fadeInUp} 0.6s ease-out;
+    background: white;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    animation: ${fadeInUp} 0.6s ease-out;
 `;
 
 const HeaderContent = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: 1rem;
-    align-items: flex-start;
-  }
+    flex-wrap: wrap;
 `;
 
 const HeaderTitle = styled.h1`
-  color: #2D3748;
-  font-size: 2rem;
-  font-weight: 700;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+    color: #2D3748;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   
-  svg {
-    color: #cc1515;
-  }
+    svg { color: #cc1515; }
 `;
 
 const HeaderActions = styled.div`
-  display: flex;
-  gap: 1rem;
-  align-items: center;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
 `;
 
 const ActionButton = styled.button`
-  background: ${props => props.$variant === 'primary'
-        ? 'linear-gradient(135deg, #cc1515 0%, #9b0c0c 100%)'
-        : props.$variant === 'success'
-            ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-            : 'white'
-    };
-  color: ${props => props.$variant === 'primary' || props.$variant === 'success' ? 'white' : '#4A5568'};
-  border: ${props => props.$variant === 'primary' || props.$variant === 'success' ? 'none' : '2px solid #E2E8F0'};
-  border-radius: 0;
-  padding: 0.75rem 1.5rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  
-  &:hover {
-    transform: translateY(-2px);
-  }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-  }
+    background: ${props => {
+        switch (props.$variant) {
+            case 'primary':
+                return 'linear-gradient(135deg, #cc1515 0%, #9b0c0c 100%)';
+            case 'success':
+                return 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
+            default:
+                return 'white';
+        }
+    }};
+    color: ${props => props.$variant ? 'white' : '#4A5568'};
+    border: ${props => props.$variant ? 'none' : '2px solid #E2E8F0'};
+    border-radius: 0;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+
+    &:hover { transform: translateY(-2px); opacity: 0.95; }
+    &:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 `;
 
-// Filtros e busca
+// Filters
 const FiltersContainer = styled.div`
-  background: white;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-  animation: ${fadeInUp} 0.6s ease-out 0.1s both;
+    background: white;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #E2E8F0;
 `;
 
 const FiltersRow = styled.div`
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  flex-wrap: wrap;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
 `;
 
 const SearchContainer = styled.div`
-  position: relative;
-  flex: 1;
-  min-width: 250px;
-`;
-
-const SearchInput = styled.input`
-  width: 100%;
-  padding: 0.75rem 1rem 0.75rem 2.5rem;
-  border: 1px solid #E2E8F0;
-  border-radius: 0;
-  font-size: 1rem;
-  
-  &:focus {
-    outline: none;
-    border-color: #cc1515;
-  }
+    position: relative;
+    flex: 1;
+    min-width: 260px;
 `;
 
 const SearchIcon = styled.div`
-  position: absolute;
-  left: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #A0AEC0;
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    color: #A0AEC0;
+`;
+
+const SearchInput = styled.input`
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.25rem;
+    border: 1px solid #E2E8F0;
+    border-radius: 0;
+    font-size: 1rem;
+  
+    &:focus { outline: none; border-color: #cc1515; }
 `;
 
 const FilterSelect = styled.select`
-  padding: 0.75rem 1rem;
-  border: 1px solid #E2E8F0;
-  border-radius: 0;
-  font-size: 1rem;
-  background: white;
-  cursor: pointer;
-  
-  &:focus {
-    outline: none;
-    border-color: #cc1515;
-  }
+    padding: 0.75rem 1rem;
+    border: 1px solid #E2E8F0;
+    border-radius: 0;
+    background: white;
+    font-size: 1rem;
+    min-width: 180px;
+
+    &:focus { outline: none; border-color: #cc1515; }
 `;
 
-// Tabela de usuários
+// Table
 const TableContainer = styled.div`
-  background: white;
-  overflow: hidden;
-  animation: ${fadeInUp} 0.6s ease-out 0.2s both;
+    background: white;
+    overflow: hidden;
+    border: 1px solid #E2E8F0;
 `;
 
 const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
+    width: 100%;
+    border-collapse: collapse;
 `;
 
 const TableHeader = styled.thead`
-  background: #f7fafc;
-  
-  th {
-    padding: 1rem;
-    text-align: left;
-    font-weight: 600;
-    color: #4A5568;
-    border-bottom: 1px solid #E2E8F0;
-    font-size: 0.9rem;
-    letter-spacing: 0.5px;
-  }
+    background: #F7FAFC;
+
+    th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #4A5568;
+        border-bottom: 1px solid #E2E8F0;
+        font-size: 0.9rem;
+        letter-spacing: 0.5px;
+    }
 `;
 
 const TableBody = styled.tbody`
-  tr {
-    transition: all 0.2s ease;
-    
-    &:hover {
-      background: #f8fafc;
-    }
-    
-    &:not(:last-child) {
-      border-bottom: 1px solid #E2E8F0;
-    }
-  }
-  
-  td {
-    padding: 1rem;
-    color: #2D3748;
-    vertical-align: middle;
+    tr { transition: background 0.2s ease; }
+    tr:hover { background: #F8FAFC; }
+    tr:not(:last-child) { border-bottom: 1px solid #E2E8F0; }
 
-    & strong {
-        font-weight: 500;
+    td {
+        padding: 1rem;
+        color: #2D3748;
+        vertical-align: middle;
     }
-  }
+
+    td strong { font-weight: 600; }
 `;
 
 const RoleBadge = styled.span`
   background: ${props => {
         switch (props.$role) {
             case 'admin': return 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)';
+            case 'dev': return 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)';
             case 'gerente': return 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
             default: return 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)';
         }
@@ -232,7 +209,7 @@ const RoleBadge = styled.span`
 `;
 
 const StatusBadge = styled.span`
-  background: ${props => props.$active ? '#10B981' : '#EF4444'};
+    background: ${props => props.$status === 'ativo' ? '#10B981' : props.$status === 'bloqueado' ? '#6B7280' : '#EF4444'};
   color: white;
   padding: 0.25rem 0.75rem;
   border-radius: 0;
@@ -245,12 +222,24 @@ const ActionsCell = styled.div`
   gap: 0.5rem;
 `;
 
+const StatusChip = styled.span`
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: white;
+    background: ${props => props.$variant === 'blocked' ? '#6B7280' : '#10B981'};
+`;
+
 const IconButton = styled.button`
   background: ${props => {
         switch (props.$variant) {
             case 'edit': return '#F59E0B';
             case 'delete': return '#EF4444';
             case 'view': return '#3B82F6';
+            case 'ban': return '#6B7280';
             default: return '#6B7280';
         }
     }};
@@ -587,6 +576,8 @@ const LoadingContainer = styled.div`
 
 function AdminUsuarios({ user }) {
     const [usuarios, setUsuarios] = useState([]);
+    const [viewerRole, setViewerRole] = useState(user?.role || 'cliente');
+    const [syncingPerms, setSyncingPerms] = useState(false);
     const [lojas, setLojas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalAberto, setModalAberto] = useState(false);
@@ -832,10 +823,35 @@ function AdminUsuarios({ user }) {
         setModalPremio(true);
     };
 
+    // Sincronizar role do visualizador com o BD (caso tenha sido alterado fora da sessão)
+    const syncViewerRole = useCallback(async () => {
+        if (!user?.id) return;
+        try {
+            setSyncingPerms(true);
+            const { data, error } = await supabase
+                .from('clientes_fast')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+            if (error) throw error;
+            const dbRole = data?.role || 'cliente';
+            setViewerRole(dbRole);
+            if (dbRole !== user.role && typeof window.updateUserContext === 'function') {
+                window.updateUserContext({ role: dbRole });
+                toast.success(`Permissões atualizadas: ${dbRole}`);
+            }
+        } catch (e) {
+            console.warn('Não foi possível sincronizar permissões do usuário atual:', e?.message || e);
+        } finally {
+            setSyncingPerms(false);
+        }
+    }, [user?.id, user?.role]);
+
     useEffect(() => {
         carregarUsuarios();
         carregarLojas();
-    }, [carregarUsuarios, carregarLojas]);
+        syncViewerRole();
+    }, [carregarUsuarios, carregarLojas, syncViewerRole]);
 
     // Filtrar usuários
     const usuariosFiltrados = usuarios.filter(usuario => {
@@ -844,11 +860,10 @@ function AdminUsuarios({ user }) {
             return false;
         }
 
-        // Filtro por status
+        // Filtro por status (inclui 'bloqueado')
         if (filtroStatus !== 'todos') {
-            const isAtivo = usuario.ativo || usuario.status === 'ativo';
-            if (filtroStatus === 'ativo' && !isAtivo) return false;
-            if (filtroStatus === 'inativo' && isAtivo) return false;
+            const status = usuario.status || (usuario.ativo ? 'ativo' : 'inativo');
+            if (status !== filtroStatus) return false;
         }
 
         // Filtro por busca
@@ -863,6 +878,27 @@ function AdminUsuarios({ user }) {
 
         return true;
     });
+
+        const toggleBanUsuario = async (usuario) => {
+            const vaiBanir = usuario.status !== 'bloqueado';
+            const confirmMsg = vaiBanir
+                ? `Tem certeza que deseja banir o usuário "${usuario.nome}"? Ele ficará bloqueado para login.`
+                : `Deseja desbanir o usuário "${usuario.nome}" e reativar o acesso?`;
+            if (!window.confirm(confirmMsg)) return;
+            try {
+                const novoStatus = usuario.status === 'bloqueado' ? 'ativo' : 'bloqueado';
+                const { error } = await supabase
+                    .from('clientes_fast')
+                    .update({ status: novoStatus })
+                    .eq('id', usuario.id);
+                if (error) throw error;
+                toast.success(novoStatus === 'bloqueado' ? 'Usuário banido com sucesso.' : 'Usuário desbanido com sucesso.');
+                await carregarUsuarios();
+            } catch (e) {
+                console.error('Erro ao alterar status do usuário:', e);
+                toast.error('Não foi possível alterar o status.');
+            }
+        };
 
     const abrirModal = (usuario = null) => {
         if (usuario) {
@@ -954,11 +990,11 @@ function AdminUsuarios({ user }) {
             const dadosUsuario = {
                 nome: formData.nome.trim(),
                 email: formData.email.trim(),
-                role: formData.role,
+                role: user?.role === 'dev' ? formData.role : (usuarioEditando?.role || 'cliente'),
                 telefone: formData.telefone.trim() || null,
                 ativo: formData.ativo,
                 loja_nome: formData.loja_nome.trim() || 'N/A',
-                saldo_pontos: parseInt(formData.saldo_pontos) || 0
+                saldo_pontos: user?.role === 'dev' ? (parseInt(formData.saldo_pontos) || 0) : (usuarioEditando?.saldo_pontos || 0)
             };
 
             // Incluir senha apenas se fornecida
@@ -973,7 +1009,7 @@ function AdminUsuarios({ user }) {
                     email: dadosUsuario.email,
                     telefone: dadosUsuario.telefone,
                     role: dadosUsuario.role,
-                    status: dadosUsuario.ativo ? 'ativo' : 'inativo',
+                    status: (usuarioEditando?.status === 'bloqueado') ? 'bloqueado' : (dadosUsuario.ativo ? 'ativo' : 'inativo'),
                     saldo_pontos: dadosUsuario.saldo_pontos
                 };
 
@@ -1175,6 +1211,10 @@ function AdminUsuarios({ user }) {
                             Gerenciar Usuários
                         </HeaderTitle>
                         <HeaderActions>
+                            <ActionButton onClick={syncViewerRole} disabled={syncingPerms} title="Atualizar permissões">
+                                {syncingPerms ? <FiLoader className="animate-spin" /> : <FiShield />}
+                                {syncingPerms ? 'Verificando...' : `Permissões: ${viewerRole}`}
+                            </ActionButton>
                             <ActionButton onClick={() => abrirModal()} $variant="primary">
                                 <FiUserPlus />
                                 Novo Usuário
@@ -1203,6 +1243,7 @@ function AdminUsuarios({ user }) {
                         >
                             <option value="todos">Todas as Funções</option>
                             <option value="admin">Admin</option>
+                            <option value="dev">Dev</option>
                             <option value="gerente">Gerente</option>
                             <option value="cliente">Cliente</option>
                         </FilterSelect>
@@ -1214,6 +1255,7 @@ function AdminUsuarios({ user }) {
                             <option value="todos">Todos os Status</option>
                             <option value="ativo">Ativo</option>
                             <option value="inativo">Inativo</option>
+                            <option value="bloqueado">Bloqueado</option>
                         </FilterSelect>
                     </FiltersRow>
                 </FiltersContainer>
@@ -1223,13 +1265,9 @@ function AdminUsuarios({ user }) {
                         <TableHeader>
                             <tr>
                                 <th>Nome</th>
-                                <th>Email</th>
-                                <th>CPF</th>
                                 <th>Função</th>
                                 <th>Pontos</th>
-                                <th>Imagens</th>
                                 <th>Loja</th>
-                                <th>Status</th>
                                 <th>Ações</th>
                             </tr>
                         </TableHeader>
@@ -1244,15 +1282,10 @@ function AdminUsuarios({ user }) {
                                             </div>
                                         )}
                                     </td>
-                                    <td>{usuario.email}</td>
-                                    <td>
-                                        <span style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>
-                                            {usuario.cpf || usuario.cpf_cnpj || 'Não informado'}
-                                        </span>
-                                    </td>
                                     <td>
                                         <RoleBadge $role={usuario.role}>
                                             {usuario.role === 'admin' ? 'Admin' :
+                                                usuario.role === 'dev' ? 'Dev' :
                                                 usuario.role === 'gerente' ? 'Gerente' : 'Cliente'}
                                         </RoleBadge>
                                     </td>
@@ -1264,46 +1297,7 @@ function AdminUsuarios({ user }) {
                                             TP: {formatarPontos(usuario.total_pontos_ganhos)}
                                         </div>
                                     </td>
-                                    <td>
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            lineHeight: '1.2',
-                                            fontSize: '0.75rem',
-                                            gap: '0.5rem',
-                                            fontWeight: '500'
-                                        }}>
-                                            {usuario.total_imagens > 0 ? (
-                                                <>
-                                                    <span style={{
-                                                        color: '#10B981',
-                                                        background: '#F0FDF4',
-                                                        padding: '0.25rem 0.5rem',
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: '500'
-                                                    }}>
-                                                        {usuario.total_imagens} arquivo{usuario.total_imagens !== 1 ? 's' : ''}
-                                                    </span>
-                                                </>
-                                            ) : (
-                                                <span style={{
-                                                    color: '#A0AEC0',
-                                                    fontSize: '0.875rem',
-                                                    background: '#F7FAFC',
-                                                    padding: '0.25rem 0.5rem',
-
-                                                }}>
-                                                    Nenhum arquivo
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
                                     <td>{usuario.loja_nome}</td>
-                                    <td>
-                                        <StatusBadge $active={usuario.ativo || usuario.status === 'ativo'}>
-                                            {usuario.ativo || usuario.status === 'ativo' ? 'Ativo' : 'Inativo'}
-                                        </StatusBadge>
-                                    </td>
                                     <td>
                                         <ActionsCell>
                                             <IconButton
@@ -1320,7 +1314,17 @@ function AdminUsuarios({ user }) {
                                             >
                                                 <FiEdit3 size={14} />
                                             </IconButton>
-                                            {user?.role === 'admin' && (
+                                                {(user?.role === 'admin' || user?.role === 'dev') && (
+                                                    <IconButton
+                                                        $variant="ban"
+                                                        onClick={() => toggleBanUsuario(usuario)}
+                                                        title={usuario.status === 'bloqueado' ? 'Desbanir usuário' : 'Banir usuário'}
+                                                    >
+                                                        {usuario.status === 'bloqueado' ? <FiUnlock size={14} /> : <FiSlash size={14} />}
+                                                    </IconButton>
+                                                )}
+                                            {/* Excluir apenas para dev; admin não pode */}
+                                            {user?.role === 'dev' && (
                                                 <IconButton
                                                     $variant="delete"
                                                     onClick={() => excluirUsuario(usuario)}
@@ -1438,11 +1442,12 @@ function AdminUsuarios({ user }) {
                                             <FormSelect
                                                 value={formData.role}
                                                 onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                                                disabled={salvando}
+                                                disabled={salvando || (user?.role !== 'dev')}
                                             >
                                                 <option value="cliente">Cliente</option>
                                                 <option value="gerente">Gerente</option>
                                                 <option value="admin">Administrador</option>
+                                                <option value="dev">Desenvolvedor</option>
                                             </FormSelect>
                                         </FormGroup>
 
@@ -1470,7 +1475,7 @@ function AdminUsuarios({ user }) {
                                                 min="0"
                                                 value={formData.saldo_pontos}
                                                 onChange={(e) => setFormData(prev => ({ ...prev, saldo_pontos: e.target.value }))}
-                                                disabled={salvando}
+                                                disabled={salvando || (user?.role !== 'dev')}
                                                 placeholder="0"
                                             />
                                             <span style={{ fontSize: '0.75rem', color: '#718096' }}>
@@ -1974,11 +1979,11 @@ function AdminUsuarios({ user }) {
                                         )}
                                     </FormSection>
 
-                                    {/* Arquivos Enviados - Unificado */}
+                                    {/* Notas Enviadas - inclui dados e pontos retornados */}
                                     <FormSection>
                                         <FormSectionTitle>
                                             <FiAlertCircle />
-                                            Arquivos Enviados ({imagensUsuario.length} arquivo{imagensUsuario.length !== 1 ? 's' : ''})
+                                            Notas Enviadas ({imagensUsuario.length} nota{imagensUsuario.length !== 1 ? 's' : ''})
                                         </FormSectionTitle>
 
                                         {imagensUsuario.length > 0 ? (
@@ -2100,7 +2105,7 @@ function AdminUsuarios({ user }) {
                                                             </div>
                                                         )}
 
-                                                        {/* Informações detalhadas da imagem */}
+                                                        {/* Informações detalhadas da nota */}
                                                         <div>
                                                             {/* Número da Nota */}
                                                             <div style={{ marginBottom: '0.5rem' }}>
@@ -2197,6 +2202,28 @@ function AdminUsuarios({ user }) {
                                                                 </div>
                                                             </div>
 
+                                                            {/* Pontos retornados e dados da nota (quando disponíveis) */}
+                                                            {(typeof imagem.pontos_retornados !== 'undefined' || imagem.dados_nota) && (
+                                                                <div style={{ marginTop: '0.75rem' }}>
+                                                                    {typeof imagem.pontos_retornados !== 'undefined' && (
+                                                                        <div style={{ marginBottom: '0.5rem' }}>
+                                                                            <div style={{ color: '#718096', fontWeight: 500 }}>Pontos retornados:</div>
+                                                                            <div style={{ color: '#10B981', fontWeight: 'bold' }}>
+                                                                                {(Number(imagem.pontos_retornados) || 0).toLocaleString('pt-BR')} pts
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    {imagem.dados_nota && (
+                                                                        <div>
+                                                                            <div style={{ color: '#718096', fontWeight: 500, marginBottom: '0.25rem' }}>Dados da Nota (resumo):</div>
+                                                                            <pre style={{ background: '#F7FAFC', border: '1px solid #E2E8F0', padding: '0.5rem', maxHeight: 150, overflow: 'auto', fontSize: '0.75rem' }}>
+{JSON.stringify(imagem.dados_nota, null, 2)}
+                                                                            </pre>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
                                                             {/* Indicador de ação */}
                                                             <div style={{
                                                                 marginTop: '0.75rem',
@@ -2217,16 +2244,10 @@ function AdminUsuarios({ user }) {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <div style={{
-                                                textAlign: 'center',
-                                                padding: '3rem',
-                                                background: '#F7FAFC',
-
-                                                border: '1px solid #E2E8F0'
-                                            }}>
+                                            <div style={{ textAlign: 'center', padding: '3rem', background: '#F7FAFC', border: '1px solid #E2E8F0' }}>
                                                 <FiAlertCircle size={48} style={{ color: '#A0AEC0', marginBottom: '1rem' }} />
-                                                <h3 style={{ color: '#4A5568', marginBottom: '0.5rem' }}>Nenhuma imagem encontrada</h3>
-                                                <p style={{ color: '#718096' }}>Este usuário ainda não enviou nenhum arquivo.</p>
+                                                <h3 style={{ color: '#4A5568', marginBottom: '0.5rem' }}>Nenhuma nota enviada</h3>
+                                                <p style={{ color: '#718096' }}>As notas processadas aparecerão aqui com os dados e pontos retornados.</p>
                                             </div>
                                         )}
                                     </FormSection>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import toast from 'react-hot-toast';
 import { FiUser, FiLock, FiMail, FiPhone, FiLogIn, FiUserPlus, FiLoader, FiFileText, FiCheck, FiRefreshCw, FiArrowLeft } from 'react-icons/fi';
@@ -385,31 +385,46 @@ const AuthNovoClean = ({ onLogin }) => {
         senha: ''
     });
 
-    // Estados para registro
+    // Estados para registro (campos e etapas)
     const [registerData, setRegisterData] = useState({
         nome: '',
-        cpf_cnpj: '',
+        cpf: '',
+        cnpj: '', // opcional
         telefone: '',
-        email: '',
-        senha: '',
-        confirmarSenha: ''
+        email: ''
     });
+
+    // Refs para auto-avançar entre inputs do cadastro
+    const nomeRef = useRef(null);
+    const cpfRef = useRef(null);
+    const cnpjRef = useRef(null);
+    const telefoneRef = useRef(null);
+    const emailRef = useRef(null);
+    const cadastrarBtnRef = useRef(null);
+
+    // Etapas e estados do OTP no cadastro
+    const [registerStep, setRegisterStep] = useState('form'); // 'form' | 'otp'
+    const [registerOtpDigits, setRegisterOtpDigits] = useState(['', '', '', '', '', '']);
+    const [registerPhoneE164, setRegisterPhoneE164] = useState('');
+    const [registerMsg, setRegisterMsg] = useState('');
+    const [registerOtpMsg, setRegisterOtpMsg] = useState('');
+    const [registerSendingCode, setRegisterSendingCode] = useState(false);
+    const [registerVerifying, setRegisterVerifying] = useState(false);
+    const [registerResendLeft, setRegisterResendLeft] = useState(0);
+    const [registerCooldownId, setRegisterCooldownId] = useState(null);
 
     // Estados para regulamento
     const [regulamentoAccepted, setRegulamentoAccepted] = useState(false);
     const [showRegulamento, setShowRegulamento] = useState(false);
 
     // Funções de formatação
-    const formatCPFCNPJ = (value) => {
-        const numbers = value.replace(/\D/g, '');
-
-        if (numbers.length <= 11) {
-            // CPF: 000.000.000-00
-            return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-        } else {
-            // CNPJ: 00.000.000/0000-00
-            return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-        }
+    const formatCPF = (value) => {
+        const numbers = value.replace(/\D/g, '').slice(0, 11);
+        return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    };
+    const formatCNPJ = (value) => {
+        const numbers = value.replace(/\D/g, '').slice(0, 14);
+        return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
     };
 
     const formatPhone = (value) => {
@@ -469,11 +484,61 @@ const AuthNovoClean = ({ onLogin }) => {
         setCooldownId(id);
     };
 
-    // Validações
-    const validateCPFCNPJ = (value) => {
-        const numbers = value.replace(/\D/g, '');
-        return numbers.length === 11 || numbers.length === 14;
+    const startRegisterCooldown = (seconds = 60) => {
+        if (registerCooldownId) {
+            clearInterval(registerCooldownId);
+        }
+        setRegisterResendLeft(seconds);
+        const id = setInterval(() => {
+            setRegisterResendLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(id);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        setRegisterCooldownId(id);
     };
+
+    // Validações
+    // ===== Validações CPF/CNPJ com dígitos verificadores =====
+    const validateCPF = (cpf) => {
+        const s = (cpf || '').replace(/\D/g, '');
+        if (s.length !== 11) return false;
+        if (/^(\d)\1{10}$/.test(s)) return false;
+        let sum = 0;
+        for (let i = 0; i < 9; i++) sum += parseInt(s.charAt(i)) * (10 - i);
+        let rev = 11 - (sum % 11);
+        if (rev === 10 || rev === 11) rev = 0;
+        if (rev !== parseInt(s.charAt(9))) return false;
+        sum = 0;
+        for (let i = 0; i < 10; i++) sum += parseInt(s.charAt(i)) * (11 - i);
+        rev = 11 - (sum % 11);
+        if (rev === 10 || rev === 11) rev = 0;
+        return rev === parseInt(s.charAt(10));
+    };
+
+    const validateCNPJ = (cnpj) => {
+        const s = (cnpj || '').replace(/\D/g, '');
+        if (s.length !== 14) return false;
+        if (/^(\d)\1{13}$/.test(s)) return false;
+        const calc = (base) => {
+            let len = base.length - 7, sum = 0, pos = len - 7;
+            for (let i = len; i >= 1; i--) {
+                sum += parseInt(base.charAt(len - i)) * pos--;
+                if (pos < 2) pos = 9;
+            }
+            let res = sum % 11;
+            return (res < 2) ? 0 : 11 - res;
+        };
+        const base12 = s.substring(0, 12);
+        const d1 = calc(base12);
+        const d2 = calc(base12 + d1);
+        return s.endsWith(`${d1}${d2}`);
+    };
+
+    // (removido: validação combinada por tipo; validamos CPF e CNPJ separadamente)
 
     const validateEmail = (email) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -557,8 +622,7 @@ const AuthNovoClean = ({ onLogin }) => {
         return null;
     };
 
-    const handleLoginVerifyCode = async (e) => {
-        e.preventDefault();
+    const verifyLoginOtp = async () => {
         setMsgCode('');
         const code = otpDigits.join('').replace(/\D/g, '');
         if (code.length !== 6) {
@@ -593,6 +657,12 @@ const AuthNovoClean = ({ onLogin }) => {
                 // Buscar usuário pela conta vinculada ao telefone
                 const user = await findUserByPhone(currentPhoneE164);
                 if (user) {
+                    if (user.status === 'bloqueado') {
+                        const msg = 'Seu acesso foi bloqueado por tentativa de fraude. Caso ache que isso é um erro, dirija-se até uma loja e solicite ajuda!';
+                        setMsgCode(msg);
+                        toast.error(msg);
+                        return;
+                    }
                     toast.success(`Bem-vindo, ${user.nome}!`);
                     onLogin(user);
                 } else {
@@ -616,6 +686,11 @@ const AuthNovoClean = ({ onLogin }) => {
         } finally {
             setVerifying(false);
         }
+    };
+
+    const handleLoginVerifyCode = async (e) => {
+        e.preventDefault();
+        await verifyLoginOtp();
     };
 
     const handleResend = async () => {
@@ -655,37 +730,138 @@ const AuthNovoClean = ({ onLogin }) => {
         }
     };
 
-    const handleRegister = async (e) => {
+    // ===== Unicidade e bloqueio =====
+    const checkCpfInBlocklist = async (cpfCnpjDigits) => {
+        const only = (cpfCnpjDigits || '').replace(/\D/g, '');
+        if (only.length !== 11) return false; // apenas CPF é bloqueável aqui
+        try {
+            const { data, error } = await supabase
+                .from('cpf_nao_valido')
+                .select('cpf')
+                .eq('cpf', only)
+                .limit(1);
+            if (error) return false;
+            return Array.isArray(data) && data.length > 0;
+        } catch (_) {
+            // fallback silencioso se a tabela não existir
+            return false;
+        }
+    };
+
+    const uniqueCpf = async (cpf) => {
+        const digits = cpf.replace(/\D/g, '');
+        const formatted = formatCPF(digits);
+        try {
+            const { data } = await supabase
+                .from('clientes_fast')
+                .select('id')
+                .or(`cpf_cnpj.eq.${formatted},cpf_cnpj.eq.${digits}`)
+                .limit(1);
+            return !(data && data.length);
+        } catch (_) {
+            return true;
+        }
+    };
+
+    const uniqueCnpj = async (cnpj) => {
+        // verifica se já usaram este CNPJ como principal (cpf_cnpj) ou como opcional
+        const digits = cnpj.replace(/\D/g, '');
+        const formatted = formatCNPJ(digits);
+        try {
+            const { data } = await supabase
+                .from('clientes_fast')
+                .select('id')
+                .or(`cpf_cnpj.eq.${formatted},cpf_cnpj.eq.${digits},cnpj_opcional.eq.${formatted},cnpj_opcional.eq.${digits}`)
+                .limit(1);
+            return !(data && data.length);
+        } catch (_) {
+            return true;
+        }
+    };
+
+    const uniqueEmail = async (email) => {
+        if (!email) return true;
+        const { data, error } = await supabase
+            .from('clientes_fast')
+            .select('id')
+            .eq('email', email)
+            .limit(1);
+        if (error) return true;
+        return !(Array.isArray(data) && data.length > 0);
+    };
+
+    const uniqueTelefone = async (telMaskedOrE164) => {
+        const e164 = toE164('+55 ' + telMaskedOrE164.replace(/\D/g, '')) || telMaskedOrE164;
+        const digits = digitsOnly(e164).slice(-8);
+        try {
+            const { data } = await supabase
+                .from('clientes_fast')
+                .select('id, telefone')
+                .or(`telefone.eq.${e164},telefone.ilike.*${digits}*,telefone.eq.${telMaskedOrE164}`)
+                .limit(1);
+            return !(data && data.length);
+        } catch (_) {
+            return true;
+        }
+    };
+
+    const handleRegisterStart = async (e) => {
         e.preventDefault();
         setLoading(true);
         setErrors({});
+        setRegisterMsg('');
 
         try {
-            // Validações
             const newErrors = {};
-
-            if (!registerData.nome.trim()) {
-                newErrors.nome = 'Nome é obrigatório';
+            const nome = registerData.nome.trim();
+            if (!nome || nome.length < 3 || /\d/.test(nome)) {
+                newErrors.nome = 'Informe seu nome completo (sem números).';
             }
 
-            if (!validateCPFCNPJ(registerData.cpf_cnpj)) {
-                newErrors.cpf_cnpj = 'CPF/CNPJ inválido';
+            // CPF obrigatório
+            if (!registerData.cpf) {
+                newErrors.cpf = 'CPF é obrigatório';
+            } else {
+                const cpfDigits = registerData.cpf.replace(/\D/g, '');
+                if (!(cpfDigits.length === 11 && validateCPF(cpfDigits))) {
+                    newErrors.cpf = 'CPF inválido';
+                } else {
+                    const blocked = await checkCpfInBlocklist(registerData.cpf);
+                    if (blocked) newErrors.cpf = 'Este CPF não pode criar conta no sistema.';
+                    const cpfUnique = await uniqueCpf(registerData.cpf);
+                    if (!cpfUnique) newErrors.cpf = 'CPF já cadastrado';
+                }
+            }
+
+            // CNPJ opcional
+            if (registerData.cnpj) {
+                const cnpjDigits = registerData.cnpj.replace(/\D/g, '');
+                if (!(cnpjDigits.length === 14 && validateCNPJ(cnpjDigits))) {
+                    newErrors.cnpj = 'CNPJ inválido';
+                } else {
+                    const cnpjUnique = await uniqueCnpj(registerData.cnpj);
+                    if (!cnpjUnique) newErrors.cnpj = 'CNPJ já cadastrado';
+                }
             }
 
             if (!registerData.telefone.trim()) {
                 newErrors.telefone = 'Telefone é obrigatório';
+            } else {
+                const telOk = toE164('+55 ' + registerData.telefone.replace(/\D/g, ''));
+                if (!telOk) newErrors.telefone = 'Telefone inválido';
+                else {
+                    const uniqTel = await uniqueTelefone(registerData.telefone);
+                    if (!uniqTel) newErrors.telefone = 'WhatsApp já cadastrado';
+                }
             }
 
-            if (registerData.email && !validateEmail(registerData.email)) {
+            if (!registerData.email) {
+                newErrors.email = 'Email é obrigatório';
+            } else if (!validateEmail(registerData.email)) {
                 newErrors.email = 'Email inválido';
-            }
-
-            if (registerData.senha.length < 6) {
-                newErrors.senha = 'Senha deve ter pelo menos 6 caracteres';
-            }
-
-            if (registerData.senha !== registerData.confirmarSenha) {
-                newErrors.confirmarSenha = 'Senhas não coincidem';
+            } else {
+                const uniqEmail = await uniqueEmail(registerData.email);
+                if (!uniqEmail) newErrors.email = 'Email já cadastrado';
             }
 
             if (!regulamentoAccepted) {
@@ -697,60 +873,143 @@ const AuthNovoClean = ({ onLogin }) => {
                 return;
             }
 
-            // Verificar se CPF/CNPJ já existe
-            const { data: existingUser } = await supabase
-                .from('clientes_fast')
-                .select('id')
-                .eq('cpf_cnpj', registerData.cpf_cnpj)
-                .single();
+            // Enviar OTP para o WhatsApp informado
+            const e164 = toE164('+55 ' + registerData.telefone.replace(/\D/g, ''));
+            setRegisterPhoneE164(e164);
+            setRegisterSendingCode(true);
+            const res = await fetch(`${N8N_BASE}/webhook/start-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: e164 })
+            });
+            let ok = res.ok;
+            try {
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const j = await res.json();
+                    ok = j.ok !== false;
+                } else {
+                    await res.text();
+                }
+            } catch (_) { }
+            if (ok) {
+                setRegisterOtpDigits(['', '', '', '', '', '']);
+                setRegisterStep('otp');
+                startRegisterCooldown(60);
+                setRegisterOtpMsg('Código enviado por WhatsApp.');
+                toast.success('Código enviado por WhatsApp.');
+            } else {
+                setRegisterMsg('Não foi possível enviar o código. Tente novamente.');
+                toast.error('Falha ao enviar o código.');
+            }
+        } catch (error) {
+            console.error('❌ Erro no início do cadastro:', error);
+            toast.error('Erro ao iniciar cadastro');
+        } finally {
+            setLoading(false);
+            setRegisterSendingCode(false);
+        }
+    };
 
-            if (existingUser) {
-                setErrors({ cpf_cnpj: 'CPF/CNPJ já cadastrado' });
+    const handleRegisterVerify = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        setRegisterOtpMsg('');
+        const code = registerOtpDigits.join('').replace(/\D/g, '');
+        if (code.length !== 6) {
+            setRegisterOtpMsg('Digite os 6 dígitos do código.');
+            return;
+        }
+        try {
+            setRegisterVerifying(true);
+            const res = await fetch(`${N8N_BASE}/webhook/check-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: registerPhoneE164, code })
+            });
+            let approved = false;
+            let status = 'unknown';
+            try {
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const j = await res.json();
+                    approved = !!j.approved;
+                    status = j.status || status;
+                } else {
+                    approved = res.ok;
+                }
+            } catch (_) { }
+
+            if (!approved) {
+                let msg = 'Código inválido. Tente novamente.';
+                if (status === 'expired') msg = 'Código expirado. Clique em Reenviar.';
+                if (status === 'blocked') msg = 'Muitas tentativas. Aguarde e solicite um novo código.';
+                setRegisterOtpMsg(msg);
+                toast.error(msg);
                 return;
             }
 
-            // Verificar se email já existe (se fornecido)
-            if (registerData.email) {
-                const { data: existingEmail } = await supabase
+            // Criar usuário somente após OTP válido
+                const { data, error } = await supabase
                     .from('clientes_fast')
-                    .select('id')
-                    .eq('email', registerData.email)
+                    .insert([{
+                        nome: registerData.nome.trim(),
+                        cpf_cnpj: (registerData.cpf || '').replace(/\D/g, ''),
+                        tipo: 'CPF',
+                        cnpj_opcional: registerData.cnpj ? registerData.cnpj.replace(/\D/g, '') : null,
+                        telefone: registerData.telefone,
+                        email: registerData.email || null,
+                        saldo_pontos: 0,
+                        total_pontos_ganhos: 0,
+                        total_pontos_gastos: 0,
+                        role: 'cliente'
+                    }])
+                    .select()
                     .single();
-
-                if (existingEmail) {
-                    setErrors({ email: 'Email já cadastrado' });
-                    return;
-                }
-            }
-
-            // Criar usuário
-            const { data, error } = await supabase
-                .from('clientes_fast')
-                .insert([{
-                    nome: registerData.nome.trim(),
-                    cpf_cnpj: registerData.cpf_cnpj,
-                    telefone: registerData.telefone,
-                    email: registerData.email || null,
-                    senha: registerData.senha, // Em produção, usar hash
-                    saldo_pontos: 0,
-                    total_pontos_ganhos: 0,
-                    total_pontos_gastos: 0,
-                    role: 'cliente' // Novo usuário sempre começa como cliente
-                }])
-                .select()
-                .single();
-
             if (error) throw error;
 
-            console.log('✅ Usuário cadastrado:', data);
             toast.success('Cadastro realizado com sucesso!');
             onLogin(data);
-
-        } catch (error) {
-            console.error('❌ Erro no cadastro:', error);
-            toast.error('Erro ao realizar cadastro');
+        } catch (err) {
+            console.error('Erro ao verificar OTP/cadastrar:', err);
+            toast.error('Falha ao concluir cadastro');
         } finally {
-            setLoading(false);
+            setRegisterVerifying(false);
+        }
+    };
+
+    const handleRegisterResend = async () => {
+        if (!registerPhoneE164 || registerResendLeft > 0) return;
+        try {
+            setRegisterSendingCode(true);
+            const res = await fetch(`${N8N_BASE}/webhook/start-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: registerPhoneE164, resend: true })
+            });
+            let ok = res.ok;
+            try {
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const j = await res.json();
+                    ok = j.ok !== false;
+                } else {
+                    await res.text();
+                }
+            } catch (_) { }
+            if (ok) {
+                startRegisterCooldown(60);
+                setRegisterOtpMsg('Novo código enviado.');
+                toast.success('Novo código enviado.');
+            } else {
+                setRegisterOtpMsg('Não foi possível reenviar agora. Tente novamente.');
+                toast.error('Falha ao reenviar.');
+            }
+        } catch (err) {
+            console.error('Erro ao reenviar OTP cadastro:', err);
+            setRegisterOtpMsg('Falha ao reenviar. Tente novamente.');
+            toast.error('Falha ao reenviar.');
+        } finally {
+            setRegisterSendingCode(false);
         }
     };
 
@@ -829,7 +1088,7 @@ const AuthNovoClean = ({ onLogin }) => {
                                             maxLength={1}
                                             inputMode="numeric"
                                             value={d}
-                                            onChange={(e) => {
+                                            onChange={async (e) => {
                                                 const v = e.target.value.replace(/\D/g, '').slice(0, 1);
                                                 const arr = [...otpDigits];
                                                 arr[i] = v;
@@ -838,6 +1097,10 @@ const AuthNovoClean = ({ onLogin }) => {
                                                 if (v && i < 5) {
                                                     const next = e.target.parentElement.querySelectorAll('input')[i + 1];
                                                     next && next.focus();
+                                                }
+                                                const joined = arr.join('');
+                                                if (joined.length === 6) {
+                                                    await verifyLoginOtp();
                                                 }
                                             }}
                                             onKeyDown={(e) => {
@@ -868,7 +1131,9 @@ const AuthNovoClean = ({ onLogin }) => {
                         )}
                     </Form>
                 ) : (
-                    <Form onSubmit={handleRegister}>
+                    <Form onSubmit={registerStep === 'form' ? handleRegisterStart : handleRegisterVerify}>
+                        {registerStep === 'form' ? (
+                        <>
                         <FormGroup>
                             <Label>Nome Completo *</Label>
                             <InputWrapper>
@@ -878,6 +1143,7 @@ const AuthNovoClean = ({ onLogin }) => {
                                 <Input
                                     type="text"
                                     value={registerData.nome}
+                                    ref={nomeRef}
                                     onChange={(e) => setRegisterData(prev => ({ ...prev, nome: e.target.value }))}
                                     placeholder="Digite seu nome completo"
                                     required
@@ -887,20 +1153,86 @@ const AuthNovoClean = ({ onLogin }) => {
                         </FormGroup>
 
                         <FormGroup>
-                            <Label>CPF ou CNPJ *</Label>
+                            <Label>CPF *</Label>
                             <InputWrapper>
                                 <InputIcon>
                                     <FiUser />
                                 </InputIcon>
                                 <Input
                                     type="text"
-                                    value={registerData.cpf_cnpj}
-                                    onChange={(e) => setRegisterData(prev => ({ ...prev, cpf_cnpj: formatCPFCNPJ(e.target.value) }))}
-                                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                                    value={registerData.cpf}
+                                    ref={cpfRef}
+                                    onChange={async (e) => {
+                                        const v = formatCPF(e.target.value);
+                                        setRegisterData(prev => ({ ...prev, cpf: v }));
+                                        setErrors(prev => ({ ...prev, cpf: undefined }));
+                                        const n = v.replace(/\D/g, '');
+                                        if (n.length === 11) {
+                                            if (!validateCPF(n)) {
+                                                setErrors(prev => ({ ...prev, cpf: 'CPF inválido' }));
+                                                return;
+                                            }
+                                            const blocked = await checkCpfInBlocklist(v);
+                                            if (blocked) {
+                                                setErrors(prev => ({ ...prev, cpf: 'Este CPF não pode criar conta no sistema.' }));
+                                                return;
+                                            }
+                                            const okUnique = await uniqueCpf(v);
+                                            if (!okUnique) {
+                                                setErrors(prev => ({ ...prev, cpf: 'CPF já cadastrado' }));
+                                                return;
+                                            }
+                                            // válido -> focar CNPJ (opcional)
+                                            cnpjRef.current?.focus();
+                                        }
+                                    }}
+                                    placeholder={'000.000.000-00'}
                                     required
                                 />
                             </InputWrapper>
-                            {errors.cpf_cnpj && <ErrorMessage>{errors.cpf_cnpj}</ErrorMessage>}
+                            {errors.cpf && <ErrorMessage>{errors.cpf}</ErrorMessage>}
+                        </FormGroup>
+
+                        <FormGroup>
+                            <Label>CNPJ (opcional)</Label>
+                            <InputWrapper>
+                                <InputIcon>
+                                    <FiUser />
+                                </InputIcon>
+                                <Input
+                                    type="text"
+                                    value={registerData.cnpj}
+                                    ref={cnpjRef}
+                                    onChange={async (e) => {
+                                        const v = formatCNPJ(e.target.value);
+                                        setRegisterData(prev => ({ ...prev, cnpj: v }));
+                                        setErrors(prev => ({ ...prev, cnpj: undefined }));
+                                        const n = v.replace(/\D/g, '');
+                                        if (n.length === 14) {
+                                            if (!validateCNPJ(n)) {
+                                                setErrors(prev => ({ ...prev, cnpj: 'CNPJ inválido' }));
+                                                return;
+                                            }
+                                            const okUnique = await uniqueCnpj(v);
+                                            if (!okUnique) {
+                                                setErrors(prev => ({ ...prev, cnpj: 'CNPJ já cadastrado' }));
+                                                return;
+                                            }
+                                            // válido -> focar telefone
+                                            telefoneRef.current?.focus();
+                                        }
+                                        if (n.length === 0) {
+                                            // vazio -> seguir para telefone
+                                            telefoneRef.current?.focus();
+                                        }
+                                    }}
+                                    placeholder={'00.000.000/0000-00'}
+                                />
+                            </InputWrapper>
+                            <HelpText style={{ textAlign: 'left', marginTop: 6 }}>
+                                Informe o CNPJ. Se já comprou com CNPJ, preencha para conseguir receber os pontos.
+                            </HelpText>
+                            {errors.cnpj && <ErrorMessage>{errors.cnpj}</ErrorMessage>}
                         </FormGroup>
 
                         <FormGroup>
@@ -912,7 +1244,26 @@ const AuthNovoClean = ({ onLogin }) => {
                                 <Input
                                     type="tel"
                                     value={registerData.telefone}
-                                    onChange={(e) => setRegisterData(prev => ({ ...prev, telefone: formatPhone(e.target.value) }))}
+                                    ref={telefoneRef}
+                                    onChange={async (e) => {
+                                        const v = formatPhone(e.target.value);
+                                        setRegisterData(prev => ({ ...prev, telefone: v }));
+                                        setErrors(prev => ({ ...prev, telefone: undefined }));
+                                        const d = v.replace(/\D/g, '');
+                                        if (d.length >= 10) {
+                                            const e164 = toE164('+55 ' + d);
+                                            if (!e164) {
+                                                setErrors(prev => ({ ...prev, telefone: 'Telefone inválido' }));
+                                                return;
+                                            }
+                                            const uniq = await uniqueTelefone(v);
+                                            if (!uniq) {
+                                                setErrors(prev => ({ ...prev, telefone: 'WhatsApp já cadastrado' }));
+                                                return;
+                                            }
+                                            emailRef.current?.focus();
+                                        }
+                                    }}
                                     placeholder="(00) 00000-0000"
                                     required
                                 />
@@ -921,7 +1272,7 @@ const AuthNovoClean = ({ onLogin }) => {
                         </FormGroup>
 
                         <FormGroup>
-                            <Label>Email (opcional)</Label>
+                            <Label>Email *</Label>
                             <InputWrapper>
                                 <InputIcon>
                                     <FiMail />
@@ -929,45 +1280,25 @@ const AuthNovoClean = ({ onLogin }) => {
                                 <Input
                                     type="email"
                                     value={registerData.email}
-                                    onChange={(e) => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
-                                    placeholder="Digite seu email (opcional)"
+                                    ref={emailRef}
+                                    onChange={async (e) => {
+                                        const v = e.target.value;
+                                        setRegisterData(prev => ({ ...prev, email: v }));
+                                        setErrors(prev => ({ ...prev, email: undefined }));
+                                        if (v && validateEmail(v)) {
+                                            const uniq = await uniqueEmail(v);
+                                            if (!uniq) {
+                                                setErrors(prev => ({ ...prev, email: 'Email já cadastrado' }));
+                                                return;
+                                            }
+                                            cadastrarBtnRef.current?.focus();
+                                        }
+                                    }}
+                                    placeholder="Digite seu email"
+                                    required
                                 />
                             </InputWrapper>
                             {errors.email && <ErrorMessage>{errors.email}</ErrorMessage>}
-                        </FormGroup>
-
-                        <FormGroup>
-                            <Label>Senha *</Label>
-                            <InputWrapper>
-                                <InputIcon>
-                                    <FiLock />
-                                </InputIcon>
-                                <Input
-                                    type="password"
-                                    value={registerData.senha}
-                                    onChange={(e) => setRegisterData(prev => ({ ...prev, senha: e.target.value }))}
-                                    placeholder="Mínimo 6 caracteres"
-                                    required
-                                />
-                            </InputWrapper>
-                            {errors.senha && <ErrorMessage>{errors.senha}</ErrorMessage>}
-                        </FormGroup>
-
-                        <FormGroup>
-                            <Label>Confirmar Senha *</Label>
-                            <InputWrapper>
-                                <InputIcon>
-                                    <FiLock />
-                                </InputIcon>
-                                <Input
-                                    type="password"
-                                    value={registerData.confirmarSenha}
-                                    onChange={(e) => setRegisterData(prev => ({ ...prev, confirmarSenha: e.target.value }))}
-                                    placeholder="Confirme sua senha"
-                                    required
-                                />
-                            </InputWrapper>
-                            {errors.confirmarSenha && <ErrorMessage>{errors.confirmarSenha}</ErrorMessage>}
                         </FormGroup>
 
                         <RegulamentoContainer>
@@ -992,7 +1323,9 @@ const AuthNovoClean = ({ onLogin }) => {
 
                         </RegulamentoContainer>
 
-                        <Button type="submit" disabled={loading || !regulamentoAccepted}>
+                        {registerMsg && <AlertErr>{registerMsg}</AlertErr>}
+
+                        <Button type="submit" ref={cadastrarBtnRef} disabled={loading || !regulamentoAccepted}>
                             {loading ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <Spinner />
@@ -1006,11 +1339,73 @@ const AuthNovoClean = ({ onLogin }) => {
                             )}
                         </Button>
 
-                        <HelpText>
+                         <HelpText>
                             * Campos obrigatórios
                             <br />
-                            <small>Você pode adicionar mais informações depois no seu perfil</small>
+                             <small>Mantenha seus dados sempre atualizados para garantir o recebimento correto dos pontos.</small>
                         </HelpText>
+                        </>
+                        ) : (
+                        <>
+                            <HelpText>
+                                Enviamos um código para <b>{registerPhoneE164}</b>.
+                                <br />
+                                <button
+                                    type="button"
+                                    onClick={() => { setRegisterStep('form'); setRegisterOtpDigits(['','','','','','']); setRegisterMsg(''); setRegisterOtpMsg(''); }}
+                                    style={{ background: 'none', border: 'none', color: '#A91918', textDecoration: 'underline', cursor: 'pointer' }}
+                                >
+                                    <FiArrowLeft style={{ verticalAlign: 'middle' }} /> alterar número
+                                </button>
+                            </HelpText>
+
+                            <OtpContainer>
+                                {registerOtpDigits.map((d, i) => (
+                                    <OtpInput
+                                        key={i}
+                                        maxLength={1}
+                                        inputMode="numeric"
+                                        value={d}
+                                        onChange={async (e) => {
+                                            const v = e.target.value.replace(/\D/g, '').slice(0, 1);
+                                            const arr = [...registerOtpDigits];
+                                            arr[i] = v;
+                                            setRegisterOtpDigits(arr);
+                                            if (v && i < 5) {
+                                                const next = e.target.parentElement.querySelectorAll('input')[i + 1];
+                                                next && next.focus();
+                                            }
+                                            const joined = arr.join('');
+                                            if (joined.length === 6) {
+                                                await handleRegisterVerify();
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Backspace' && !registerOtpDigits[i] && i > 0) {
+                                                const prev = e.currentTarget.parentElement.querySelectorAll('input')[i - 1];
+                                                prev && prev.focus();
+                                            }
+                                        }}
+                                    />
+                                ))}
+                            </OtpContainer>
+
+                            <Inline>
+                                <Button type="submit" disabled={registerVerifying} style={{ flex: 1, minWidth: 180 }} onClick={handleRegisterVerify}>
+                                    {registerVerifying ? (<><Spinner /> Validando...</>) : (<><FiCheck /> Validar código</>)}
+                                </Button>
+                                <SecondaryButton type="button" onClick={handleRegisterResend} disabled={registerSendingCode || registerResendLeft > 0} style={{ flex: 1, minWidth: 180 }}>
+                                    <FiRefreshCw /> Reenviar {registerResendLeft > 0 ? `(${registerResendLeft}s)` : ''}
+                                </SecondaryButton>
+                            </Inline>
+
+                            {registerOtpMsg && (
+                                registerOtpMsg.toLowerCase().includes('código enviado') || registerOtpMsg.toLowerCase().includes('novo código')
+                                    ? <AlertOk>{registerOtpMsg}</AlertOk>
+                                    : <AlertErr>{registerOtpMsg}</AlertErr>
+                            )}
+                        </>
+                        )}
                     </Form>
                 )}
             </AuthCard>

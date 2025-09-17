@@ -8,7 +8,7 @@ import imagemNotaFiscalService from '../services/imagemNotaFiscalService';
  * Componente para entrada manual do número da nota fiscal
  * Permite consultar informações diretamente pelo número da NF-e
  */
-const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
+const NotaFiscalInput = ({ onNotaProcessada, clienteId, user }) => {
   const [numeroNota, setNumeroNota] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -34,7 +34,17 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
         timestamp: new Date().toISOString(),
         numeroNota: numeroNota,
         origem: 'input_numero',
-        clienteId: clienteId
+        clienteId: clienteId,
+        cliente: user ? {
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+          telefone: user.telefone,
+          cpf: user.cpf_cnpj,
+          cnpj: user.cnpj_opcional || null,
+          loja: user.loja_nome || user.lojas?.nome || null,
+          role: user.role || null
+        } : null
       };
 
       console.log('Enviando número da NF-e para n8n:', {
@@ -69,31 +79,40 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
         } catch (e) {
           console.error('Não foi possível ler a resposta de erro:', e);
         }
-        
-        // Usar valores padrão se o n8n falhar
-        console.log('Webhook n8n retornou erro. Usando pontos padrão para continuar funcionamento.');
-        n8nResponse = {
-          pontos: 3, // pontos padrão em caso de erro
-          source: 'fallback-error-nota-input'
-        };
+        setError('Não foi possível consultar sua nota agora. Tente novamente em alguns minutos.');
+        return;
       } else {
         try {
           n8nResponse = await response.json();
           console.log('Resposta válida do n8n para número da nota:', n8nResponse);
         } catch (jsonError) {
           console.error('Erro ao fazer parse do JSON da resposta:', jsonError);
-          
-          // Fallback se não conseguir fazer parse do JSON
-          n8nResponse = {
-            pontos: 2,
-            source: 'fallback-json-error-nota-input'
-          };
+          setError('Não conseguimos interpretar a resposta. Tente novamente.');
+          return;
         }
       }
 
       // Processar resposta do n8n (mesmo padrão do upload)
       let pontosCalculados = 0;
       let dadosNotaParaSalvar = null;
+      
+      // Normalização: mapear campos novos do n8n para manter compatibilidade
+      if (Array.isArray(n8nResponse)) {
+        n8nResponse = n8nResponse.map(item => (
+          (item && typeof item === 'object')
+            ? {
+                ...item,
+                ...(item['nf-e'] && !item.nota ? { nota: item['nf-e'] } : {}),
+                ...(item['data-emissao'] && !item.data_emissao ? { data_emissao: item['data-emissao'] } : {})
+              }
+            : item
+        ));
+      } else if (n8nResponse && typeof n8nResponse === 'object') {
+        const extra = {};
+        if (n8nResponse['nf-e'] && !n8nResponse.nota) extra.nota = n8nResponse['nf-e'];
+        if (n8nResponse['data-emissao'] && !n8nResponse.data_emissao) extra.data_emissao = n8nResponse['data-emissao'];
+        if (Object.keys(extra).length) n8nResponse = { ...n8nResponse, ...extra };
+      }
       
       console.log('🔍 [INPUT MANUAL] Resposta recebida:', {
         tipo: Array.isArray(n8nResponse) ? 'array' : typeof n8nResponse,
@@ -105,6 +124,14 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
         const resultado = n8nResponse[0];
         console.log('🔍 [INPUT MANUAL] Processando resultado do array n8n:', resultado);
         
+        // Nota não pertence ao usuário
+        if (resultado.nota && /nao pertence a voce|não pertence a você/i.test(resultado.nota)) {
+          const digits = (resultado.nota.match(/\d+/g) || []).join('');
+          const docHint = digits.substring(0, 5);
+          setError(`Esta nota fiscal não pertence à sua conta. Verifique no seu Perfil se CPF e CNPJ estão cadastrados corretamente. Documento relacionado à nota inicia com: ${docHint || '*****'}.`);
+          return;
+        }
+
         if (resultado.status === 'sucesso' && resultado.pontuacao_total) {
           pontosCalculados = Number(resultado.pontuacao_total);
           dadosNotaParaSalvar = resultado;
@@ -113,6 +140,21 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
           console.warn('⚠️ [INPUT MANUAL] Resultado do n8n sem pontuacao_total válida:', resultado);
         }
       } else if (n8nResponse && typeof n8nResponse === 'object') {
+        // Erro genérico
+        if (n8nResponse.erro) {
+          setError('Houve um erro ao consultar sua nota. Revise o número e tente novamente.');
+          return;
+        }
+        // Nota usada
+        if (n8nResponse.nota === 'A nota fiscal enviada já foi usada.') {
+          setError('Esta nota fiscal já foi usada anteriormente. Pela regulamentação, não é permitido enviar a mesma nota mais de uma vez.');
+          return;
+        }
+        // Data maior que 90 dias
+        if (n8nResponse.date && /90\s*dias/i.test(n8nResponse.date)) {
+          setError('A data desta nota fiscal excedeu o limite de 90 dias, conforme nossa regulamentação.');
+          return;
+        }
         // Se é objeto direto, tentar diferentes propriedades
         pontosCalculados = Number(n8nResponse.pontuacao_total) || 
                           Number(n8nResponse.pontos) || 
@@ -121,6 +163,8 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
         console.log(`✅ [INPUT MANUAL] Pontos extraídos do n8n (objeto): ${pontosCalculados}`);
       } else {
         console.warn('⚠️ [INPUT MANUAL] Resposta do n8n não é array nem objeto válido:', n8nResponse);
+        setError('Resposta inválida do servidor. Tente novamente.');
+        return;
       }
 
       const pontos = pontosCalculados;
@@ -134,9 +178,9 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
           return;
         }
         
-        // Verificar erro de data limite (3 meses)
-        if (n8nResponse.date === "A data da nota, excedeu o limite de 3 meses!") {
-          setError('A data desta nota fiscal excedeu o limite de 3 meses. Apenas notas fiscais emitidas nos últimos 3 meses são aceitas.');
+        // Verificar erro de data limite (90 dias)
+        if (n8nResponse.date && /90\s*dias/i.test(n8nResponse.date)) {
+          setError('A data desta nota fiscal excedeu o limite de 90 dias, conforme nossa regulamentação.');
           return;
         }
       }
@@ -186,7 +230,15 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId }) => {
         }
       }
 
-      if (onNotaProcessada) onNotaProcessada({ numero: numeroNota, pontos });
+      if (onNotaProcessada) {
+        // Preferir dados retornados pelo n8n quando disponíveis
+        const origem = Array.isArray(n8nResponse) ? n8nResponse[0] : (n8nResponse && typeof n8nResponse === 'object' ? n8nResponse : null);
+        const numeroFinal = (origem?.nota || origem?.['nf-e'] || numeroNota);
+        const dataFinal = (origem?.data_emissao || origem?.['data-emissao'] || null);
+        const itens = origem?.produtos || origem?.items || [];
+        const total = origem?.valorTotal || origem?.totalValue || 0;
+        onNotaProcessada({ numero: numeroFinal, pontos, dataEmissao: dataFinal, orderDate: dataFinal, produtos: itens, valorTotal: total });
+      }
 
     } catch (err) {
       console.error('Erro ao processar nota fiscal:', err);
