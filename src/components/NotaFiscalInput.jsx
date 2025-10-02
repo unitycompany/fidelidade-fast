@@ -55,6 +55,13 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId, user }) => {
       });
       if (!payload?.cliente?.cnpj) {
         console.warn('[INPUT NUMERO] Usuário sem CNPJ cadastrado - mostrar alerta educativo.');
+        try {
+          const warned = sessionStorage.getItem('warn_cnpj_missing_input');
+          if (!warned) {
+            sessionStorage.setItem('warn_cnpj_missing_input', '1');
+            setError('Você ainda não cadastrou seu CNPJ no Perfil. Cadastre para garantir que as notas sejam validadas e pontuadas corretamente.');
+          }
+        } catch (_) { /* noop */ }
       }
 
       // Enviar para o webhook do n8n com timeout

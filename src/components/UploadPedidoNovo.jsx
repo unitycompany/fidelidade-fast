@@ -648,6 +648,13 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
       });
       if (!payload?.cliente?.cnpj) {
         console.warn('[UPLOAD NOTA] Usuário sem CNPJ cadastrado - considere orientar cadastro no Perfil.');
+        try {
+          const warned = sessionStorage.getItem('warn_cnpj_missing_upload');
+          if (!warned) {
+            sessionStorage.setItem('warn_cnpj_missing_upload', '1');
+            setError('Você ainda não cadastrou seu CNPJ no Perfil. Cadastre para garantir correta validação e pontuação das notas futuras.');
+          }
+        } catch (_) { /* noop */ }
       }
       // Enviar para o webhook do n8n com timeout (somente aqui mostra o loading)
       setIsProcessing(true);
