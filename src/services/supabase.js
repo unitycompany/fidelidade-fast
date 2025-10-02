@@ -96,6 +96,22 @@ export const db = {
         return data
     },
 
+    subscribeCliente(id, callback) {
+        if (!id) return () => {};
+        const channel = supabase.channel(`cliente-${id}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'clientes_fast', filter: `id=eq.${id}` },
+                (payload) => {
+                    if (payload?.new) {
+                        callback(payload.new);
+                    }
+                }
+            )
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    },
+
     async buscarClientePorId(id) {
         if (!id) return null;
         const { data, error } = await supabase

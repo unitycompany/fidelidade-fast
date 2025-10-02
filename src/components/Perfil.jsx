@@ -217,6 +217,20 @@ export default function Perfil({ user, onUserUpdate }) {
 
   useEffect(() => {
     if (!user) return;
+    // Realtime subscription para refletir alterações externas (admin / supabase / outro dispositivo)
+    const unsubscribe = db.subscribeCliente(user.id, (novo) => {
+      // Atualizar campos sensíveis, inclusive CNPJ
+      if (typeof window !== 'undefined' && typeof window.updateUserContext === 'function') {
+        window.updateUserContext(novo);
+      }
+      if (onUserUpdate) {
+        onUserUpdate(novo);
+      }
+      // Atualizar campo controlado localmente
+      if (novo?.cnpj_opcional) {
+        setCnpjOpcional(formatCnpj(novo.cnpj_opcional));
+      }
+    });
     // Accept phone in various formats and present in BR mask +55
     let masked = user.telefone || '';
     if (masked && !masked.startsWith('+55')) {
@@ -237,6 +251,7 @@ export default function Perfil({ user, onUserUpdate }) {
     const existing = getUserCnpj(user);
     if (existing) setCnpjOpcional(formatCnpj(existing)); else setCnpjOpcional('');
     setEditingCnpj(false);
+    return () => unsubscribe();
   }, [user]);
 
   useEffect(() => () => { if (cooldownId) clearInterval(cooldownId); }, [cooldownId]);
