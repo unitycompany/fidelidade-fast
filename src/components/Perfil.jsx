@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { FiUser, FiMail, FiPhone, FiSave, FiLoader, FiEdit3, FiCheck, FiRefreshCw, FiArrowLeft, FiMapPin } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import { supabase, updateCustomerCnpj } from '../services/supabase';
+import { supabase, updateCustomerCnpj, db } from '../services/supabase';
 import { digitsOnly, formatCnpj, normalizeCnpj, validateCnpj } from '../utils/cnpj';
 import { getUserCnpj } from '../utils/customer';
 
@@ -312,9 +312,13 @@ export default function Perfil({ user, onUserUpdate }) {
       try {
         setSavingCnpj(true);
         const updated = await updateCustomerCnpj(user.id, newCnpjDigits);
-        if (window.updateUserContext) window.updateUserContext({ cnpj_opcional: updated.cnpj_opcional });
-        if (onUserUpdate) onUserUpdate({ ...user, cnpj_opcional: updated.cnpj_opcional });
-        setCnpjOpcional(formatCnpj(updated.cnpj_opcional));
+        // Refetch do usuário completo para garantir sincronização (evita state inconsistente)
+        let refreshed = null;
+        try { refreshed = await db.buscarClientePorId(user.id); } catch { /* noop */ }
+        const finalUser = refreshed || { ...user, cnpj_opcional: updated.cnpj_opcional };
+        if (window.updateUserContext) window.updateUserContext({ cnpj_opcional: finalUser.cnpj_opcional });
+        if (onUserUpdate) onUserUpdate(finalUser);
+        setCnpjOpcional(formatCnpj(finalUser.cnpj_opcional));
         toast.success('CNPJ atualizado com sucesso');
         setEditingCnpj(false);
       } catch (e) {
@@ -557,7 +561,7 @@ export default function Perfil({ user, onUserUpdate }) {
                   </InputWrap>
                   <Helper>
                     {user?.cnpj_opcional ? (
-                      editingCnpj ? 'Edite o CNPJ e clique em Salvar para atualizar.' : 'CNPJ cadastrado. Clique em "Editar CNPJ" se precisar alterar.'
+                      editingCnpj ? 'Edite o CNPJ e clique em Salvar para atualizar.' : `CNPJ cadastrado: ${formatCnpj(user.cnpj_opcional)}. Clique em "Editar CNPJ" se precisar alterar.`
                     ) : 'Se suas compras são faturadas no CNPJ da empresa, cadastre aqui para garantir a pontuação correta.'}
                   </Helper>
                   {user?.cnpj_opcional && (

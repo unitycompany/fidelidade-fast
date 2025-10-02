@@ -96,6 +96,17 @@ export const db = {
         return data
     },
 
+    async buscarClientePorId(id) {
+        if (!id) return null;
+        const { data, error } = await supabase
+            .from('clientes_fast')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (error && error.code !== 'PGRST116') throw error;
+        return data;
+    },
+
     async criarCliente(dadosCliente) {
         const payload = { ...dadosCliente }
         if (payload.cnpj_opcional) {

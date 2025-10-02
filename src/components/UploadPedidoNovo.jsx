@@ -617,6 +617,15 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         fileType = ext;
       }
 
+      // Garantir CNPJ atualizado antes de montar payload
+      let effectiveUser = user;
+      if (effectiveUser && !effectiveUser.cnpj_opcional) {
+        try {
+          const { db } = await import('../services/supabase');
+          const refreshed = await db.buscarClientePorId(effectiveUser.id);
+          if (refreshed) effectiveUser = { ...effectiveUser, ...refreshed };
+        } catch (e) { /* noop */ }
+      }
       // Preparar dados para envio (formato mais simples)
       const payload = {
         source: 'sistema-de-fidelidade-web',
@@ -625,8 +634,8 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         mimeType: mimeType,
         format: format,
         fileType: fileType,
-        clienteId: user?.id,
-        cliente: user ? (await import('../utils/customer')).buildClientePayload(user) : null
+        clienteId: effectiveUser?.id,
+        cliente: effectiveUser ? (await import('../utils/customer')).buildClientePayload(effectiveUser) : null
       };
 
       console.log('Enviando para n8n:', {
@@ -637,6 +646,9 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
           imagemBase64: payload.imagemBase64.substring(0, 50) + '...' // Log apenas os primeiros 50 caracteres do base64
         }
       });
+      if (!payload?.cliente?.cnpj) {
+        console.warn('[UPLOAD NOTA] Usuário sem CNPJ cadastrado - considere orientar cadastro no Perfil.');
+      }
       // Enviar para o webhook do n8n com timeout (somente aqui mostra o loading)
       setIsProcessing(true);
   const controller = new AbortController();

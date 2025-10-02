@@ -29,6 +29,15 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId, user }) => {
     setPontosCreditados(false);
     
     try {
+      // Garantir CNPJ atualizado antes de montar payload
+      let effectiveUser = user;
+      if (effectiveUser && !effectiveUser.cnpj_opcional) {
+        try {
+          const { db } = await import('../services/supabase');
+          const refreshed = await db.buscarClientePorId(effectiveUser.id);
+          if (refreshed) effectiveUser = { ...effectiveUser, ...refreshed };
+        } catch (e) { /* noop */ }
+      }
       // Preparar dados para envio (só com número da NF-e)
       const payload = {
         source: 'sistema-de-fidelidade-web',
@@ -36,7 +45,7 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId, user }) => {
         numeroNota: numeroNota,
         origem: 'input_numero',
         clienteId: clienteId,
-        cliente: buildClientePayload(user)
+        cliente: buildClientePayload(effectiveUser)
       };
 
       console.log('Enviando número da NF-e para n8n:', {
@@ -44,6 +53,9 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId, user }) => {
         numeroNota: numeroNota,
         cnpj_enviado: payload?.cliente?.cnpj
       });
+      if (!payload?.cliente?.cnpj) {
+        console.warn('[INPUT NUMERO] Usuário sem CNPJ cadastrado - mostrar alerta educativo.');
+      }
 
       // Enviar para o webhook do n8n com timeout
       const controller = new AbortController();
