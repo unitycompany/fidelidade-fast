@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import toast from 'react-hot-toast';
 import { FiUser, FiLock, FiMail, FiPhone, FiLogIn, FiUserPlus, FiLoader, FiFileText, FiCheck, FiRefreshCw, FiArrowLeft } from 'react-icons/fi';
-import { supabase } from '../services/supabase';
+import { supabase, isCnpjAvailable } from '../services/supabase';
+import { digitsOnly, formatCnpj, normalizeCnpj, validateCnpj } from '../utils/cnpj';
 import LoadingGif from './LoadingGif';
 import Regulamento from './Regulamento';
 
@@ -422,10 +423,6 @@ const AuthNovoClean = ({ onLogin }) => {
         const numbers = value.replace(/\D/g, '').slice(0, 11);
         return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
     };
-    const formatCNPJ = (value) => {
-        const numbers = value.replace(/\D/g, '').slice(0, 14);
-        return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-    };
 
     const formatPhone = (value) => {
         const numbers = value.replace(/\D/g, '');
@@ -433,7 +430,6 @@ const AuthNovoClean = ({ onLogin }) => {
     };
 
     // Helpers para máscara BR/E.164
-    const digitsOnly = (s) => (s.match(/\d+/g) || []).join('');
     const formatBRMask = (v) => {
         let d = digitsOnly(v);
         if (!d.startsWith('55')) d = '55' + d;
@@ -504,41 +500,22 @@ const AuthNovoClean = ({ onLogin }) => {
     // Validações
     // ===== Validações CPF/CNPJ com dígitos verificadores =====
     const validateCPF = (cpf) => {
-        const s = (cpf || '').replace(/\D/g, '');
-        if (s.length !== 11) return false;
-        if (/^(\d)\1{10}$/.test(s)) return false;
-        let sum = 0;
-        for (let i = 0; i < 9; i++) sum += parseInt(s.charAt(i)) * (10 - i);
-        let rev = 11 - (sum % 11);
-        if (rev === 10 || rev === 11) rev = 0;
-        if (rev !== parseInt(s.charAt(9))) return false;
-        sum = 0;
-        for (let i = 0; i < 10; i++) sum += parseInt(s.charAt(i)) * (11 - i);
-        rev = 11 - (sum % 11);
-        if (rev === 10 || rev === 11) rev = 0;
-        return rev === parseInt(s.charAt(10));
-    };
+        const digits = digitsOnly(cpf);
+        if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
 
-    const validateCNPJ = (cnpj) => {
-        const s = (cnpj || '').replace(/\D/g, '');
-        if (s.length !== 14) return false;
-        if (/^(\d)\1{13}$/.test(s)) return false;
-        const calc = (base) => {
-            let len = base.length - 7, sum = 0, pos = len - 7;
-            for (let i = len; i >= 1; i--) {
-                sum += parseInt(base.charAt(len - i)) * pos--;
-                if (pos < 2) pos = 9;
+        const calcDigit = (factor) => {
+            let sum = 0;
+            for (let i = 0; i < factor - 1; i++) {
+                sum += Number(digits[i]) * (factor - i);
             }
-            let res = sum % 11;
-            return (res < 2) ? 0 : 11 - res;
+            const remainder = sum % 11;
+            return remainder < 2 ? 0 : 11 - remainder;
         };
-        const base12 = s.substring(0, 12);
-        const d1 = calc(base12);
-        const d2 = calc(base12 + d1);
-        return s.endsWith(`${d1}${d2}`);
-    };
 
-    // (removido: validação combinada por tipo; validamos CPF e CNPJ separadamente)
+        const firstDigit = calcDigit(10);
+        const secondDigit = calcDigit(11);
+        return firstDigit === Number(digits[9]) && secondDigit === Number(digits[10]);
+    };
 
     const validateEmail = (email) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -763,22 +740,6 @@ const AuthNovoClean = ({ onLogin }) => {
         }
     };
 
-    const uniqueCnpj = async (cnpj) => {
-        // verifica se já usaram este CNPJ como principal (cpf_cnpj) ou como opcional
-        const digits = cnpj.replace(/\D/g, '');
-        const formatted = formatCNPJ(digits);
-        try {
-            const { data } = await supabase
-                .from('clientes_fast')
-                .select('id')
-                .or(`cpf_cnpj.eq.${formatted},cpf_cnpj.eq.${digits},cnpj_opcional.eq.${formatted},cnpj_opcional.eq.${digits}`)
-                .limit(1);
-            return !(data && data.length);
-        } catch (_) {
-            return true;
-        }
-    };
-
     const uniqueEmail = async (email) => {
         if (!email) return true;
         const { data, error } = await supabase
@@ -835,12 +796,12 @@ const AuthNovoClean = ({ onLogin }) => {
 
             // CNPJ opcional
             if (registerData.cnpj) {
-                const cnpjDigits = registerData.cnpj.replace(/\D/g, '');
-                if (!(cnpjDigits.length === 14 && validateCNPJ(cnpjDigits))) {
+                const normalizedCnpj = normalizeCnpj(registerData.cnpj);
+                if (!normalizedCnpj || !validateCnpj(normalizedCnpj)) {
                     newErrors.cnpj = 'CNPJ inválido';
                 } else {
-                    const cnpjUnique = await uniqueCnpj(registerData.cnpj);
-                    if (!cnpjUnique) newErrors.cnpj = 'CNPJ já cadastrado';
+                    const available = await isCnpjAvailable(normalizedCnpj);
+                    if (!available) newErrors.cnpj = 'CNPJ já cadastrado';
                 }
             }
 
@@ -949,13 +910,14 @@ const AuthNovoClean = ({ onLogin }) => {
             }
 
             // Criar usuário somente após OTP válido
+                const cnpjDigits = normalizeCnpj(registerData.cnpj)
                 const { data, error } = await supabase
                     .from('clientes_fast')
                     .insert([{
                         nome: registerData.nome.trim(),
                         cpf_cnpj: (registerData.cpf || '').replace(/\D/g, ''),
                         tipo: 'CPF',
-                        cnpj_opcional: registerData.cnpj ? registerData.cnpj.replace(/\D/g, '') : null,
+                        cnpj_opcional: cnpjDigits,
                         telefone: registerData.telefone,
                         email: registerData.email || null,
                         saldo_pontos: 0,
@@ -1204,24 +1166,24 @@ const AuthNovoClean = ({ onLogin }) => {
                                     value={registerData.cnpj}
                                     ref={cnpjRef}
                                     onChange={async (e) => {
-                                        const v = formatCNPJ(e.target.value);
-                                        setRegisterData(prev => ({ ...prev, cnpj: v }));
+                                        const formatted = formatCnpj(e.target.value);
+                                        setRegisterData(prev => ({ ...prev, cnpj: formatted }));
                                         setErrors(prev => ({ ...prev, cnpj: undefined }));
-                                        const n = v.replace(/\D/g, '');
-                                        if (n.length === 14) {
-                                            if (!validateCNPJ(n)) {
+                                        const digits = digitsOnly(formatted);
+                                        if (digits.length === 14) {
+                                            if (!validateCnpj(digits)) {
                                                 setErrors(prev => ({ ...prev, cnpj: 'CNPJ inválido' }));
                                                 return;
                                             }
-                                            const okUnique = await uniqueCnpj(v);
-                                            if (!okUnique) {
+                                            const available = await isCnpjAvailable(digits);
+                                            if (!available) {
                                                 setErrors(prev => ({ ...prev, cnpj: 'CNPJ já cadastrado' }));
                                                 return;
                                             }
                                             // válido -> focar telefone
                                             telefoneRef.current?.focus();
                                         }
-                                        if (n.length === 0) {
+                                        if (digits.length === 0) {
                                             // vazio -> seguir para telefone
                                             telefoneRef.current?.focus();
                                         }

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { formatCnpj, normalizeCnpj, validateCnpj } from '../utils/cnpj'
 
 // Configuração do Supabase - usando variáveis Vite
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.REACT_APP_SUPABASE_URL
@@ -9,6 +10,71 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+const countMatches = async (column, values, ignoreId) => {
+    const list = Array.from(new Set(values.filter(Boolean)))
+    if (!list.length) return 0
+
+    let query = supabase
+        .from('clientes_fast')
+        .select('id', { count: 'exact', head: true })
+
+    if (list.length === 1) {
+        query = query.eq(column, list[0])
+    } else {
+        query = query.in(column, list)
+    }
+
+    if (ignoreId) {
+        query = query.neq('id', ignoreId)
+    }
+
+    const { count, error } = await query
+    if (error) throw error
+    return count || 0
+}
+
+export const isCnpjAvailable = async (cnpjValue, ignoreCustomerId = null) => {
+    const digits = normalizeCnpj(cnpjValue)
+    if (!digits) return true
+
+    const formatted = formatCnpj(digits)
+    const valuesToCheck = formatted && formatted !== digits ? [digits, formatted] : [digits]
+
+    const optionalCount = await countMatches('cnpj_opcional', valuesToCheck, ignoreCustomerId)
+    if (optionalCount > 0) return false
+
+    const principalCount = await countMatches('cpf_cnpj', valuesToCheck, ignoreCustomerId)
+    if (principalCount > 0) return false
+
+    return true
+}
+
+export const updateCustomerCnpj = async (customerId, rawCnpj) => {
+    const digits = normalizeCnpj(rawCnpj)
+    if (!digits || !validateCnpj(digits)) {
+        const error = new Error('CNPJ inválido')
+        error.code = 'invalid_cnpj'
+        throw error
+    }
+
+    const available = await isCnpjAvailable(digits, customerId)
+    if (!available) {
+        const error = new Error('CNPJ já cadastrado')
+        error.code = 'cnpj_in_use'
+        throw error
+    }
+
+    const { data, error } = await supabase
+        .from('clientes_fast')
+        .update({ cnpj_opcional: digits })
+        .eq('id', customerId)
+        .select('id, cnpj_opcional')
+        .single()
+
+    if (error) throw error
+    return data
+}
 
 // Funções helper para o banco de dados
 export const db = {
@@ -31,9 +97,26 @@ export const db = {
     },
 
     async criarCliente(dadosCliente) {
+        const payload = { ...dadosCliente }
+        if (payload.cnpj_opcional) {
+            const digits = normalizeCnpj(payload.cnpj_opcional)
+            if (!digits || !validateCnpj(digits)) {
+                const error = new Error('CNPJ inválido')
+                error.code = 'invalid_cnpj'
+                throw error
+            }
+            const available = await isCnpjAvailable(digits)
+            if (!available) {
+                const error = new Error('CNPJ já cadastrado')
+                error.code = 'cnpj_in_use'
+                throw error
+            }
+            payload.cnpj_opcional = digits
+        }
+
         const { data, error } = await supabase
             .from('clientes_fast')
-            .insert(dadosCliente)
+            .insert(payload)
             .select()
             .single()
 

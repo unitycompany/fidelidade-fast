@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import styled, { keyframes, css } from 'styled-components';
 import { FiUpload, FiFile, FiCheck, FiX, FiStar, FiInfo, FiEye, FiTarget, FiDatabase, FiGift, FiFileText, FiUser } from 'react-icons/fi';
 import { analyzeOrderWithGemini } from '../services/geminiService';
 import { processOrderResult, validateOrder, validarPontosCalculados } from '../utils/pedidosFast'; // removed getProdutosElegiveis import
-import { saveOrder, saveOrderItems, addPointsToCustomer, checkOrderExists } from '../services/supabase';
+import { saveOrder, saveOrderItems, addPointsToCustomer, checkOrderExists, updateCustomerCnpj, isCnpjAvailable } from '../services/supabase';
 import { getPointsPerReal } from '../utils/config';
 import { sefazValidationService } from '../services/sefazValidation';
 import sapService from '../services/sapService';
@@ -12,6 +13,7 @@ import { notifyPointsEarned } from '../services/notificationManager.js';
 import NotaFiscalInput from './NotaFiscalInput';
 import { supabase } from '../services/supabase';
 import imagemNotaFiscalService from '../services/imagemNotaFiscalService';
+import { formatCnpj, normalizeCnpj, validateCnpj } from '../utils/cnpj';
 
 // Animações
 const fadeIn = keyframes`
@@ -1032,48 +1034,28 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
   const [cnpjInline, setCnpjInline] = useState('');
   const [savingCnpj, setSavingCnpj] = useState(false);
 
-  const formatCNPJ = (value) => {
-    const numbers = (value || '').replace(/\D/g, '').slice(0, 14);
-    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-  };
-  const validateCNPJ = (cnpj) => {
-    const s = (cnpj || '').replace(/\D/g, '');
-    if (s.length !== 14) return false;
-    if (/^(\d)\1{13}$/.test(s)) return false;
-    const calc = (base) => {
-      let len = base.length - 7, sum = 0, pos = len - 7;
-      for (let i = len; i >= 1; i--) { sum += parseInt(base.charAt(len - i)) * pos--; if (pos < 2) pos = 9; }
-      let res = sum % 11; return (res < 2) ? 0 : 11 - res;
-    };
-    const base12 = s.substring(0, 12);
-    const d1 = calc(base12); const d2 = calc(base12 + d1);
-    return s.endsWith(`${d1}${d2}`);
-  };
-  const uniqueCnpj = async (cnpj) => {
-    const digits = (cnpj || '').replace(/\D/g, '');
-    try {
-      const { data } = await supabase.from('clientes_fast').select('id').or(`cpf_cnpj.eq.${digits},cnpj_opcional.eq.${digits}`).limit(1);
-      if (data && data.length === 1 && data[0].id === user.id) return true;
-      return !(data && data.length);
-    } catch (_) { return true; }
-  };
   const handleSalvarCnpjInline = async () => {
     try {
       setSavingCnpj(true);
-      const digits = (cnpjInline || '').replace(/\D/g, '');
-      if (!digits) { toast.error('Informe o CNPJ'); return; }
-      if (!validateCNPJ(digits)) { toast.error('CNPJ inválido'); return; }
-      const ok = await uniqueCnpj(digits);
-      if (!ok) { toast.error('CNPJ já cadastrado em outra conta'); return; }
-      const { error } = await supabase.from('clientes_fast').update({ cnpj_opcional: digits }).eq('id', user.id);
-      if (error) throw error;
-      if (window.updateUserContext) window.updateUserContext({ cnpj_opcional: digits });
-      if (onUserUpdate) onUserUpdate({ ...user, cnpj_opcional: digits });
+      const digits = normalizeCnpj(cnpjInline);
+      if (!digits) { toast.error('Informe o CNPJ completo'); return; }
+      if (!validateCnpj(digits)) { toast.error('CNPJ inválido'); return; }
+      const available = await isCnpjAvailable(digits, user?.id);
+      if (!available) { toast.error('CNPJ já cadastrado em outra conta'); return; }
+      const updated = await updateCustomerCnpj(user.id, digits);
+      if (window.updateUserContext) window.updateUserContext({ cnpj_opcional: updated.cnpj_opcional });
+      if (onUserUpdate) onUserUpdate({ ...user, cnpj_opcional: updated.cnpj_opcional });
       setCnpjInline('');
       toast.success('CNPJ salvo com sucesso!');
     } catch (e) {
       console.error('Erro ao salvar CNPJ inline:', e);
-      toast.error('Erro ao salvar CNPJ');
+      if (e?.code === 'cnpj_in_use') {
+        toast.error('CNPJ já cadastrado em outra conta');
+      } else if (e?.code === 'invalid_cnpj') {
+        toast.error('CNPJ inválido');
+      } else {
+        toast.error('Erro ao salvar CNPJ');
+      }
     } finally { setSavingCnpj(false); }
   };
   
@@ -1127,7 +1109,7 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
                       <input
                         type="text"
                         value={cnpjInline}
-                        onChange={(e) => setCnpjInline(formatCNPJ(e.target.value))}
+                        onChange={(e) => setCnpjInline(formatCnpj(e.target.value))}
                         placeholder="00.000.000/0000-00"
                         style={{ width: '100%', padding: '10px 12px 10px 34px', border: '1px solid #ddd', borderRadius: 4 }}
                       />

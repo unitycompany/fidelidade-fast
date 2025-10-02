@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { FiUser, FiMail, FiPhone, FiSave, FiLoader, FiEdit3, FiCheck, FiRefreshCw, FiArrowLeft, FiMapPin } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import { supabase } from '../services/supabase';
+import { supabase, updateCustomerCnpj } from '../services/supabase';
+import { digitsOnly, formatCnpj, normalizeCnpj, validateCnpj } from '../utils/cnpj';
 
 // Detect dev vs prod to decide webhook base (same pattern as AuthNovoClean)
 const N8N_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV)
@@ -166,7 +167,6 @@ const OtpInput = styled.input`
 `;
 
 // Helpers from AuthNovoClean for phone mask/validation
-const digitsOnly = (s) => (s.match(/\d+/g) || []).join('');
 const formatBRMask = (v) => {
   let d = digitsOnly(v);
   if (!d.startsWith('55')) d = '55' + d;
@@ -233,20 +233,13 @@ export default function Perfil({ user, onUserUpdate }) {
     setLojaNome(user.loja_nome || '');
     // Pre-set CNPJ opcional if exists
     if (user.cnpj_opcional) {
-      const digits = (user.cnpj_opcional || '').replace(/\D/g, '').slice(0,14);
-      const maskedCnpj = digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-      setCnpjOpcional(maskedCnpj);
+      setCnpjOpcional(formatCnpj(user.cnpj_opcional));
     } else {
       setCnpjOpcional('');
     }
   }, [user]);
 
   useEffect(() => () => { if (cooldownId) clearInterval(cooldownId); }, [cooldownId]);
-
-  const initials = useMemo(() => {
-    const n = form.nome?.trim() || 'U';
-    return n.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-  }, [form.nome]);
 
   const startCooldown = (seconds = 60) => {
     if (cooldownId) clearInterval(cooldownId);
@@ -290,7 +283,7 @@ export default function Perfil({ user, onUserUpdate }) {
         try {
           const ct = res.headers.get('content-type') || '';
           if (ct.includes('application/json')) { const j = await res.json(); ok = j.ok !== false; } else { await res.text(); }
-        } catch (_) { }
+        } catch { /* noop */ }
         if (!ok) throw new Error('Falha ao enviar código.');
         setCurrentPhoneE164(newE164);
         setOtpDigits(['', '', '', '', '', '']);
@@ -310,28 +303,33 @@ export default function Perfil({ user, onUserUpdate }) {
 
     // Se usuário não tinha CNPJ e preencheu agora, validar e salvar antes
     if (!user?.cnpj_opcional && cnpjOpcional) {
-      const digits = (cnpjOpcional || '').replace(/\D/g, '');
-      if (digits) {
-        if (!validateCNPJ(digits)) { toast.error('CNPJ inválido'); return; }
-        const isUnique = await uniqueCnpj(digits);
-        if (!isUnique) { toast.error('CNPJ já cadastrado em outra conta'); return; }
-        try {
-          setSavingCnpj(true);
-          const { error } = await supabase
-            .from('clientes_fast')
-            .update({ cnpj_opcional: digits })
-            .eq('id', user.id);
-          if (error) throw error;
-          if (window.updateUserContext) window.updateUserContext({ cnpj_opcional: digits });
-          if (onUserUpdate) onUserUpdate({ ...user, cnpj_opcional: digits });
-        } catch (e) {
+      const digits = normalizeCnpj(cnpjOpcional);
+      if (!digits) {
+        toast.error('Informe o CNPJ completo');
+        return;
+      }
+      if (!validateCnpj(digits)) {
+        toast.error('CNPJ inválido');
+        return;
+      }
+      try {
+        setSavingCnpj(true);
+        const updated = await updateCustomerCnpj(user.id, digits);
+        if (window.updateUserContext) window.updateUserContext({ cnpj_opcional: updated.cnpj_opcional });
+        if (onUserUpdate) onUserUpdate({ ...user, cnpj_opcional: updated.cnpj_opcional });
+        setCnpjOpcional(formatCnpj(updated.cnpj_opcional));
+      } catch (e) {
+        if (e?.code === 'cnpj_in_use') {
+          toast.error('CNPJ já cadastrado em outra conta');
+        } else if (e?.code === 'invalid_cnpj') {
+          toast.error('CNPJ inválido');
+        } else {
           console.error('Erro ao salvar CNPJ com alterações:', e);
           toast.error('Erro ao salvar CNPJ');
-          setSavingCnpj(false);
-          return;
-        } finally {
-          setSavingCnpj(false);
         }
+        return;
+      } finally {
+        setSavingCnpj(false);
       }
     }
 
@@ -395,7 +393,7 @@ export default function Perfil({ user, onUserUpdate }) {
         const ct = res.headers.get('content-type') || '';
         if (ct.includes('application/json')) { const j = await res.json(); approved = !!j.approved; status = j.status || status; }
         else { const t = await res.text(); serverText = t; approved = res.ok; status = res.ok ? 'ok' : (t || 'erro'); }
-      } catch (_) { }
+      } catch { /* noop */ }
       if (!approved) {
         let msg = 'Código inválido. Tente novamente.';
         if (status === 'expired') msg = 'Código expirado. Clique em Reenviar.';
@@ -426,7 +424,7 @@ export default function Perfil({ user, onUserUpdate }) {
       let ok = res.ok; try {
         const ct = res.headers.get('content-type') || '';
         if (ct.includes('application/json')) { const j = await res.json(); ok = j.ok !== false; } else { await res.text(); }
-      } catch (_) { }
+      } catch { /* noop */ }
       if (!ok) throw new Error('Falha ao reenviar');
       startCooldown(60);
       setMsgCode('Novo código enviado.');
@@ -436,32 +434,6 @@ export default function Perfil({ user, onUserUpdate }) {
       setMsgCode('Não foi possível reenviar agora.');
       toast.error('Falha ao reenviar.');
     } finally { setSendingCode(false); }
-  };
-
-  // ====== CPF/CNPJ Validation helpers (reuse patterns) ======
-  const validateCNPJ = (cnpj) => {
-    const s = (cnpj || '').replace(/\D/g, '');
-    if (s.length !== 14) return false;
-    if (/^(\d)\1{13}$/.test(s)) return false;
-    const calc = (base) => {
-      let len = base.length - 7, sum = 0, pos = len - 7;
-      for (let i = len; i >= 1; i--) {
-        sum += parseInt(base.charAt(len - i)) * pos--;
-        if (pos < 2) pos = 9;
-      }
-      let res = sum % 11;
-      return (res < 2) ? 0 : 11 - res;
-    };
-    const base12 = s.substring(0, 12);
-    const d1 = calc(base12);
-    const d2 = calc(base12 + d1);
-    return s.endsWith(`${d1}${d2}`);
-  };
-
-  const formatCNPJ = (value) => {
-    const numbers = (value || '').replace(/\D/g, '').slice(0, 14);
-    if (numbers.length < 14) return numbers;
-    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
   };
 
   // Validação simples Cidade/UF
@@ -475,22 +447,6 @@ export default function Perfil({ user, onUserUpdate }) {
     if (!/^[A-Za-zÀ-ÿ0-9' .-]{2,}$/.test(cidade)) return false;
     if (!/^[A-Za-z]{2}$/.test(uf)) return false;
     return true;
-  };
-
-  const uniqueCnpj = async (cnpj) => {
-    const digits = (cnpj || '').replace(/\D/g, '');
-    try {
-      const { data } = await supabase
-        .from('clientes_fast')
-        .select('id')
-        .or(`cpf_cnpj.eq.${digits},cnpj_opcional.eq.${digits}`)
-        .limit(1);
-      // Allow if it's the current user's own CNPJ
-      if (data && data.length === 1 && data[0].id === user.id) return true;
-      return !(data && data.length);
-    } catch (_) {
-      return true;
-    }
   };
 
   // Removido botão próprio de CNPJ; será salvo junto com as demais alterações
@@ -594,7 +550,7 @@ export default function Perfil({ user, onUserUpdate }) {
                         <Input
                           type="text"
                           value={cnpjOpcional}
-                          onChange={(e) => setCnpjOpcional(formatCNPJ(e.target.value))}
+                          onChange={(e) => setCnpjOpcional(formatCnpj(e.target.value))}
                           placeholder="00.000.000/0000-00"
                         />
                       </InputWrap>
@@ -607,7 +563,7 @@ export default function Perfil({ user, onUserUpdate }) {
               )}
 
               <ButtonRow>
-                <Button onClick={handleSave} disabled={saving || sendingCode}>
+                <Button onClick={handleSave} disabled={saving || sendingCode || savingCnpj}>
                   {saving ? <Spinner /> : <FiSave />} {saving ? 'Salvando...' : 'Salvar alterações'}
                 </Button>
               </ButtonRow>
