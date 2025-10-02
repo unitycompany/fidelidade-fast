@@ -626,21 +626,12 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
         format: format,
         fileType: fileType,
         clienteId: user?.id,
-        cliente:
-          user ? {
-            id: user.id,
-            nome: user.nome,
-            email: user.email,
-            telefone: user.telefone,
-            cpf: user.cpf_cnpj,
-            cnpj: user.cnpj_opcional || null,
-            loja: user.loja_nome || user.lojas?.nome || null,
-            role: user.role || null
-          } : null
+        cliente: user ? (await import('../utils/customer')).buildClientePayload(user) : null
       };
 
       console.log('Enviando para n8n:', {
         url: 'https://n8n.unitycompany.com.br/webhook/sistema-de-fidelidade',
+        cnpj_enviado: payload?.cliente?.cnpj,
         payload: {
           ...payload,
           imagemBase64: payload.imagemBase64.substring(0, 50) + '...' // Log apenas os primeiros 50 caracteres do base64

@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { FiSearch, FiInfo, FiFileText, FiAlertCircle } from 'react-icons/fi';
 import { addPointsToCustomer } from '../services/supabase';
 import imagemNotaFiscalService from '../services/imagemNotaFiscalService';
+import { buildClientePayload } from '../utils/customer';
 
 /**
  * Componente para entrada manual do número da nota fiscal
@@ -35,21 +36,13 @@ const NotaFiscalInput = ({ onNotaProcessada, clienteId, user }) => {
         numeroNota: numeroNota,
         origem: 'input_numero',
         clienteId: clienteId,
-        cliente: user ? {
-          id: user.id,
-          nome: user.nome,
-          email: user.email,
-          telefone: user.telefone,
-          cpf: user.cpf_cnpj,
-          cnpj: user.cnpj_opcional || null,
-          loja: user.loja_nome || user.lojas?.nome || null,
-          role: user.role || null
-        } : null
+        cliente: buildClientePayload(user)
       };
 
       console.log('Enviando número da NF-e para n8n:', {
         url: 'https://n8n.unitycompany.com.br/webhook/sistema-de-fidelidade',
-        numeroNota: numeroNota
+        numeroNota: numeroNota,
+        cnpj_enviado: payload?.cliente?.cnpj
       });
 
       // Enviar para o webhook do n8n com timeout

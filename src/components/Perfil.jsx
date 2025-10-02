@@ -4,6 +4,7 @@ import { FiUser, FiMail, FiPhone, FiSave, FiLoader, FiEdit3, FiCheck, FiRefreshC
 import toast from 'react-hot-toast';
 import { supabase, updateCustomerCnpj } from '../services/supabase';
 import { digitsOnly, formatCnpj, normalizeCnpj, validateCnpj } from '../utils/cnpj';
+import { getUserCnpj } from '../utils/customer';
 
 // Detect dev vs prod to decide webhook base (same pattern as AuthNovoClean)
 const N8N_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV)
@@ -200,6 +201,7 @@ const maskFromDigitsBR = (digits) => {
 export default function Perfil({ user, onUserUpdate }) {
   const [form, setForm] = useState({ nome: '', cpf_cnpj: '', telefone: '', email: '' });
   const [cnpjOpcional, setCnpjOpcional] = useState('');
+  const [editingCnpj, setEditingCnpj] = useState(false);
   const [lojaNome, setLojaNome] = useState('');
   const [savingCnpj, setSavingCnpj] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -232,11 +234,9 @@ export default function Perfil({ user, onUserUpdate }) {
     // Loja (Cidade/UF) quando gerente
     setLojaNome(user.loja_nome || '');
     // Pre-set CNPJ opcional if exists
-    if (user.cnpj_opcional) {
-      setCnpjOpcional(formatCnpj(user.cnpj_opcional));
-    } else {
-      setCnpjOpcional('');
-    }
+    const existing = getUserCnpj(user);
+    if (existing) setCnpjOpcional(formatCnpj(existing)); else setCnpjOpcional('');
+    setEditingCnpj(false);
   }, [user]);
 
   useEffect(() => () => { if (cooldownId) clearInterval(cooldownId); }, [cooldownId]);
@@ -301,23 +301,22 @@ export default function Perfil({ user, onUserUpdate }) {
       return;
     }
 
-    // Se usuário não tinha CNPJ e preencheu agora, validar e salvar antes
-    if (!user?.cnpj_opcional && cnpjOpcional) {
-      const digits = normalizeCnpj(cnpjOpcional);
-      if (!digits) {
-        toast.error('Informe o CNPJ completo');
-        return;
-      }
-      if (!validateCnpj(digits)) {
+    // Validar / atualizar CNPJ se preenchido e houve alteração
+    const existingDigits = normalizeCnpj(user?.cnpj_opcional);
+    const newCnpjDigits = normalizeCnpj(cnpjOpcional);
+    if (cnpjOpcional && newCnpjDigits && newCnpjDigits !== existingDigits) {
+      if (!validateCnpj(newCnpjDigits)) {
         toast.error('CNPJ inválido');
         return;
       }
       try {
         setSavingCnpj(true);
-        const updated = await updateCustomerCnpj(user.id, digits);
+        const updated = await updateCustomerCnpj(user.id, newCnpjDigits);
         if (window.updateUserContext) window.updateUserContext({ cnpj_opcional: updated.cnpj_opcional });
         if (onUserUpdate) onUserUpdate({ ...user, cnpj_opcional: updated.cnpj_opcional });
         setCnpjOpcional(formatCnpj(updated.cnpj_opcional));
+        toast.success('CNPJ atualizado com sucesso');
+        setEditingCnpj(false);
       } catch (e) {
         if (e?.code === 'cnpj_in_use') {
           toast.error('CNPJ já cadastrado em outra conta');
@@ -539,28 +538,44 @@ export default function Perfil({ user, onUserUpdate }) {
                 </Grid>
               )}
 
-              {/* CNPJ opcional: se ausente, permitir cadastro */}
-              {!(user?.cnpj_opcional) && (
-                <>
-                  <Grid>
-                    <FormGroup style={{ gridColumn: '1 / -1' }}>
-                      <Label>CNPJ (opcional)</Label>
-                      <InputWrap>
-                        <InputIcon><FiUser /></InputIcon>
-                        <Input
-                          type="text"
-                          value={cnpjOpcional}
-                          onChange={(e) => setCnpjOpcional(formatCnpj(e.target.value))}
-                          placeholder="00.000.000/0000-00"
-                        />
-                      </InputWrap>
-                      <Helper>
-                        Se suas compras são faturadas no CNPJ da empresa, cadastre aqui para garantir a pontuação correta.
-                      </Helper>
-                    </FormGroup>
-                  </Grid>
-                </>
-              )}
+              {/* CNPJ opcional: sempre mostrar; permitir editar */}
+              <Grid>
+                <FormGroup style={{ gridColumn: '1 / -1' }}>
+                  <Label>CNPJ (opcional)</Label>
+                  <InputWrap>
+                    <InputIcon><FiUser /></InputIcon>
+                    <Input
+                      type="text"
+                      value={cnpjOpcional}
+                      onChange={(e) => {
+                        if (!editingCnpj && user?.cnpj_opcional) return; // bloquear edição até clicar em editar
+                        setCnpjOpcional(formatCnpj(e.target.value));
+                      }}
+                      disabled={savingCnpj || (!editingCnpj && !!user?.cnpj_opcional)}
+                      placeholder="00.000.000/0000-00"
+                    />
+                  </InputWrap>
+                  <Helper>
+                    {user?.cnpj_opcional ? (
+                      editingCnpj ? 'Edite o CNPJ e clique em Salvar para atualizar.' : 'CNPJ cadastrado. Clique em "Editar CNPJ" se precisar alterar.'
+                    ) : 'Se suas compras são faturadas no CNPJ da empresa, cadastre aqui para garantir a pontuação correta.'}
+                  </Helper>
+                  {user?.cnpj_opcional && (
+                    <Button type="button" disabled={savingCnpj} style={{ marginTop: '0.5rem', background: editingCnpj ? '#6c757d' : '#A91918' }} onClick={() => {
+                      if (editingCnpj) {
+                        // Cancelar edição -> restaurar valor original formatado
+                        const existing = getUserCnpj(user);
+                        setCnpjOpcional(existing ? formatCnpj(existing) : '');
+                        setEditingCnpj(false);
+                      } else {
+                        setEditingCnpj(true);
+                      }
+                    }}>
+                      {editingCnpj ? 'Cancelar edição' : 'Editar CNPJ'}
+                    </Button>
+                  )}
+                </FormGroup>
+              </Grid>
 
               <ButtonRow>
                 <Button onClick={handleSave} disabled={saving || sendingCode || savingCnpj}>
