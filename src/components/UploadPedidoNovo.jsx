@@ -637,7 +637,6 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
           imagemBase64: payload.imagemBase64.substring(0, 50) + '...' // Log apenas os primeiros 50 caracteres do base64
         }
       });
-
       // Enviar para o webhook do n8n com timeout (somente aqui mostra o loading)
       setIsProcessing(true);
   const controller = new AbortController();
