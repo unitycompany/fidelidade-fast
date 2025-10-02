@@ -732,7 +732,6 @@ function UploadPedidoNovo({ user, onUserUpdate }) {
           return;
         }
       }
-
       // Concluiu o envio ao n8n: remover loading agora
       setIsProcessing(false);
 
