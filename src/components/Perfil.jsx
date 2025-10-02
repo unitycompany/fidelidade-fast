@@ -219,6 +219,7 @@ export default function Perfil({ user, onUserUpdate }) {
     if (!user) return;
     // Realtime subscription para refletir alterações externas (admin / supabase / outro dispositivo)
     const unsubscribe = db.subscribeCliente(user.id, (novo) => {
+      console.log('[Realtime cliente] Atualização recebida:', { id: novo?.id, cnpj_opcional: novo?.cnpj_opcional });
       // Atualizar campos sensíveis, inclusive CNPJ
       if (typeof window !== 'undefined' && typeof window.updateUserContext === 'function') {
         window.updateUserContext(novo);
@@ -227,8 +228,14 @@ export default function Perfil({ user, onUserUpdate }) {
         onUserUpdate(novo);
       }
       // Atualizar campo controlado localmente
-      if (novo?.cnpj_opcional) {
-        setCnpjOpcional(formatCnpj(novo.cnpj_opcional));
+      if (Object.prototype.hasOwnProperty.call(novo, 'cnpj_opcional')) {
+        if (novo.cnpj_opcional) {
+          setCnpjOpcional(formatCnpj(novo.cnpj_opcional));
+        } else {
+          // CNPJ removido externamente
+            setCnpjOpcional('');
+            setEditingCnpj(false);
+        }
       }
     });
     // Accept phone in various formats and present in BR mask +55
