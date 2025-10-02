@@ -15,28 +15,36 @@ export const formatCnpj = (value = '') => {
   return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
 }
 
+// Validação de CNPJ (algoritmo oficial)
+// 1. Normaliza e rejeita sequências repetidas.
+// 2. Calcula primeiro dígito com pesos 5,4,3,2,9,8,7,6,5,4,3,2.
+// 3. Calcula segundo dígito com pesos 6,5,4,3,2,9,8,7,6,5,4,3,2.
+// (Implementação com laço genérico reiniciando peso em 9 quando <2)
 export const validateCnpj = (value = '') => {
-  const digits = normalizeCnpj(value)
-  if (!digits) return false
-  if (/^(\d)\1{13}$/.test(digits)) return false
+  // Normaliza para apenas dígitos e garante 14 caracteres
+  const cnpj = normalizeCnpj(value)
+  if (!cnpj) return false
 
+  // Rejeita sequências repetidas (ex: 00000000000000)
+  if (/^(\d)\1{13}$/.test(cnpj)) return false
+
+  // Algoritmo oficial: pesos decrescentes reiniciando em 9
   const calcDigit = (base) => {
-    let len = base.length - 7
-    let sum = 0
-    let pos = len - 7
-    for (let i = len; i >= 1; i--) {
-      sum += parseInt(base.charAt(len - i), 10) * pos--
+    let soma = 0
+    let pos = base.length - 7 // para 12 dígitos -> 5; para 13 -> 6
+    for (let i = base.length; i >= 1; i--) {
+      const idx = base.length - i
+      soma += parseInt(base.charAt(idx), 10) * pos--
       if (pos < 2) pos = 9
     }
-    const remainder = sum % 11
-    return remainder < 2 ? 0 : 11 - remainder
+    const resto = soma % 11
+    return (resto < 2) ? 0 : 11 - resto
   }
 
-  const firstBase = digits.substring(0, 12)
-  const firstDigit = calcDigit(firstBase)
-  const secondDigit = calcDigit(firstBase + firstDigit)
-
-  return digits.endsWith(`${firstDigit}${secondDigit}`)
+  const base12 = cnpj.substring(0, 12)
+  const d1 = calcDigit(base12)
+  const d2 = calcDigit(base12 + d1)
+  return cnpj.endsWith(`${d1}${d2}`)
 }
 
 export default {

@@ -8,7 +8,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   
-  <!-- Headers de Segurança - CSP adequado para carregamento de recursos -->
+  <!-- Headers de Segurança - CSP principal
+    IMPORTANTE: Havia uma segunda meta CSP mais abaixo muito restritiva (connect-src 'self' https:) que bloqueava
+    o WebSocket wss://*.supabase.co e gerava o erro de conexão mostrado no console.
+    Mantemos APENAS esta política abaixo. Ajuste aqui se precisar liberar novos domínios. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://qpkngxxqlenppktqxprr.supabase.co; connect-src 'self' https://qpkngxxqlenppktqxprr.supabase.co https://*.supabase.co https://*.googleapis.com https://api.openai.com https://api.anthropic.com https://api.deepseek.com https://n8n.unitycompany.com.br wss://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://storage.googleapis.com https://imagedelivery.net https://*.cloudflare.com *;" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="X-Frame-Options" content="DENY" />
@@ -107,8 +110,7 @@
     rel="stylesheet">
 
   <!-- Security -->
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https:;" />
+  <!-- (REMOVIDO) Meta CSP duplicada e restritiva que anulava o wss. Mantida apenas a primeira definição acima. -->
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="X-Frame-Options" content="DENY" />
   <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
